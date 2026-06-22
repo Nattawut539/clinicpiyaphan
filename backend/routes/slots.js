@@ -174,7 +174,7 @@ router.get("/month-status", async (req, res) => {
         COUNT(s.slot_id) FILTER (
           WHERE s.status = 'open'
             AND a.appointment_id IS NULL
-            AND h.holiday_id IS NULL
+            AND h.service_date IS NULL
         )::int AS available_slots
 
         ,(h.service_date IS NOT NULL) AS is_holiday,
