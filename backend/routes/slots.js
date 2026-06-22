@@ -56,11 +56,30 @@ router.get("/day", async (req, res) => {
   }
 
   try {
+    const holiday = await pool.query(
+      `SELECT reason FROM clinic.clinic_holidays WHERE service_date = $1::date LIMIT 1`,
+      [date]
+    );
+    if (holiday.rowCount) {
+      return res.status(409).json({
+        error: holiday.rows[0].reason || "คลินิกหยุดให้บริการในวันนี้",
+        is_holiday: true,
+      });
+    }
+
     // 1) สร้าง slot ของวันที่เลือกก่อน ถ้ายังไม่มี
-    await pool.query(`SELECT clinic.seed_slots($1::date, $1::date)`, [date]);
+    try {
+      await pool.query(`SELECT clinic.seed_slots($1::date, $1::date)`, [date]);
+    } catch (seedErr) {
+      console.warn("Warning: seed_slots failed (function may not exist):", seedErr.message);
+    }
 
     // 2) ล็อก slot ที่หมดเวลาจองแล้ว
-    await pool.query("SELECT clinic.lock_timed_out_slots()");
+    try {
+      await pool.query("SELECT clinic.lock_timed_out_slots()");
+    } catch (lockErr) {
+      console.warn("Warning: lock_timed_out_slots failed (function may not exist):", lockErr.message);
+    }
 
     // 3) ดึง slot ของวันนั้นกลับไปให้ frontend
     // แก้แล้ว: ถ้ามี appointment อยู่แล้ว ให้ส่ง status เป็น closed
@@ -127,13 +146,21 @@ router.get("/month-status", async (req, res) => {
     const endDate = new Date(y, m, 0).toISOString().slice(0, 10);
 
     // สร้าง slot ของเดือนนั้นก่อน เผื่อยังไม่มีข้อมูล slot
-    await pool.query(`SELECT clinic.seed_slots($1::date, $2::date)`, [
-      startDate,
-      endDate,
-    ]);
+    try {
+      await pool.query(`SELECT clinic.seed_slots($1::date, $2::date)`, [
+        startDate,
+        endDate,
+      ]);
+    } catch (seedErr) {
+      console.warn("Warning: seed_slots failed (function may not exist):", seedErr.message);
+    }
 
     // ล็อก slot ที่หมดเวลาจองแล้ว
-    await pool.query("SELECT clinic.lock_timed_out_slots()");
+    try {
+      await pool.query("SELECT clinic.lock_timed_out_slots()");
+    } catch (lockErr) {
+      console.warn("Warning: lock_timed_out_slots failed (function may not exist):", lockErr.message);
+    }
 
     const result = await pool.query(
       `
@@ -147,7 +174,11 @@ router.get("/month-status", async (req, res) => {
         COUNT(s.slot_id) FILTER (
           WHERE s.status = 'open'
             AND a.appointment_id IS NULL
+            AND h.holiday_id IS NULL
         )::int AS available_slots
+
+        ,(h.service_date IS NOT NULL) AS is_holiday,
+        h.reason AS holiday_reason
 
       FROM clinic.appointment_slots s
 
@@ -155,14 +186,30 @@ router.get("/month-status", async (req, res) => {
         ON a.slot_id = s.slot_id
         AND a.status NOT IN ('cancelled', 'rejected')
 
+      LEFT JOIN (
+        SELECT service_date, MAX(reason) AS reason
+        FROM clinic.clinic_holidays
+        GROUP BY service_date
+      ) h ON h.service_date = s.service_date
+
       WHERE s.service_date BETWEEN $1::date AND $2::date
         AND s.hour_of_day IN (7, 8, 9, 10, 16, 17, 18, 19)
 
-      GROUP BY s.service_date
+      GROUP BY s.service_date, h.service_date, h.reason
       ORDER BY s.service_date ASC
       `,
       [startDate, endDate]
-    );
+    ).catch(err => {
+      console.error("Query error for month-status:", {
+        message: err.message,
+        code: err.code,
+        detail: err.detail,
+        hint: err.hint,
+        startDate,
+        endDate,
+      });
+      throw err;
+    });
 
     const data = result.rows.map((row) => {
       const date =
@@ -176,7 +223,9 @@ router.get("/month-status", async (req, res) => {
 
       let status = "available";
 
-      if (availableSlots === 0) {
+      if (row.is_holiday) {
+        status = "holiday";
+      } else if (availableSlots === 0) {
         status = "full";
       } else if (availableSlots <= 2) {
         status = "almost_full";
@@ -190,6 +239,8 @@ router.get("/month-status", async (req, res) => {
         booked_slots: bookedSlots,
         available_slots: availableSlots,
         status,
+        is_holiday: Boolean(row.is_holiday),
+        holiday_reason: row.holiday_reason || null,
       };
     });
 
@@ -220,7 +271,22 @@ router.get("/user-calendar", async (req, res) => {
   }
 
   try {
-    await pool.query("SELECT clinic.lock_timed_out_slots()");
+    const holiday = await pool.query(
+      `SELECT reason FROM clinic.clinic_holidays WHERE service_date = $1::date LIMIT 1`,
+      [date]
+    );
+    if (holiday.rowCount) {
+      return res.status(409).json({
+        error: holiday.rows[0].reason || "คลินิกหยุดให้บริการในวันนี้",
+        is_holiday: true,
+      });
+    }
+
+    try {
+      await pool.query("SELECT clinic.lock_timed_out_slots()");
+    } catch (lockErr) {
+      console.warn("Warning: lock_timed_out_slots failed (function may not exist):", lockErr.message);
+    }
 
     const result = await pool.query(
       `
@@ -265,7 +331,11 @@ router.get("/user-calendar", async (req, res) => {
 // ดึงปฏิทินทั้งสัปดาห์ให้ user เห็นทั้งหมด
 router.get("/week", async (_req, res) => {
   try {
-    await pool.query("SELECT clinic.lock_timed_out_slots()");
+    try {
+      await pool.query("SELECT clinic.lock_timed_out_slots()");
+    } catch (lockErr) {
+      console.warn("Warning: lock_timed_out_slots failed (function may not exist):", lockErr.message);
+    }
 
     const result = await pool.query(`
       SELECT *
@@ -288,7 +358,11 @@ router.get("/month", async (req, res) => {
   }
 
   try {
-    await pool.query("SELECT clinic.lock_timed_out_slots()");
+    try {
+      await pool.query("SELECT clinic.lock_timed_out_slots()");
+    } catch (lockErr) {
+      console.warn("Warning: lock_timed_out_slots failed (function may not exist):", lockErr.message);
+    }
 
     const result = await pool.query(
       `
@@ -296,7 +370,14 @@ router.get("/month", async (req, res) => {
       FROM clinic.get_calendar_month($1, $2, 'Asia/Bangkok')
       `,
       [Number(year), Number(month)]
-    );
+    ).catch(err => {
+      if (err.message.includes("does not exist")) {
+        console.warn("Warning: clinic.get_calendar_month function does not exist");
+        // Return empty array if function doesn't exist
+        return { rows: [] };
+      }
+      throw err;
+    });
 
     res.json(result.rows);
   } catch (err) {
