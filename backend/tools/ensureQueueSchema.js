@@ -155,7 +155,11 @@ async function ensureQueueSchema() {
     `);
 
     await client.query(`
-      CREATE OR REPLACE FUNCTION clinic.seed_slots(
+      DROP FUNCTION IF EXISTS clinic.seed_slots(date, date) CASCADE
+    `);
+
+    await client.query(`
+      CREATE FUNCTION clinic.seed_slots(
         start_date date,
         end_date date
       ) RETURNS void AS $$
@@ -168,7 +172,11 @@ async function ensureQueueSchema() {
     `);
 
     await client.query(`
-      CREATE OR REPLACE FUNCTION clinic.lock_timed_out_slots() RETURNS void AS $$
+      DROP FUNCTION IF EXISTS clinic.lock_timed_out_slots() CASCADE
+    `);
+
+    await client.query(`
+      CREATE FUNCTION clinic.lock_timed_out_slots() RETURNS void AS $$
       BEGIN
         -- This function locks slots that have timed out
         -- For now, this is a placeholder - actual timeout logic would go here
@@ -178,7 +186,11 @@ async function ensureQueueSchema() {
     `);
 
     await client.query(`
-      CREATE OR REPLACE FUNCTION clinic.get_calendar_month(
+      DROP FUNCTION IF EXISTS clinic.get_calendar_month(integer, integer, text) CASCADE
+    `);
+
+    await client.query(`
+      CREATE FUNCTION clinic.get_calendar_month(
         p_year integer,
         p_month integer,
         p_timezone text
