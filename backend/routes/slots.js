@@ -2,14 +2,34 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../tools/db");
 const jwt = require("jsonwebtoken");
+const { JWT_SECRET } = require("../tools/config");
+const {
+  DEFAULT_SUNDAY_REASON,
+  ensureCalendarRulesSchema,
+  isClinicHoliday,
+  monthHolidayQuery,
+} = require("../tools/calendarRules");
+const {
+  ensureSlotsForDate,
+  ensureSlotsForRange,
+  reopenBookableSlotsForDate,
+  reopenBookableSlotsForRange,
+} = require("../tools/slotSeeder");
 
 // อ่าน JWT ของ users และคืนข้อมูล user จาก token
 function getUserFromToken(req) {
+  /*
+    return res.status(400).json({
+      error: "เปิดจองเฉพาะสัปดาห์ปัจจุบันเท่านั้น",
+      current_week: getCurrentWeekRangeBangkok(),
+    });
+  */
+
   try {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return null;
 
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET);
 
     return {
       ...payload,
@@ -40,6 +60,36 @@ function isPastDate(date) {
   return String(date) < today;
 }
 
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function formatUtcDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getCurrentWeekRangeBangkok() {
+  const todayKey = getTodayBangkokDate();
+  const today = new Date(`${todayKey}T00:00:00.000Z`);
+  const day = today.getUTCDay();
+  const daysFromMonday = (day + 6) % 7;
+  const start = addDays(today, -daysFromMonday);
+  const end = addDays(start, 6);
+
+  return {
+    start: formatUtcDate(start),
+    end: formatUtcDate(end),
+  };
+}
+
+function isDateInCurrentWeek(date) {
+  const { start, end } = getCurrentWeekRangeBangkok();
+  const value = String(date).slice(0, 10);
+  return value >= start && value <= end;
+}
+
 // ดึง slot ทั้งหมดของวันเดียว
 // ถ้าวันนั้นยังไม่มี slot ให้สร้างจาก template อัตโนมัติก่อน
 router.get("/day", async (req, res) => {
@@ -55,14 +105,19 @@ router.get("/day", async (req, res) => {
     });
   }
 
+  if (!isDateInCurrentWeek(date)) {
+    return res.status(400).json({
+      error: "เปิดจองเฉพาะสัปดาห์ปัจจุบันเท่านั้น",
+      current_week: getCurrentWeekRangeBangkok(),
+    });
+  }
+
   try {
-    const holiday = await pool.query(
-      `SELECT reason FROM clinic.clinic_holidays WHERE service_date = $1::date LIMIT 1`,
-      [date]
-    );
-    if (holiday.rowCount) {
+    await ensureCalendarRulesSchema(pool);
+    const holiday = await isClinicHoliday(pool, date);
+    if (holiday) {
       return res.status(409).json({
-        error: holiday.rows[0].reason || "คลินิกหยุดให้บริการในวันนี้",
+        error: holiday.reason || "คลินิกหยุดให้บริการในวันนี้",
         is_holiday: true,
       });
     }
@@ -73,6 +128,8 @@ router.get("/day", async (req, res) => {
     } catch (seedErr) {
       console.warn("Warning: seed_slots failed (function may not exist):", seedErr.message);
     }
+    await ensureSlotsForDate(pool, date);
+    await reopenBookableSlotsForDate(pool, date);
 
     // 2) ล็อก slot ที่หมดเวลาจองแล้ว
     try {
@@ -135,6 +192,7 @@ router.get("/month-status", async (req, res) => {
   }
 
   try {
+    await ensureCalendarRulesSchema(pool);
     const y = Number(year);
     const m = Number(month);
 
@@ -143,7 +201,10 @@ router.get("/month-status", async (req, res) => {
     }
 
     const startDate = `${y}-${String(m).padStart(2, "0")}-01`;
-    const endDate = new Date(y, m, 0).toISOString().slice(0, 10);
+    // Build this as a UTC calendar date. Using a local midnight followed by
+    // toISOString() moves the date back one day when the server runs in
+    // Asia/Bangkok.
+    const endDate = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 
     // สร้าง slot ของเดือนนั้นก่อน เผื่อยังไม่มีข้อมูล slot
     try {
@@ -154,6 +215,8 @@ router.get("/month-status", async (req, res) => {
     } catch (seedErr) {
       console.warn("Warning: seed_slots failed (function may not exist):", seedErr.message);
     }
+    await ensureSlotsForRange(pool, startDate, endDate);
+    await reopenBookableSlotsForRange(pool, startDate, endDate);
 
     // ล็อก slot ที่หมดเวลาจองแล้ว
     try {
@@ -165,7 +228,9 @@ router.get("/month-status", async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-        s.service_date::date AS date,
+        -- A PostgreSQL DATE has no timezone. Return it as text so the pg
+        -- driver cannot turn Bangkok midnight into the previous UTC date.
+        s.service_date::text AS date,
 
         COUNT(s.slot_id)::int AS total_slots,
 
@@ -177,8 +242,19 @@ router.get("/month-status", async (req, res) => {
             AND h.service_date IS NULL
         )::int AS available_slots
 
-        ,(h.service_date IS NOT NULL) AS is_holiday,
-        h.reason AS holiday_reason
+        ,(
+          h.service_date IS NOT NULL
+          OR (
+            EXTRACT(ISODOW FROM s.service_date)::int = 7
+            AND o.service_date IS NULL
+          )
+        ) AS is_holiday,
+        CASE
+          WHEN h.service_date IS NOT NULL THEN h.reason
+          WHEN EXTRACT(ISODOW FROM s.service_date)::int = 7
+            AND o.service_date IS NULL THEN $3::text
+          ELSE NULL
+        END AS holiday_reason
 
       FROM clinic.appointment_slots s
 
@@ -192,13 +268,16 @@ router.get("/month-status", async (req, res) => {
         GROUP BY service_date
       ) h ON h.service_date = s.service_date
 
+      LEFT JOIN clinic.clinic_open_days o
+        ON o.service_date = s.service_date
+
       WHERE s.service_date BETWEEN $1::date AND $2::date
         AND s.hour_of_day IN (7, 8, 9, 10, 16, 17, 18, 19)
 
-      GROUP BY s.service_date, h.service_date, h.reason
+      GROUP BY s.service_date, h.service_date, h.reason, o.service_date
       ORDER BY s.service_date ASC
       `,
-      [startDate, endDate]
+      [startDate, endDate, DEFAULT_SUNDAY_REASON]
     ).catch(err => {
       console.error("Query error for month-status:", {
         message: err.message,
@@ -212,10 +291,7 @@ router.get("/month-status", async (req, res) => {
     });
 
     const data = result.rows.map((row) => {
-      const date =
-        row.date instanceof Date
-          ? row.date.toISOString().slice(0, 10)
-          : String(row.date).slice(0, 10);
+      const date = String(row.date).slice(0, 10);
 
       const totalSlots = Number(row.total_slots || 0);
       const bookedSlots = Number(row.booked_slots || 0);
@@ -244,6 +320,29 @@ router.get("/month-status", async (req, res) => {
       };
     });
 
+    const holidayRows = await pool.query(
+      monthHolidayQuery("", true),
+      [y, m, DEFAULT_SUNDAY_REASON]
+    );
+    const knownDates = new Set(data.map((item) => item.date));
+
+    holidayRows.rows.forEach((holiday) => {
+      const date = String(holiday.holiday_date).slice(0, 10);
+      if (knownDates.has(date)) return;
+
+      data.push({
+        date,
+        total_slots: 0,
+        booked_slots: 0,
+        available_slots: 0,
+        status: "holiday",
+        is_holiday: true,
+        holiday_reason: holiday.reason || (holiday.is_default ? DEFAULT_SUNDAY_REASON : "วันหยุดของคลินิก"),
+      });
+    });
+
+    data.sort((a, b) => a.date.localeCompare(b.date));
+
     res.json(data);
   } catch (err) {
     console.error("GET /slots/month-status error:", err);
@@ -271,16 +370,17 @@ router.get("/user-calendar", async (req, res) => {
   }
 
   try {
-    const holiday = await pool.query(
-      `SELECT reason FROM clinic.clinic_holidays WHERE service_date = $1::date LIMIT 1`,
-      [date]
-    );
-    if (holiday.rowCount) {
+    await ensureCalendarRulesSchema(pool);
+    const holiday = await isClinicHoliday(pool, date);
+    if (holiday) {
       return res.status(409).json({
-        error: holiday.rows[0].reason || "คลินิกหยุดให้บริการในวันนี้",
+        error: holiday.reason || "คลินิกหยุดให้บริการในวันนี้",
         is_holiday: true,
       });
     }
+
+    await ensureSlotsForDate(pool, date);
+    await reopenBookableSlotsForDate(pool, date);
 
     try {
       await pool.query("SELECT clinic.lock_timed_out_slots()");

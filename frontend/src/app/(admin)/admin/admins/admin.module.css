@@ -1,0 +1,1669 @@
+.container {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  width: 100%;
+  background: #f4f7fb;
+  overflow: hidden;
+}
+
+/* ===== popup ===== */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 14, 40, 0.38);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+
+.popup {
+  width: min(1100px, 96vw);
+  max-height: 92vh;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  animation: popIn 0.15s ease;
+}
+
+@keyframes popIn {
+  from {
+    transform: translateY(8px);
+    opacity: 0.6;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.popupHeader {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  min-height: 58px;
+  padding: 12px 18px;
+  background: linear-gradient(90deg, #0d144a, #2e2ba7);
+  color: #fff;
+}
+
+.popupTitle {
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  font-size: clamp(16px, 1.6vw, 22px);
+}
+
+.closeBtn {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.closeBtn:hover {
+  background: rgba(239, 68, 68, 0.18);
+  transform: scale(1.03);
+}
+
+.popupBody {
+  padding: 18px 22px 18px;
+  overflow: auto;
+  background: #f8fafc;
+}
+
+.loadingBox {
+  padding: 32px;
+  text-align: center;
+  font-size: 18px;
+  color: #475569;
+}
+
+/* ===== cards ===== */
+.cardContainer {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 18px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  padding: 16px;
+  min-width: 0;
+}
+
+.cardHeader {
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: 12px;
+  color: #0f172a;
+}
+
+.topSection {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.photoColumn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profileImage {
+  width: 92px;
+  height: 92px;
+  object-fit: cover;
+  border-radius: 50%;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
+  background: #fff;
+}
+
+.nameSection .name {
+  font-size: clamp(18px, 1.6vw, 24px);
+  line-height: 1.25;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.subInfo {
+  color: #6b7280;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.divider {
+  border: 0;
+  border-top: 1px solid #eef2f7;
+  margin: 14px 0;
+}
+
+.infoGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.inlineGroup {
+  --label-w: 110px;
+  display: grid;
+  grid-template-columns:
+    var(--label-w) minmax(0, 1fr)
+    var(--label-w) minmax(0, 1fr)
+    var(--label-w) minmax(0, 1fr);
+  column-gap: 8px;
+  row-gap: 6px;
+  align-items: start;
+  font-size: 15px;
+  min-width: 0;
+}
+
+.inlineGroup.twoCols {
+  grid-template-columns:
+    var(--label-w) minmax(0, 1fr)
+    var(--label-w) minmax(0, 1fr);
+}
+
+.inlineGroup > span:nth-child(odd) {
+  color: #374151;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.inlineGroup > span:nth-child(even) {
+  color: #374151;
+  font-weight: 500;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
+
+.rowFull,
+.rowFullWide {
+  display: grid;
+  grid-template-columns: var(--label-w) minmax(0, 1fr);
+  column-gap: 8px;
+  row-gap: 6px;
+  align-items: start;
+  min-width: 0;
+}
+
+.rowFull > span:first-child,
+.rowFullWide > span:first-child {
+  color: #374151;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.valuePre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+  color: #374151;
+  font-weight: 500;
+}
+
+.footerData {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #e5e7eb;
+  color: #0f172a;
+  font-weight: 500;
+}
+
+/* ===== error popup ===== */
+.popupOverlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 51, 102, 0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  padding: 16px;
+}
+
+.popupBoxerror {
+  background: white;
+  padding: 24px 36px;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  font-size: 20px;
+  font-weight: bold;
+  color: #d62828;
+  text-align: center;
+  animation: fadePopup 0.3s ease;
+}
+
+.popupIcon {
+  font-size: 36px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+@keyframes fadePopup {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.brand {
+  color: white;
+  font-weight: 700;
+  font-size: clamp(18px, 2vw, 28px);
+  font-family: "Prompt", sans-serif;
+  letter-spacing: 0.5px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subBrand {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rightHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+
+
+.searchButton {
+  background-color: #08a7a8;
+  border: none;
+  color: white;
+  padding: 10px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.searchButton:hover {
+  background-color: #023852;
+}
+
+/* ===== main layout ===== */
+.wrapper {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.contentArea {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px 18px;
+  background: #f9f9f9;
+  overflow: auto;
+}
+
+.errorText {
+  color: #d62828;
+  margin-bottom: 10px;
+}
+
+.successText {
+  color: #108005;
+  margin-bottom: 10px;
+}
+
+/* ===== section ===== */
+.allPatientsSection {
+  width: 100%;
+  min-height: calc(100vh - 110px);
+  box-sizing: border-box;
+  padding: 14px;
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 2px 8px rgba(0, 51, 102, 0.05);
+  min-width: 0;
+}
+
+.allPatientsSection h2 {
+  color: #108005;
+  font-size: clamp(17px, 1.5vw, 21px);
+  font-weight: 600;
+  margin-bottom: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #e6f4ea;
+  padding: 10px 16px;
+  border-left: 6px solid #108005;
+  border-radius: 10px;
+  max-width: 100%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.allPatientsSection h2::before {
+  content: "📋";
+  font-size: 20px;
+}
+
+.emptyBox {
+  padding: 30px 16px;
+  text-align: center;
+  color: #64748b;
+  border: 1px dashed #d7e3ef;
+  border-radius: 12px;
+  background: #fafcff;
+}
+
+/* ===== table ===== */
+.tableScroll {
+  width: 100%;
+  max-width: 100%;
+  max-height: calc(100vh - 210px);
+  overflow: auto;
+  border: 1px solid #e8f2eb;
+  border-radius: 13px;
+  box-shadow: inset 0 0 0 1px rgba(16, 128, 5, 0.03);
+  background: #fff;
+  scrollbar-width: thin;
+}
+
+.patientTable {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  font-family: "Segoe UI", sans-serif;
+  font-size: 15px;
+  color: #333;
+}
+
+.patientTable th {
+  background-color: #0077b6;
+  color: white;
+  font-weight: 600;
+  text-align: center;
+  padding: 12px;
+  border-bottom: 2px solid #dee2e6;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.patientTable td {
+  padding: 10px 12px;
+  text-align: center;
+  border-bottom: 1px solid #dee2e6;
+  background-color: #f9fcff;
+  vertical-align: middle;
+}
+
+.patientTable tr:nth-child(even) td {
+  background-color: #eef6fb;
+}
+
+.patientTable tr:hover td {
+  background-color: #e1f0f8;
+  transition: 0.3s;
+}
+
+.patientTable td,
+.patientTable th {
+  word-break: break-word;
+}
+
+.patientTable td:nth-child(1),
+.patientTable td:nth-child(2),
+.patientTable td:nth-child(4),
+.patientTable td:nth-child(6),
+.patientTable td:nth-child(7),
+.patientTable th:nth-child(1),
+.patientTable th:nth-child(2),
+.patientTable th:nth-child(4),
+.patientTable th:nth-child(6),
+.patientTable th:nth-child(7) {
+  white-space: nowrap;
+}
+
+.addressCell {
+  white-space: normal !important;
+  text-align: left !important;
+  min-width: 220px;
+}
+
+.colAction {
+  width: 74px;
+  min-width: 74px;
+}
+
+.actionCell {
+  white-space: nowrap;
+}
+
+.eyeBtn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: #eef6ff;
+  color: #1d4ed8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.eyeBtn:hover {
+  background: #dbeafe;
+  transform: scale(1.05);
+}
+
+.tableScroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.tableScroll::-webkit-scrollbar-track {
+  background: #f3f8f4;
+  border-radius: 10px;
+}
+
+.tableScroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #5fbf72, #2aa04d);
+  border-radius: 10px;
+  border: 2px solid #f3f8f4;
+}
+
+.tableScroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #49b262, #218b40);
+}
+
+/* ===== responsive ===== */
+@media (max-width: 1100px) {
+  .cardContainer {
+    grid-template-columns: 1fr;
+  }
+
+  .popup {
+    width: min(1000px, 98vw);
+  }
+}
+
+@media (max-width: 980px) {
+  .inlineGroup {
+    --label-w: 100px;
+  }
+
+  .inlineGroup,
+  .inlineGroup.twoCols {
+    grid-template-columns: var(--label-w) minmax(0, 1fr);
+  }
+
+  .topSection {
+    grid-template-columns: 84px 1fr;
+  }
+
+  .profileImage {
+    width: 76px;
+    height: 76px;
+  }
+
+  .brand {
+    font-size: 22px;
+  }
+
+  .searchInput {
+    max-width: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .leftHeader {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .rightHeader {
+    flex: 1;
+    min-width: 0;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .searchInput {
+    flex: 1;
+    min-width: 0;
+    max-width: 230px;
+    font-size: 14px;
+    padding: 9px 12px;
+  }
+
+  .searchButton {
+    padding: 9px 14px;
+    font-size: 14px;
+  }
+
+  .contentArea {
+    padding: 10px;
+  }
+
+  /* .allPatientsSection {
+    padding: 10px;
+  }
+
+  .allPatientsSection h2 {
+    font-size: 16px;
+    padding: 8px 12px;
+  } */
+
+  .patientTable {
+    min-width: 900px;
+  }
+
+  .popupBody {
+    padding: 14px;
+  }
+
+  .popupBoxerror {
+    font-size: 17px;
+    padding: 18px 22px;
+  }
+}
+
+@media (max-width: 640px) {
+  .brand {
+    font-size: 18px;
+  }
+
+  .subBrand {
+    font-size: 11px;
+  }
+
+  .logoIcon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .searchInput {
+    max-width: 180px;
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+
+  .searchButton {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 520px) {
+  .header {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    align-items: stretch;
+    padding: 10px 12px;
+  }
+
+  .leftHeader {
+    width: 100%;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .headerText {
+    min-width: 0;
+  }
+
+  .brand {
+    font-size: 17px;
+    line-height: 1.1;
+  }
+
+  .subBrand {
+    font-size: 11px;
+  }
+
+  .logoIcon {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+  }
+
+  .rightHeader {
+    width: 100%;
+    min-width: 0;
+    justify-content: stretch;
+    gap: 8px;
+  }
+
+  .searchInput {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    max-width: none;
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+
+  .searchButton {
+    width: auto;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .popupHeader {
+    padding: 10px 14px;
+  }
+
+  .popupTitle {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 420px) {
+  .leftHeader {
+    align-items: flex-start;
+  }
+
+  .brand {
+    font-size: 16px;
+  }
+
+  .subBrand {
+    display: none;
+  }
+
+  .rightHeader {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+}
+
+/* =========================================================
+   Patient Management UI ให้เหมือนหน้า UX/UI
+========================================================= */
+
+.patientPanel {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e6edf5;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+}
+
+.patientPanelHeader {
+  min-height: 105px;
+  padding: 26px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid #eef3f8;
+}
+
+.patientPanelTitle {
+  margin: 0;
+  color: #102033;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.patientPanelCount {
+  margin: 6px 0 0;
+  color: #7b93b6;
+  font-size: 15px;
+}
+
+.patientSearchBox {
+  position: relative;
+  width: 390px;
+  max-width: 100%;
+}
+
+.patientSearchIcon {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #7d95b5;
+  font-size: 24px;
+  line-height: 1;
+  z-index: 1;
+}
+
+.patientSearchInput {
+  width: 100%;
+  height: 58px;
+  padding: 0 18px 0 54px;
+  border: 1px solid #dce5f1;
+  border-radius: 18px;
+  background: #f9fbfe;
+  color: #1e3552;
+  font-size: 16px;
+  font-family: "Prompt", sans-serif;
+  outline: none;
+  transition: 0.2s ease;
+}
+
+.patientSearchInput::placeholder {
+  color: #7186a4;
+}
+
+.patientSearchInput:focus {
+  border-color: #1f63f2;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(31, 99, 242, 0.12);
+}
+
+.hiddenSearchButton {
+  display: none;
+}
+
+.patientTableWrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.modernPatientTable {
+  width: 100%;
+  min-width: 1100px;
+  border-collapse: collapse;
+  font-family: "Prompt", sans-serif;
+}
+
+.modernPatientTable thead tr {
+  background: #1f5ff2;
+}
+
+.modernPatientTable th {
+  padding: 20px 22px;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.modernPatientTable th:last-child {
+  text-align: center;
+}
+
+.modernPatientTable td {
+  padding: 20px 22px;
+  font-size: 16px;
+  color: #334f70;
+  vertical-align: middle;
+  border-bottom: 1px solid #eef3f8;
+  background: #ffffff;
+}
+
+.modernPatientTable tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+.modernPatientTable tbody tr:hover td {
+  background: #eef5ff;
+}
+
+.patientCodeBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  padding: 7px 12px;
+  border-radius: 12px;
+  background: #dceafe;
+  color: #0b5cf0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.nationalIdCell {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.3px;
+}
+
+.patientNameCell {
+  font-weight: 700;
+  color: #102033 !important;
+  white-space: nowrap;
+}
+
+.modernAddressCell {
+  max-width: 260px;
+  color: #58708f !important;
+}
+
+.modernAddressCell span {
+  display: block;
+  max-width: 240px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.birthDateCell {
+  white-space: nowrap;
+}
+
+/* ปุ่มดูข้อมูลผู้ป่วย */
+.modernEyeBtn {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 13px;
+  background: #eef6ff;
+  color: #0b63ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.modernEyeBtn:hover {
+  background: #dcecff;
+  transform: translateY(-1px);
+}
+
+.modernEyeBtn:active {
+  transform: scale(0.96);
+}
+
+/* popup แบบรูปที่ 2 */
+.modernModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modernPatientModal {
+  width: min(620px, 96vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+}
+
+.modernModalHeader {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 72px;
+  padding: 0 26px;
+  background: #ffffff;
+  border-bottom: 1px solid #edf2f7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modernModalHeader h3 {
+  margin: 0;
+  color: #102033;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.modernCloseBtn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 13px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.modernCloseBtn:hover {
+  background: #e2e8f0;
+}
+
+.modernModalBody {
+  padding: 22px 26px 28px;
+}
+
+.modernProfileCard {
+  padding: 0 20px;
+  min-height: 100px;
+  border-radius: 0 0 18px 18px;
+  background: linear-gradient(90deg, #eff6ff, #dbeafe);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin: -22px -26px 26px;
+}
+
+.modernAvatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  background: #1f5ff2;
+  color: #ffffff;
+  font-size: 42px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.modernAvatarImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.modernProfileCard h4 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #102033;
+}
+
+.modernPatientCode {
+  margin: 5px 0;
+  color: #0b5cf0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.modernPatientAge {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.modernInfoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 22px;
+  row-gap: 24px;
+}
+
+.modernInfoItem {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.modernInfoIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #0b63ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.modernInfoItem p {
+  margin: 0 0 4px;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.modernInfoItem strong {
+  color: #1e3552;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.modernHealthGrid {
+  margin-top: 26px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.modernHealthCard {
+  padding: 18px;
+  min-height: 88px;
+  border-radius: 16px;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.modernHealthCard span {
+  color: #64748b;
+  font-size: 26px;
+}
+
+.modernHealthCard p {
+  margin: 0 0 4px;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.modernHealthCard strong {
+  color: #1e3552;
+  font-size: 18px;
+}
+
+.modernHealthCard small {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.modernAllergyGrid {
+  margin-top: 26px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.modernDrugCard,
+.modernFoodCard {
+  min-height: 88px;
+  padding: 18px;
+  border-radius: 16px;
+}
+
+.modernDrugCard {
+  background: #fff1f2;
+}
+
+.modernFoodCard {
+  background: #fff7ed;
+}
+
+.modernDrugCard p,
+.modernFoodCard p {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.modernDrugCard p {
+  color: #ef4444;
+}
+
+.modernFoodCard p {
+  color: #f97316;
+}
+
+.modernDrugCard strong,
+.modernFoodCard strong {
+  color: #102033;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.modernHistorySection {
+  margin-top: 28px;
+}
+
+.modernHistorySection h4 {
+  margin: 0 0 14px;
+  color: #102033;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.modernHistoryCard {
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modernHistoryCard strong {
+  color: #1e3552;
+  font-size: 15px;
+}
+
+.modernHistoryCard p {
+  margin: 5px 0 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.modernHistoryCard span {
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #16a34a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+@media (max-width: 640px) {
+  .modernPatientModal {
+    width: 96vw;
+  }
+
+  .modernInfoGrid,
+  .modernHealthGrid,
+  .modernAllergyGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .modernProfileCard {
+    align-items: flex-start;
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+}
+
+.noHistoryBox {
+  padding: 18px;
+  border-radius: 16px;
+  background: #f8fafc;
+  color: #94a3b8;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.modernDrugCard p,
+.modernFoodCard p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modernHealthCard svg {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.historyApproved {
+  background: #dcfce7 !important;
+  color: #16a34a !important;
+}
+
+.historyCancelled {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+}
+
+.historyPending {
+  background: #fef3c7 !important;
+  color: #b45309 !important;
+}
+
+.bellIcon {
+  font-size: 23px;
+  line-height: 1;
+}
+
+@media (max-width: 900px) {
+  .patientPanelHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .patientSearchBox {
+    width: 100%;
+  }
+
+  .modernPatientTable {
+    min-width: 1050px;
+  }
+}
+
+@media (max-width: 640px) {
+  .patientPanel {
+    border-radius: 18px;
+  }
+
+  .patientPanelHeader {
+    padding: 20px;
+  }
+
+  .patientPanelTitle {
+    font-size: 18px;
+  }
+
+  .patientSearchInput {
+    height: 52px;
+    font-size: 14px;
+  }
+}
+
+/* =========================================================
+   Modern Admin Layout Override
+   ให้ Header / Sidebar spacing เหมือนหน้า Dashboard
+   วางท้ายไฟล์ CSS module ของแต่ละหน้า
+========================================================= */
+
+.container {
+  height: 100dvh;
+  overflow: hidden;
+  background: #f8fafc;
+  font-family: "Prompt", sans-serif;
+}
+
+/* ===== Header แบบเดียวกับ Dashboard ===== */
+
+.header {
+  position: fixed;
+  top: 0;
+  left: var(--sidebar-current-width, 72px);
+  right: 0;
+  height: 78px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5eaf0;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  z-index: 900;
+  color: #172033;
+  transition: left 0.25s ease;
+}
+
+.leftHeader {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.rightHeader {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* ถ้าหน้าไหนยังใช้ logo + brand เดิม */
+.logoIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  object-fit: contain;
+  background: #f4f7fb;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.brand {
+  color: #172033;
+  font-size: 22px;
+  font-weight: 700;
+  font-family: "Prompt", sans-serif;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-shadow: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ถ้าหน้าไหนใช้โครง Header ใหม่แบบ Dashboard */
+.pageIcon {
+  color: #1559f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pageIcon span {
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.pageTitleBox {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #172033;
+  line-height: 1.1;
+}
+
+.pageDate {
+  margin: 5px 0 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: #8a97aa;
+}
+
+.notificationBtn {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 18px;
+  background: #f4f7fb;
+  color: #24344d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.notificationBtn:hover {
+  background: #edf3fb;
+}
+
+.redDot {
+  position: absolute;
+  top: 11px;
+  right: 12px;
+  width: 10px;
+  height: 10px;
+  background: #ff3b45;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+}
+
+.adminBox {
+  height: 54px;
+  padding: 0 16px 0 12px;
+  border-radius: 18px;
+  background: #f7f9fc;
+  border: 1px solid #edf0f5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.adminAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: #1559f6;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.adminText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.adminText span {
+  font-size: 15px;
+  font-weight: 700;
+  color: #172033;
+}
+
+.adminText small {
+  margin-top: 3px;
+  font-size: 12px;
+  color: #8a97aa;
+}
+
+/* ===== Layout หลัก ให้ไม่โดน Sidebar/Header ทับ ===== */
+
+.Wrapper,
+.wrapper {
+  margin-left: var(--sidebar-current-width, 72px);
+  padding-top: 78px;
+  width: auto;
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  transition: margin-left 0.25s ease;
+}
+
+/* หน้า admin / appointment / help / medicalrecords ส่วนมากใช้ contentArea */
+.contentArea {
+  flex: 1;
+  min-width: 0;
+  height: calc(100dvh - 78px);
+  overflow: auto;
+  padding: 24px clamp(24px, 2.2vw, 42px);
+  border-radius: 0;
+  text-align: initial;
+  font-size: initial;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(219, 234, 254, 0.8),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(254, 243, 199, 0.5),
+      transparent 28%
+    ),
+    #f8fafc;
+  font-family: "Prompt", sans-serif;
+}
+
+/* หน้า compile ใช้ dashboard เป็น content หลัก */
+.dashboard {
+  flex: 1;
+  min-width: 0;
+  height: calc(100dvh - 78px);
+  overflow: auto;
+  padding: 24px clamp(24px, 2.2vw, 42px);
+  border-radius: 0;
+  text-align: initial;
+  font-size: initial;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(219, 234, 254, 0.8),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(254, 243, 199, 0.5),
+      transparent 28%
+    ),
+    #f8fafc;
+  font-family: "Prompt", sans-serif;
+}
+
+/* ถ้าหน้าไหนใช้ main เป็น content หลัก */
+.main {
+  flex: 1;
+  min-width: 0;
+  height: calc(100dvh - 78px);
+  overflow: auto;
+  padding: 24px clamp(24px, 2.2vw, 42px);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(219, 234, 254, 0.8),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(254, 243, 199, 0.5),
+      transparent 28%
+    ),
+    #f8fafc;
+}
+
+/* scrollbar ให้เหมือน dashboard */
+.contentArea::-webkit-scrollbar,
+.dashboard::-webkit-scrollbar,
+.main::-webkit-scrollbar {
+  width: 7px;
+}
+
+.contentArea::-webkit-scrollbar-thumb,
+.dashboard::-webkit-scrollbar-thumb,
+.main::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+/* ===== Search ในหน้า admin ให้เข้ากับ header ใหม่ ===== */
+
+.searchInput {
+  height: 42px;
+  padding: 0 14px;
+  font-size: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  outline: none;
+  width: min(300px, 32vw);
+  background-color: #f8fafc;
+  color: #172033;
+  box-shadow: none;
+  transition: all 0.2s ease;
+}
+
+.searchInput:focus {
+  background-color: #ffffff;
+  border-color: #1559f6;
+  box-shadow: 0 0 0 3px rgba(21, 89, 246, 0.12);
+}
+
+.searchButton {
+  height: 42px;
+  border: none;
+  color: #ffffff;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 14px;
+  background: #1559f6;
+  transition: 0.2s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.searchButton:hover {
+  background: #0f46c8;
+}
+
+/* ===== Responsive ===== */
+
+@media (max-width: 768px) {
+  .header {
+    left: 64px;
+    height: 70px;
+    padding: 0 14px;
+  }
+
+  .Wrapper,
+  .wrapper {
+    margin-left: 64px;
+    padding-top: 70px;
+  }
+
+  .contentArea,
+  .dashboard,
+  .main {
+    height: calc(100dvh - 70px);
+    padding: 16px 14px;
+  }
+
+  .brand,
+  .pageTitle {
+    font-size: 18px;
+  }
+
+  .pageDate {
+    font-size: 11px;
+  }
+
+  .notificationBtn {
+    width: 42px;
+    height: 42px;
+    border-radius: 15px;
+  }
+
+  .adminBox {
+    height: 46px;
+    padding: 0 8px;
+  }
+
+  .adminText {
+    display: none;
+  }
+
+  .adminAvatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+  }
+
+  .searchInput {
+    width: 100%;
+    max-width: 180px;
+  }
+}

@@ -1,11 +1,5 @@
-import React from 'react'
+import { redirect } from 'next/navigation';
 
-export default function page() {
-  return (
-    <div className='color-red-500'>page
-      <p className="italic md:not-italic">
-        Lorem ipsum dolor sit amet
-      </p>
-    </div>
-  )
+export default function HomePage() {
+  redirect('/userlogin');
 }

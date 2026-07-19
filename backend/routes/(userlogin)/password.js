@@ -3,12 +3,12 @@ const express = require("express");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { JWT_SECRET } = require("../../tools/config");
 const nodemailer = require("nodemailer");
 const pool = require("../../tools/db");
 
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_for_local";
 const EXPIRE_MIN = Number(process.env.RESET_TOKEN_EXPIRE_MIN || 10);
 
 // อ่านค่าจาก .env (รองรับทั้ง SMTP_* และ MAIL_*)
@@ -24,10 +24,10 @@ function genOTP() {
 
 function makeTransport() {
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: false, // ใช้ STARTTLS
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
   });
 }
 /**
@@ -43,24 +43,18 @@ router.post("/forgot-password/request", async (req, res) => {
 
   const client = await pool.connect();
   try {
-    // หา user แบบไม่สนตัวพิมพ์เล็กใหญ่ และต้องเป็นบัญชีที่มี password_hash
+    // บัญชีทุกประเภทที่มีอีเมลสามารถยืนยัน OTP เพื่อตั้งรหัสผ่านได้
+    // รวมถึงบัญชีที่สร้างผ่าน Google/LINE และยังไม่เคยมีรหัสผ่าน
     const { rows } = await client.query(
-      `SELECT user_id, email, password_hash
+      `SELECT user_id, email
    FROM clinic.users
    WHERE lower(email) = $1
    LIMIT 1`,
       [email]
     );
 
-    // ด้านล่างใช้ rows[0].password_hash เหมือนเดิมได้เลย
     if (!rows.length) {
       return res.status(404).json({ message: "ไม่พบบัญชีอีเมลนี้ในระบบ" });
-    }
-    if (!rows[0].password_hash) {
-      return res.status(400).json({
-        message:
-          "บัญชีนี้ลงทะเบียนด้วย Google/LINE ไม่สามารถรีเซ็ตผ่านอีเมลได้",
-      });
     }
 
     const otp = genOTP();
@@ -119,12 +113,13 @@ router.post("/forgot-password/request", async (req, res) => {
  */
 router.post("/forgot-password/verify", async (req, res) => {
   try {
-    const { email, otp } = req.body || {};
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const otp = String(req.body?.otp || "").trim();
     if (!email || !otp)
       return res.status(400).json({ message: "ข้อมูลไม่ครบ" });
 
     const r = await pool.query(
-      "SELECT token, expires_at FROM clinic.password_reset_otps WHERE email=$1 AND otp=$2 LIMIT 1",
+      "SELECT token, expires_at FROM clinic.password_reset_otps WHERE lower(email)=$1 AND otp=$2 LIMIT 1",
       [email, otp]
     );
     if (!r.rowCount) return res.status(400).json({ message: "OTP ไม่ถูกต้อง" });
@@ -149,6 +144,8 @@ router.post("/forgot-password/reset", async (req, res) => {
     const { token, new_password } = req.body || {};
     if (!token || !new_password)
       return res.status(400).json({ message: "ข้อมูลไม่ครบ" });
+    if (String(new_password).length < 8)
+      return res.status(400).json({ message: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร" });
 
     let payload;
     try {
@@ -160,9 +157,12 @@ router.post("/forgot-password/reset", async (req, res) => {
       return res.status(400).json({ message: "โทเคนไม่ถูกต้อง" });
     }
 
-    const email = payload.email;
+    const email = String(payload.email || "").trim().toLowerCase();
+    const userId = payload.uid;
+    if (!email || !userId)
+      return res.status(400).json({ message: "โทเคนไม่ถูกต้อง" });
     const check = await pool.query(
-      "SELECT 1 FROM clinic.password_reset_otps WHERE email=$1 AND token=$2 LIMIT 1",
+      "SELECT 1 FROM clinic.password_reset_otps WHERE lower(email)=$1 AND token=$2 AND expires_at > NOW() LIMIT 1",
       [email, token]
     );
     if (!check.rowCount)
@@ -170,10 +170,10 @@ router.post("/forgot-password/reset", async (req, res) => {
 
     const hash = await bcrypt.hash(new_password, 10);
     await pool.query(
-      "UPDATE clinic.users SET password_hash=$1 WHERE email=$2",
-      [hash, email]
+      "UPDATE clinic.users SET password_hash=$1 WHERE user_id=$2 AND lower(email)=$3",
+      [hash, userId, email]
     );
-    await pool.query("DELETE FROM clinic.password_reset_otps WHERE email=$1", [
+    await pool.query("DELETE FROM clinic.password_reset_otps WHERE lower(email)=$1", [
       email,
     ]);
 

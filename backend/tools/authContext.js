@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const pool = require("./db");
+const { JWT_SECRET } = require("./config");
 
 /**
  * อ่าน token แล้ว set context ให้ RLS ผ่าน set_config (ปลอดภัยสุดสำหรับ RLS)
@@ -16,7 +17,7 @@ function authContext(required = true) {
         return res.status(401).json({ message: "No token" });
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, JWT_SECRET);
 
       const user_id = decoded.user_id ?? decoded.id ?? decoded.sub;
       const role = String(decoded.role || "").toLowerCase();

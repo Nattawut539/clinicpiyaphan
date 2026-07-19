@@ -1,8 +1,7 @@
 // tools/_utils.js
 const jwt = require("jsonwebtoken");
 const pool = require("./db");
-
-const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_for_local";
+const { JWT_SECRET } = require("./config");
 
 /* ---------- Token helpers ---------- */
 // สร้างโทเค็น
@@ -84,7 +83,7 @@ function authRequired(req, res, next) {
 function requireStaff(req, res, next) {
   try {
     req.user = parseUser(req);
-    const ok = ["doctor", "assistant", "admin", "super_admin"].includes(
+    const ok = ["doctor", "assistant", "admin", "super_admin", "superadmin"].includes(
       req.user.role
     );
     if (!ok) return res.status(403).json({ message: "forbidden" });

@@ -1,0 +1,315 @@
+.page {
+  min-height: calc(100vh - 120px);
+  padding: 28px;
+  background: #f6f8fb;
+}
+
+.headerBlock {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.headerBlock span {
+  color: #1559f6;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.headerBlock h1 {
+  margin: 4px 0;
+  color: #14365d;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.headerBlock p {
+  margin: 0;
+  color: #71849d;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.profileGrid {
+  display: grid;
+  grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.profileCard,
+.detailsCard,
+.stateCard,
+.successMessage,
+.errorMessage {
+  border: 1px solid #e4ebf4;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 40px rgba(20, 52, 93, 0.08);
+}
+
+.profileCard {
+  padding: 28px 22px;
+}
+
+.avatarWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 132px;
+  height: 132px;
+  overflow: hidden;
+  border: 6px solid #edf4ff;
+  border-radius: 36px;
+  background: linear-gradient(135deg, #1559f6, #22b8cf);
+  color: #ffffff;
+}
+
+.avatar img {
+  object-fit: cover;
+}
+
+.cameraButton {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 3px solid #ffffff;
+  border-radius: 14px;
+  background: #1559f6;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.cameraButton input {
+  display: none;
+}
+
+.patientBadge {
+  max-width: 100%;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #eef5ff;
+  color: #1559f6;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.identity {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.identity strong,
+.identity span {
+  display: block;
+}
+
+.identity strong {
+  color: #163760;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.identity span {
+  margin-top: 5px;
+  color: #7a91aa;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.detailsCard {
+  padding: 24px;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.cardHeader h2 {
+  margin: 0;
+  color: #14365d;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field span {
+  color: #60758d;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.field p,
+.field input,
+.field textarea {
+  min-height: 46px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #e4ebf4;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #172033;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.field input,
+.field textarea {
+  outline: none;
+  background: #ffffff;
+}
+
+.field textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.field input:focus,
+.field textarea:focus {
+  border-color: #1559f6;
+  box-shadow: 0 0 0 4px rgba(21, 89, 246, 0.1);
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.iconText {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.editButton,
+.saveButton,
+.cancelButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.editButton,
+.saveButton {
+  background: #1559f6;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(21, 89, 246, 0.22);
+}
+
+.cancelButton {
+  background: #eef3f9;
+  color: #415b78;
+}
+
+.saveButton:disabled,
+.cancelButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.actionGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stateCard,
+.successMessage,
+.errorMessage {
+  padding: 18px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.stateCard {
+  color: #60758d;
+}
+
+.successMessage {
+  margin-bottom: 16px;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.errorMessage {
+  margin-bottom: 16px;
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+@media (max-width: 900px) {
+  .page {
+    padding: 18px;
+  }
+
+  .headerBlock {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .profileGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .headerBlock h1 {
+    font-size: 24px;
+  }
+
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .cardHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .actionGroup,
+  .editButton,
+  .saveButton,
+  .cancelButton {
+    width: 100%;
+  }
+}

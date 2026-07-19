@@ -12,6 +12,26 @@ async function ensureQueueSchema() {
     `);
 
     await client.query(`
+      ALTER TABLE clinic.measurements
+      ADD COLUMN IF NOT EXISTS chief_complaint text,
+      ADD COLUMN IF NOT EXISTS temperature numeric(4,1),
+      ADD COLUMN IF NOT EXISTS heart_rate integer,
+      ADD COLUMN IF NOT EXISTS respiratory_rate integer,
+      ADD COLUMN IF NOT EXISTS systolic_bp integer,
+      ADD COLUMN IF NOT EXISTS diastolic_bp integer
+    `);
+
+    await client.query(`
+      ALTER TABLE clinic.medical_records
+      ADD COLUMN IF NOT EXISTS body_drawing_data text
+    `);
+
+    await client.query(`
+      ALTER TABLE clinic.queue_tickets
+      ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()
+    `);
+
+    await client.query(`
       UPDATE clinic.measurements m
       SET queue_id = q.queue_id
       FROM clinic.queue_tickets q
@@ -102,13 +122,40 @@ async function ensureQueueSchema() {
           REFERENCES clinic.queue_tickets(queue_id) ON DELETE CASCADE,
         code_hash varchar(64) NOT NULL UNIQUE,
         used_at timestamptz,
+        expires_at timestamptz NOT NULL DEFAULT (now() + interval '15 minutes'),
         created_at timestamptz NOT NULL DEFAULT now()
       )
     `);
 
     await client.query(`
+      ALTER TABLE clinic.appointment_access_codes
+      ADD COLUMN IF NOT EXISTS expires_at timestamptz NOT NULL DEFAULT (now() + interval '15 minutes')
+    `);
+
+    await client.query(`
+      UPDATE clinic.appointment_access_codes
+      SET expires_at = created_at + interval '15 minutes'
+      WHERE expires_at IS NULL
+    `);
+
+    await client.query(`
+      UPDATE clinic.appointment_access_codes ac
+      SET expires_at = ((s.service_date::date + (s.hour_of_day::int * interval '1 hour')) AT TIME ZONE 'Asia/Bangkok') + interval '15 minutes'
+      FROM clinic.appointments a
+      JOIN clinic.appointment_slots s ON s.slot_id = a.slot_id
+      WHERE ac.appointment_id = a.appointment_id
+        AND ac.used_at IS NULL
+    `);
+
+    await client.query(`
       CREATE INDEX IF NOT EXISTS appointment_access_codes_unused_idx
       ON clinic.appointment_access_codes (code_hash)
+      WHERE used_at IS NULL
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS appointment_access_codes_expires_at_idx
+      ON clinic.appointment_access_codes (expires_at)
       WHERE used_at IS NULL
     `);
 
@@ -133,6 +180,125 @@ async function ensureQueueSchema() {
     await client.query(`
       CREATE INDEX IF NOT EXISTS clinic_holidays_date_idx
       ON clinic.clinic_holidays (service_date)
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS clinic.user_notifications (
+        notification_id bigserial PRIMARY KEY,
+        user_id integer NOT NULL REFERENCES clinic.users(user_id) ON DELETE CASCADE,
+        source_type varchar(40) NOT NULL,
+        source_id text NOT NULL,
+        event_key varchar(80) NOT NULL,
+        title text NOT NULL,
+        message text NOT NULL,
+        severity varchar(20) NOT NULL DEFAULT 'info',
+        target_url text,
+        event_at timestamptz,
+        email_required boolean NOT NULL DEFAULT false,
+        email_sent_at timestamptz,
+        is_read boolean NOT NULL DEFAULT false,
+        read_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        expires_at timestamptz NOT NULL DEFAULT (now() + interval '1 month'),
+        UNIQUE (user_id, source_type, source_id, event_key)
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS user_notifications_user_active_idx
+      ON clinic.user_notifications (user_id, is_read, created_at DESC)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS user_notifications_expiry_idx
+      ON clinic.user_notifications (expires_at)
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS clinic.clinic_open_days (
+        service_date date PRIMARY KEY,
+        reason text,
+        created_by integer,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    await client.query(`
+      CREATE OR REPLACE FUNCTION clinic.is_slot_closed(
+        p_date date,
+        p_avaliable text
+      ) RETURNS boolean AS $$
+        SELECT (
+          EXISTS (
+            SELECT 1
+            FROM clinic.weekly_closed_windows w
+            WHERE w.weekday = EXTRACT(DOW FROM p_date)::smallint
+              AND w.avaliable_date = p_avaliable
+              AND w.is_closed
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM clinic.clinic_open_days o
+            WHERE o.service_date = p_date
+          )
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM clinic.clinic_holidays h
+          WHERE h.service_date = p_date
+            AND (h.avaliable_date = 'all_day' OR h.avaliable_date = p_avaliable)
+        )
+      $$ LANGUAGE sql STABLE
+    `);
+
+    await client.query(`
+      CREATE OR REPLACE FUNCTION clinic.guard_appointment_insert()
+      RETURNS trigger AS $$
+      DECLARE
+        s_date   date;
+        s_avail  varchar;
+        s_hour   smallint;
+        s_status clinic.slot_status;
+        s_start  timestamp;
+        s_until  timestamp;
+        ws       date;
+        we       date;
+      BEGIN
+        SELECT service_date, avaliable_date, hour_of_day, status, start_ts, bookable_until
+          INTO s_date, s_avail, s_hour, s_status, s_start, s_until
+        FROM clinic.appointment_slots
+        WHERE slot_id = NEW.slot_id;
+
+        IF s_date IS NULL THEN
+          RAISE EXCEPTION 'Slot % not found', NEW.slot_id;
+        END IF;
+
+        IF clinic.is_slot_closed(s_date, s_avail::text) THEN
+          RAISE EXCEPTION 'Slot % % is closed by clinic schedule', s_date, s_avail;
+        END IF;
+
+        IF s_status <> 'open' THEN
+          RAISE EXCEPTION 'Slot % on % % is not open (status=%)', NEW.slot_id, s_date, s_avail, s_status;
+        END IF;
+
+        IF now() > s_until THEN
+          RAISE EXCEPTION 'Booking window closed: % % @% (deadline %)',
+            s_date, s_avail, to_char(s_start, 'HH24:MI'), to_char(s_until, 'HH24:MI');
+        END IF;
+
+        SELECT week_start, week_end
+          INTO ws, we
+        FROM clinic.current_week_bounds('Asia/Bangkok');
+
+        IF NOT clinic.is_staff() AND (s_date < ws OR s_date > we) THEN
+          RAISE EXCEPTION 'You can only book in current week (% to %). Slot date: %', ws, we, s_date;
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql
     `);
 
     await client.query(`

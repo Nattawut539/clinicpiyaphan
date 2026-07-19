@@ -1,0 +1,54 @@
+.container { min-height: 100vh; background: #f5f7fb; color: #172033; font-family: "Prompt", sans-serif; }
+.header { height: 86px; padding: 0 32px 0 calc(var(--sidebar-current-width, 72px) + 32px); display: flex; align-items: center; justify-content: space-between; background: #fff; border-bottom: 1px solid #e7edf5; transition: padding-left .2s ease; }
+.header h1 { margin: 0; font-size: 22px; }
+.header p { margin: 5px 0 0; color: #8a97aa; font-size: 13px; }
+.wrapper { display: flex; }
+.content { width: calc(100% - var(--sidebar-current-width, 72px)); min-width: 0; margin-left: var(--sidebar-current-width, 72px); padding: 28px; transition: margin-left .2s ease, width .2s ease; }
+.topbar { margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.backLink { color: #31506f; display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 700; text-decoration: none; }
+.weekPicker { min-width: 430px; padding: 10px; display: flex; align-items: center; justify-content: space-between; gap: 14px; background: #fff; border: 1px solid #dfe8f3; border-radius: 18px; box-shadow: 0 4px 14px rgba(15, 23, 42, .04); }
+.weekPicker div { display: flex; flex-direction: column; align-items: center; }
+.weekPicker small { color: #8a9bb8; font-size: 11px; }
+.weekPicker strong { margin-top: 2px; color: #173b73; font-size: 14px; }
+.weekPicker button { width: 38px; height: 38px; border: 0; border-radius: 12px; background: #eff6ff; color: #1559f6; display: grid; place-items: center; cursor: pointer; }
+.weekPicker button:disabled { color: #aab6c6; background: #f1f5f9; cursor: not-allowed; }
+.panel { overflow: hidden; background: #fff; border: 1px solid #e3ebf5; border-radius: 22px; box-shadow: 0 6px 20px rgba(15, 23, 42, .05); }
+.panelHeader { min-height: 94px; padding: 22px 26px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid #edf2f7; }
+.titleGroup { display: flex; align-items: center; gap: 12px; color: #1559f6; }
+.titleGroup h2 { margin: 0; color: #102033; font-size: 20px; }
+.titleGroup p { margin: 4px 0 0; color: #8a9bb8; font-size: 14px; }
+.searchBox { width: min(360px, 100%); height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 9px; color: #8796aa; border: 1px solid #dfe7f1; border-radius: 14px; }
+.searchBox:focus-within { border-color: #1559f6; box-shadow: 0 0 0 3px rgba(21, 89, 246, .1); }
+.searchBox input { width: 100%; border: 0; outline: 0; color: #172033; font: inherit; font-size: 14px; }
+.message { padding: 60px 24px; color: #8290a4; text-align: center; font-weight: 600; }
+.error { color: #dc2626; }
+.tableWrap { width: 100%; overflow-x: auto; }
+.tableWrap table { width: 100%; min-width: 1050px; border-collapse: collapse; }
+.tableWrap th { padding: 17px 20px; background: #1f5ff2; color: #fff; text-align: left; font-size: 14px; white-space: nowrap; }
+.tableWrap td { max-width: 240px; padding: 16px 20px; color: #38516e; border-bottom: 1px solid #edf2f7; font-size: 14px; vertical-align: middle; }
+.tableWrap tbody tr:not(.dateRow):hover td { background: #f5f9ff; }
+.dateRow td, .dateRow:hover td { padding: 12px 20px; background: linear-gradient(90deg, #eaf2ff, #f6f9ff); border-color: #cfddf0; }
+.dateRow div { display: flex; align-items: center; gap: 9px; color: #1f5ff2; }
+.dateRow strong { color: #173b73; font-size: 15px; }
+.dateRow span { margin-left: auto; padding: 4px 10px; border-radius: 999px; background: #fff; color: #6480a7; font-size: 12px; font-weight: 700; }
+.queue, .patientCode { padding: 6px 10px; border-radius: 10px; background: #e3efff; color: #1559f6; white-space: nowrap; }
+.name { color: #102033 !important; font-weight: 700; white-space: nowrap; }
+.clamp { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewButton { padding: 8px 12px; border: 0; border-radius: 11px; background: #eff6ff; color: #1559f6; display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.overlay { position: fixed; z-index: 2000; inset: 0; padding: 24px; background: rgba(15, 23, 42, .55); display: grid; place-items: center; backdrop-filter: blur(3px); }
+.detailModal { width: min(760px, 100%); max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 22px; box-shadow: 0 24px 70px rgba(15, 23, 42, .25); }
+.modalHeader { padding: 24px 26px; display: flex; justify-content: space-between; border-bottom: 1px solid #e8eef6; }
+.modalHeader small { color: #1559f6; font-weight: 700; }
+.modalHeader h2 { margin: 5px 0 2px; font-size: 22px; }
+.modalHeader p { margin: 0; color: #7d8da3; font-size: 13px; }
+.modalHeader button { width: 38px; height: 38px; border: 0; border-radius: 12px; background: #f1f5f9; color: #64748b; display: grid; place-items: center; cursor: pointer; }
+.detailGrid { padding: 24px 26px 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.detailGrid > div { min-height: 105px; padding: 16px; border-radius: 15px; background: #f8fafc; border: 1px solid #e8eef5; }
+.detailGrid span { color: #1559f6; font-size: 13px; font-weight: 800; }
+.detailGrid p { margin: 8px 0 0; color: #334f70; line-height: 1.65; white-space: pre-wrap; }
+.detailGrid .fullWidth { grid-column: 1 / -1; min-height: auto; }
+.detailGrid .notesBox { grid-column: 1 / -1; min-height: 240px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: auto repeat(2, minmax(76px, 1fr)); gap: 10px; }
+.notesBox span { grid-column: 1 / -1; }
+.notesBox p { grid-column: 1 / -1; grid-row: 2 / span 2; margin: 0; padding: 12px; border-radius: 12px; background: linear-gradient(#eef2f7 1px, transparent 1px), linear-gradient(90deg, #eef2f7 1px, transparent 1px), #ffffff; background-size: 25% 50%; color: #334f70; line-height: 1.65; }
+.bodyDrawingImage { display: block; width: min(520px, 100%); margin-top: 12px; border: 1px solid #dbe4ee; border-radius: 14px; background: #fff; }
+@media (max-width: 800px) { .header { padding: 0 16px 0 calc(var(--sidebar-current-width, 72px) + 16px); } .content { padding: 18px 14px; } .topbar, .panelHeader { align-items: stretch; flex-direction: column; } .weekPicker { min-width: 0; width: 100%; } .searchBox { width: 100%; } .detailGrid { grid-template-columns: 1fr; } .detailGrid .fullWidth { grid-column: auto; } .detailGrid .notesBox { grid-column: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); } .notesBox p { background-size: 50% 50%; } }

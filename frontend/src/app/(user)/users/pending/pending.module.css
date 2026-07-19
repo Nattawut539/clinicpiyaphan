@@ -1,0 +1,1199 @@
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700;800&display=swap');
+
+.wrapper {
+  min-height: calc(100vh - 135px);
+  padding: 24px clamp(16px, 4vw, 56px) 72px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: 'Prompt', sans-serif;
+  box-sizing: border-box;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  max-width: 1180px;
+  margin: 0 auto 18px;
+}
+
+.pageHeader h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.pageHeader p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.toggleButtons {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #e2e8f0;
+  border-radius: 16px;
+  width: fit-content;
+}
+
+.activeButton,
+.inactiveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.activeButton {
+  background: #ffffff;
+  color: #0f766e;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.inactiveButton {
+  background: transparent;
+  color: #64748b;
+}
+
+.inactiveButton:hover {
+  color: #334155;
+}
+
+.main {
+  display: grid;
+  grid-template-columns: minmax(360px, 3fr) minmax(320px, 2fr);
+  gap: 18px;
+  max-width: 1180px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.leftPanel,
+.rightPanel {
+  min-width: 0;
+}
+
+.rightPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hintCard,
+.bookingCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.hintCard {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 34px;
+  text-align: center;
+}
+
+.hintIcon {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  color: #14b8a6;
+  background: #ccfbf1;
+  margin-bottom: 14px;
+}
+
+.hintCard h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #334155;
+}
+
+.hintCard p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.selectedDateBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.selectedDateBar span {
+  display: block;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+}
+
+.selectedDateBar strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.selectedDateBar button {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.selectedDateBar button:hover {
+  color: #ffffff;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px;
+}
+
+.cardBody h3,
+.slotTitle h3,
+.summaryCard h3 {
+  margin: 0;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.topicGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.topicButton,
+.topicActive {
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 2px solid #e2e8f0;
+  border-radius: 13px;
+  background: #f8fafc;
+  color: #475569;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: border 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.topicButton:hover {
+  border-color: #5eead4;
+}
+
+.topicActive {
+  border-color: #0f766e;
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.customInput {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 10px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  outline: none;
+  color: #334155;
+  font-family: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.customInput:focus {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.16);
+}
+
+.slotTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: #f59e0b;
+}
+
+.slotTitle + .slotGrid {
+  margin-bottom: 2px;
+}
+
+.slotGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.slotGrid .note {
+  grid-column: 1 / -1;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.slotButton {
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 2px solid #e2e8f0;
+  border-radius: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border 0.2s ease, background 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+
+.slotButton span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.slotButton strong {
+  font-size: 14px;
+  color: #334155;
+}
+
+.slotButton em {
+  margin-top: 2px;
+  color: #dc2626;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.slotButton:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.morning {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+}
+
+.morning:not(:disabled):hover,
+.morning.selectedSlot {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: #ffffff;
+}
+
+.afternoon {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4338ca;
+}
+
+.afternoon:not(:disabled):hover,
+.afternoon.selectedSlot {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #ffffff;
+}
+
+.selectedSlot strong,
+.selectedSlot span {
+  color: #ffffff;
+}
+
+.summaryCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.summaryCard h3 {
+  padding: 14px 16px;
+  background: #1e293b;
+  color: #ffffff;
+}
+
+.summaryCard div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 16px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.summaryCard span {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.summaryCard strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #1e293b;
+  font-size: 13px;
+  text-align: right;
+}
+
+.completedButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  border-radius: 14px;
+  background: #0f766e;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(15, 118, 110, 0.18);
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.completedButton:hover {
+  background: #115e59;
+}
+
+.completedButton:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.note {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
+}
+
+.errorNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border-radius: 13px;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+@media (max-width: 960px) {
+  .pageHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .main {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .wrapper {
+    padding: 18px 12px 68px;
+  }
+
+  .pageHeader h1 {
+    font-size: 24px;
+  }
+
+  .toggleButtons {
+    width: 100%;
+  }
+
+  .activeButton,
+  .inactiveButton {
+    flex: 1;
+    padding: 0 10px;
+  }
+
+  .topicGrid,
+  .slotGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summaryCard div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+/* Modern booking refresh */
+.wrapper {
+  min-height: calc(100dvh - 135px);
+  background:
+    radial-gradient(circle at 8% 4%, rgba(45, 212, 191, 0.2), transparent 30%),
+    radial-gradient(circle at 92% 12%, rgba(251, 113, 133, 0.16), transparent 26%),
+    linear-gradient(135deg, #f8fafc 0%, #eefbf8 48%, #fff7ed 100%);
+}
+
+.pageHeader {
+  align-items: center;
+  padding: 8px 0;
+}
+
+.pageHeader h1 {
+  color: #111827;
+  font-size: 34px;
+  letter-spacing: 0;
+}
+
+.pageHeader p {
+  max-width: 620px;
+  color: #667085;
+  font-size: 15px;
+}
+
+.toggleButtons {
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.activeButton {
+  background: #111827;
+  color: #ffffff;
+  box-shadow: 0 12px 22px rgba(17, 24, 39, 0.18);
+}
+
+.inactiveButton {
+  color: #475467;
+}
+
+.weekWindowCard {
+  max-width: 1180px;
+  margin: 0 auto 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(45, 212, 191, 0.34);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(240, 253, 250, 0.88)),
+    #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+}
+
+.weekWindowCard span {
+  display: block;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.weekWindowCard strong {
+  display: block;
+  margin-top: 3px;
+  color: #111827;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.weekWindowCard p {
+  max-width: 470px;
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: right;
+}
+
+.main {
+  grid-template-columns: minmax(380px, 1.05fr) minmax(360px, 0.95fr);
+  gap: 22px;
+}
+
+.hintCard,
+.bookingCard {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.1);
+  backdrop-filter: blur(18px);
+}
+
+.hintCard {
+  min-height: 360px;
+}
+
+.hintIcon {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  color: #0f766e;
+  background:
+    linear-gradient(135deg, rgba(45, 212, 191, 0.32), rgba(251, 191, 36, 0.24)),
+    #ecfeff;
+  box-shadow: 0 14px 26px rgba(20, 184, 166, 0.16);
+}
+
+.hintCard h2 {
+  color: #111827;
+  font-size: 22px;
+}
+
+.hintCard p {
+  max-width: 360px;
+  color: #667085;
+  line-height: 1.7;
+}
+
+.selectedDateBar {
+  background:
+    linear-gradient(135deg, #111827, #0f766e 58%, #f97316);
+}
+
+.selectedDateBar button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.cardBody {
+  gap: 20px;
+  padding: 20px;
+}
+
+.cardBody h3,
+.slotTitle h3,
+.summaryCard h3 {
+  color: #111827;
+  font-size: 15px;
+}
+
+.topicGrid {
+  gap: 10px;
+}
+
+.topicButton,
+.topicActive {
+  border-width: 1px;
+  border-color: rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.82);
+}
+
+.topicButton:hover {
+  border-color: #14b8a6;
+  background: #ecfeff;
+  transform: translateY(-1px);
+}
+
+.topicActive {
+  border-color: #111827;
+  background: #111827;
+  color: #ffffff;
+  box-shadow: 0 14px 24px rgba(17, 24, 39, 0.16);
+}
+
+.slotGrid {
+  gap: 10px;
+}
+
+.slotButton {
+  min-height: 78px;
+  border-width: 1px;
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.slotButton:not(:disabled):hover {
+  transform: translateY(-2px);
+}
+
+.morning {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+
+.morning:not(:disabled):hover,
+.morning.selectedSlot {
+  background: linear-gradient(135deg, #fb923c, #f59e0b);
+  border-color: transparent;
+}
+
+.afternoon {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.afternoon:not(:disabled):hover,
+.afternoon.selectedSlot {
+  background: linear-gradient(135deg, #2563eb, #14b8a6);
+  border-color: transparent;
+}
+
+.summaryCard {
+  border: 0;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+}
+
+.summaryCard h3 {
+  background: #111827;
+}
+
+.completedButton {
+  min-height: 54px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #111827, #0f766e);
+  box-shadow: 0 18px 32px rgba(15, 118, 110, 0.22);
+}
+
+.completedButton:hover {
+  background: linear-gradient(135deg, #0f172a, #0d9488);
+  transform: translateY(-1px);
+}
+
+.errorNote {
+  border: 1px solid #fecdd3;
+  background: #fff1f2;
+}
+
+@media (max-width: 960px) {
+  .weekWindowCard {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .weekWindowCard p {
+    max-width: none;
+    text-align: left;
+  }
+}
+
+@media (max-width: 560px) {
+  .pageHeader h1 {
+    font-size: 28px;
+  }
+
+  .weekWindowCard {
+    border-radius: 16px;
+  }
+}
+
+/* Clean clinic booking redesign */
+.wrapper {
+  min-height: calc(100dvh - 135px);
+  padding: 28px clamp(14px, 3vw, 40px) 72px;
+  background:
+    linear-gradient(180deg, #f7fafc 0%, #eef5f4 100%);
+  color: #101828;
+}
+
+.pageHeader,
+.weekWindowCard,
+.main {
+  max-width: 1120px;
+}
+
+.pageHeader {
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 0;
+}
+
+.pageHeader h1 {
+  color: #101828;
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 800;
+}
+
+.pageHeader p {
+  max-width: 560px;
+  margin-top: 6px;
+  color: #667085;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.toggleButtons {
+  min-height: 48px;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.activeButton,
+.inactiveButton {
+  min-height: 38px;
+  border-radius: 6px;
+}
+
+.activeButton {
+  background: #0f766e;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.inactiveButton {
+  color: #475467;
+}
+
+.inactiveButton:hover {
+  background: #f2f4f7;
+  color: #101828;
+}
+
+.weekWindowCard {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid #d0eee9;
+  border-left: 5px solid #14b8a6;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.06);
+}
+
+.weekWindowCard span {
+  color: #0f766e;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+}
+
+.weekWindowCard strong {
+  color: #101828;
+  font-size: 16px;
+}
+
+.weekWindowCard p {
+  color: #667085;
+  font-size: 13px;
+}
+
+.main {
+  grid-template-columns: minmax(390px, 1.08fr) minmax(360px, 0.92fr);
+  gap: 18px;
+}
+
+.hintCard,
+.bookingCard {
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(16, 24, 40, 0.08);
+  backdrop-filter: none;
+}
+
+.hintCard {
+  min-height: 326px;
+  padding: 38px 28px;
+}
+
+.hintIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  background: #ecfdf3;
+  color: #0f766e;
+  box-shadow: none;
+}
+
+.hintCard h2 {
+  color: #101828;
+  font-size: 20px;
+}
+
+.hintCard p {
+  max-width: 330px;
+  color: #667085;
+  font-size: 14px;
+}
+
+.selectedDateBar {
+  padding: 16px 18px;
+  background: #101828;
+  color: #ffffff;
+}
+
+.selectedDateBar button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.cardBody {
+  gap: 18px;
+  padding: 18px;
+}
+
+.cardBody h3,
+.slotTitle h3,
+.summaryCard h3 {
+  color: #101828;
+  font-size: 14px;
+}
+
+.topicGrid {
+  gap: 8px;
+}
+
+.topicButton,
+.topicActive {
+  min-height: 44px;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #344054;
+  line-height: 1.35;
+}
+
+.topicButton:hover {
+  border-color: #14b8a6;
+  background: #f0fdfa;
+  transform: none;
+}
+
+.topicActive {
+  border-color: #0f766e;
+  background: #0f766e;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.customInput {
+  border-radius: 8px;
+  border-color: #d0d5dd;
+}
+
+.slotTitle {
+  color: #0f766e;
+}
+
+.slotGrid {
+  gap: 8px;
+}
+
+.slotButton {
+  min-height: 72px;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.slotButton strong {
+  color: #101828;
+  font-size: 15px;
+}
+
+.slotButton:not(:disabled):hover {
+  transform: none;
+  border-color: #101828;
+}
+
+.morning {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+
+.morning:not(:disabled):hover,
+.morning.selectedSlot {
+  background: #f97316;
+  border-color: #f97316;
+  color: #ffffff;
+}
+
+.afternoon {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.afternoon:not(:disabled):hover,
+.afternoon.selectedSlot {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.summaryCard {
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.summaryCard h3 {
+  background: #f9fafb;
+  color: #101828;
+  border-bottom: 1px solid #e4e7ec;
+}
+
+.summaryCard div {
+  border-top: 0;
+  border-bottom: 1px solid #f2f4f7;
+}
+
+.summaryCard div:last-child {
+  border-bottom: 0;
+}
+
+.completedButton {
+  min-height: 50px;
+  border-radius: 8px;
+  background: #0f766e;
+  box-shadow: none;
+}
+
+.completedButton:hover {
+  background: #115e59;
+  transform: none;
+}
+
+.errorNote {
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  background: #fff1f2;
+}
+
+.note {
+  color: #667085;
+}
+
+.sessionBlock {
+  padding: 14px;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+}
+
+.morningBlock {
+  background: #fff7ed;
+}
+
+.afternoonBlock {
+  background: #eff6ff;
+}
+
+.morning {
+  background: #d97706;
+  border-color: #b45309;
+  color: #ffffff;
+}
+
+.morning span,
+.morning strong {
+  color: #ffffff;
+}
+
+.morning:not(:disabled):hover,
+.morning.selectedSlot {
+  background: #92400e;
+  border-color: #92400e;
+  color: #ffffff;
+}
+
+.afternoon {
+  background: #1d4ed8;
+  border-color: #1e40af;
+  color: #ffffff;
+}
+
+.afternoon span,
+.afternoon strong {
+  color: #ffffff;
+}
+
+.afternoon:not(:disabled):hover,
+.afternoon.selectedSlot {
+  background: #1e3a8a;
+  border-color: #1e3a8a;
+  color: #ffffff;
+}
+
+.unavailableSlot,
+.unavailableSlot:disabled {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.unavailableSlot span,
+.unavailableSlot strong {
+  color: #94a3b8;
+}
+
+.unavailableSlot em {
+  color: #b91c1c;
+}
+
+@media (max-width: 960px) {
+  .pageHeader {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 14px;
+    text-align: center;
+  }
+
+  .pageHeader p {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .toggleButtons {
+    align-self: center;
+    max-width: 100%;
+  }
+
+  .main {
+    grid-template-columns: 1fr;
+  }
+
+  .weekWindowCard {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 560px) {
+  .wrapper {
+    padding: 18px 12px 68px;
+  }
+
+  .pageHeader h1 {
+    font-size: 26px;
+  }
+
+  .toggleButtons {
+    width: 100%;
+  }
+
+  .activeButton,
+  .inactiveButton {
+    flex: 1;
+    min-width: 0;
+    padding: 0 10px;
+  }
+
+  .weekWindowCard {
+    padding: 14px;
+  }
+}
+
+/* Keep the booking page header in the same row at every viewport size. */
+.pageHeader {
+  align-items: center;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 14px;
+  text-align: left;
+}
+
+.pageHeader > div:first-child {
+  min-width: 0;
+}
+
+.pageHeader h1 {
+  font-size: clamp(20px, 3.4vw, 30px);
+  line-height: 1.2;
+}
+
+.pageHeader p {
+  margin-left: 0;
+  margin-right: 0;
+  font-size: clamp(11px, 1.6vw, 14px);
+  line-height: 1.45;
+}
+
+.toggleButtons {
+  flex: 0 0 auto;
+  align-self: center;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.activeButton,
+.inactiveButton {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 0 clamp(9px, 1.7vw, 16px);
+  font-size: clamp(12px, 1.5vw, 14px);
+}
+
+@media (max-width: 560px) {
+  .pageHeader {
+    gap: 8px;
+  }
+
+  .toggleButtons {
+    gap: 3px;
+    padding: 3px;
+    border-radius: 12px;
+  }
+
+  .activeButton,
+  .inactiveButton {
+    min-height: 31px;
+    gap: 5px;
+    padding: 0 7px;
+    border-radius: 9px;
+    font-size: 11px;
+  }
+
+  .activeButton svg,
+  .inactiveButton svg {
+    width: 13px;
+    height: 13px;
+  }
+}

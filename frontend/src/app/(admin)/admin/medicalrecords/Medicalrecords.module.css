@@ -1,0 +1,2355 @@
+.container {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  position: relative;
+  height: 100vh;
+}
+
+/* ===== Popup base ===== */
+.overlay {
+  position: fixed; inset: 0;
+  /* สีทับบาง ๆ */
+  background: rgba(8, 14, 40, 0.38);
+  /* ทำให้พื้นหลังข้างหลังเบลอ */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px); /* Safari */
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+}
+
+.popup{
+  width: min(1040px, 96vw);
+  max-height: 90vh;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto 1fr auto; /* header | body | footer */
+  animation: popIn .15s ease;
+}
+@keyframes popIn{ from{ transform: translateY(8px); opacity:.6 } to{ transform:none; opacity:1 } }
+
+/* แถบหัวด้านบน */
+.popupHeader{
+  display: grid;
+  grid-template-columns: 1fr auto;  /* ซ้าย:หัวข้อ | ขวา:ปุ่ม X */
+  align-items: center;
+  min-height: 56px;
+  padding: 0 18px;
+  background: linear-gradient(90deg,#0d144a,#2e2ba7);
+  color: #fff;
+}
+.popupTitle{
+  margin: 0; font-weight: 800; letter-spacing: .2px;
+}
+
+.closeBtn{
+  --btn-size: 34px;
+  width: var(--btn-size); height: var(--btn-size);
+  display: grid; place-items: center;
+  border: 0; border-radius: 10px;
+  background: rgba(239, 68, 68, .12); /* แดงจาง */
+  color: #ef4444;                     /* แดงชัด */
+  font-size: 22px; line-height: 1; cursor: pointer;
+  transition: filter .2s ease, transform .06s ease, background .2s ease;
+}
+.closeBtn:hover{ filter: brightness(1.08); background: rgba(239,68,68,.18); }
+.closeBtn:active{ transform: translateY(1px); }
+
+.popupBody{ padding: 18px 22px 10px; overflow: auto; }
+.popupFooter{ padding: 12px 18px; background:#fafafa; text-align:right; }
+.btnOk{ background:#22c55e; color:#fff; border:0; border-radius:10px; padding:9px 16px; font-weight:700; cursor:pointer; }
+
+/* ===== Layout ด้านใน ===== */
+/* ใช้ grid 2 คอลัมน์: ซ้ายการ์ดโปรไฟล์(ใหญ่), ขวาการ์ดการแพทย์ */
+.cardContainer {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;  /* ซ้ายกว้างกว่านิดให้ภาพ/ชื่อหายใจ */
+  gap: 18px;
+}
+
+/* การ์ดมาตรฐาน */
+.card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 4px 10px rgba(0,0,0,.06);
+  padding: 16px 16px 14px;
+}
+
+.cardHeader {
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: 12px;
+  color: #0f172a;
+}
+
+/* ส่วนบนของการ์ดซ้าย: รูป + ชื่อ */
+.topSection {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+.photoColumn img {
+  width: 90px; height: 90px; object-fit: cover; border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+}
+.nameSection .name { font-size: 20px; line-height: 1.25; }
+.subInfo { color:#6b7280; font-size: 14px; margin-top: 4px; }
+
+/* เส้นคั่นเนียนขึ้น */
+.divider {
+  border: 0; border-top: 1px solid #eef2f7;
+  margin: 14px 0;
+}
+
+/* กลุ่มข้อมูล: ใช้ grid สำหรับ label/value ให้เท่ากันทุกแถว */
+.infoGroup {
+  --label-w: 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;              /* ระยะห่างระหว่างแต่ละบรรทัด */
+  margin-top: 10px;
+}
+
+/* จัดคอลัมน์แบบ label | value × 3 คู่
+   ใช้ minmax(0,1fr) เพื่อให้ค่าพับบรรทัดได้จริงและไม่ดันกริดล้น */
+.inlineGroup {
+  display: grid;
+  grid-template-columns:
+    var(--label-w) minmax(0, 1fr)
+    var(--label-w) minmax(0, 1fr)
+    var(--label-w) minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 6px;
+  row-gap: 2px;
+  font-size: 15px;
+}
+
+.inlineGroup.twoCols {
+  grid-template-columns:
+    var(--label-w) minmax(0, 1.5fr)
+    var(--label-w) minmax(0, 1.5fr);
+}
+
+
+/* ค่าที่ต้องการรักษาบรรทัด/เว้นบรรทัดตามจริง (เช่น ที่อยู่) */
+.valuePre {
+  white-space: pre-wrap;      /* รักษา \n และพับบรรทัด */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+  font-weight: 400;
+}
+
+/* label: อยู่บรรทัดเดียว ไม่หักคำ */
+.inlineGroup > span:nth-child(odd){
+  color: #374151;
+  font-weight: 600;
+  white-space: nowrap;
+  align-self: start;
+ 
+}
+
+.inlineGroup > span:nth-child(even){
+   color: #374151;
+  white-space: normal; 
+  font-weight: 500;        
+  overflow-wrap: anywhere;      
+  word-break: break-word;       
+  min-width: 0;         
+}
+
+/* แถวที่ต้องกินเต็มบล็อก เช่น ที่อยู่ */
+.rowFull{
+  display: grid;
+  grid-template-columns: var(--label-w) minmax(0,1fr);
+  column-gap: 1px;
+  row-gap: 6px;
+  align-items: start;
+  line-height: 1.45;
+  color: #374151;
+  font-weight: 600;
+  white-space: nowrap;
+  align-self: start;
+}
+.rowFullemergency{
+  display: grid;
+  grid-template-columns: var(--label-w) minmax(0,1fr);
+  grid-template-columns: var(--label-w) minmax(0,1fr);
+  column-gap: 25px;
+  row-gap: 6px;
+  align-items: start;
+  line-height: 1.45;
+  color: #374151;
+  font-weight: 600;
+  white-space: nowrap;
+  align-self: start;
+}
+
+.rowFullallergy{
+  display: grid;
+  grid-template-columns: var(--label-w) minmax(0,1fr);
+  grid-template-columns: var(--label-w) minmax(0,1fr);
+  column-gap: 50px;
+  row-gap: 6px;
+  align-items: start;
+  line-height: 1.45;
+  color: #374151;
+  font-weight: 600;
+  white-space: nowrap;
+  align-self: start;
+}
+
+
+/* จอแคบ: ลดเหลือ 2 คู๋ (อ่านง่าย ไม่แน่น) */
+@media (max-width: 980px){
+  .inlineGroup{
+    grid-template-columns: var(--label-w) minmax(0,1fr);
+  }
+}
+
+/* ฟุตเตอร์ข้อมูลในการ์ด */
+.footerData {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #e5e7eb;
+  color:#0f172a;
+}
+
+
+/* การ์ดขวา (ข้อมูลการแพทย์) ให้ height auto และเว้นช่องสวยๆ */
+.card.right { align-self: start; }
+
+/* ===== Responsive ===== */
+@media (max-width: 980px) {
+  .cardContainer { grid-template-columns: 1fr; }
+  .topSection { grid-template-columns: 80px 1fr; }
+  .infoGroup { --label-w: 100px; }
+  .inlineGroup {
+    grid-template-columns: var(--label-w) 1fr;
+  }
+}
+
+.popupOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 51, 102, 0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.popupBoxerror {
+  background: white;
+  padding: 24px 36px;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  font-size: 20px;
+  font-weight: bold;
+  color: #d62828;
+  text-align: center;
+  animation: fadePopup 0.3s ease;
+}
+
+.popupIcon {
+  font-size: 36px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+
+@keyframes fadePopup {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+/* .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 35px 15px;
+  background: linear-gradient(to right, #0d144a, #2e2ba7);
+  color: white;
+  height: 80px;
+  font-family: 'Prompt', sans-serif;
+}
+
+.leftHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+} */
+
+.logoIcon {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  object-fit: cover;
+  /* filter: drop-shadow(4px 3px 10px #D3D3D3); */
+  /* transition: transform 0.2s ease; */
+}
+ 
+.logoIcon:hover{
+  transform: scale(1.1);
+}
+
+.brand {
+  color: white;
+  font-weight: 700;
+  font-size: 24px;
+  font-family: 'Prompt', sans-serif;
+  letter-spacing: 1px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+} 
+
+.nav {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.nav ul {
+  list-style: none;
+  display: flex;
+  gap: 50px;
+  padding: 0;
+  margin: 0;
+}
+
+.nav li {
+  position: relative;
+}
+
+.nav a {
+  color: white;
+  text-decoration: none;
+  font-size: 1rem;
+  padding: 4px 8px;
+  position: relative;
+}
+
+.nav a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: 0%;
+  height: 2px;
+  background-color: #f7eded;
+  transition: width 0.3s ease-in-out;
+}
+
+.nav a:hover::after {
+  width: 100%;
+}
+
+
+.rightHeader {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 10px 5px;
+}
+
+
+.Wrapper {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+
+.wrapper {
+  --width-open: 230px;
+  --width-closed: 65px;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+.wrapper{
+  display: flex;
+}
+.contentArea {
+  flex-grow: 1;
+  width: 100%;
+  padding: 12px 20px;
+  background: #f9f9f9;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 20px;
+  overflow-x: auto;
+}
+.allPatientsSection {
+  padding: 13px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 51, 102, 0.05);
+  /* margin-top: 24px; */
+}
+
+.allPatientsSection h2 {
+  color: #108005; 
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #e6f4ea; 
+  padding: 10px 16px;
+  border-left: 6px solid #108005;
+  border-radius: 8px;
+  width: fit-content;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+
+.allPatientsSection h2::before {
+  content: '📋';
+  font-size: 20px;
+}
+
+.patientTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 15px;
+  color: #333;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.patientTable th {
+  background-color: #0077b6; 
+  color: white;
+  font-weight: 600;
+  text-align: center;
+  padding: 12px;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.patientTable td {
+  padding: 10px 12px;
+  text-align: center;
+  border-bottom: 1px solid #dee2e6;
+  background-color: #f9fcff;
+}
+
+.patientTable tr:nth-child(even) td {
+  background-color: #eef6fb;
+}
+
+.patientTable tr:hover td {
+  background-color: #e1f0f8;
+  transition: 0.3s;
+}  
+
+.tableScroll{
+  max-height: 633px;       /* ลดลงเล็กน้อยเพื่อเห็นเอฟเฟ็กต์ไวขึ้น */
+  overflow-y: scroll;        /* เลื่อนแนวตั้ง */
+  overflow-x: hidden;      /* ไม่ให้เลื่อนแนวนอน */
+  border: 1px solid #e8f2eb;
+  border-radius: 13px;
+  box-shadow: inset 0 0 0 1px rgba(16,128,5,0.03);
+  background: #fff;
+}
+
+.patientTable th,
+.patientTable td{
+  white-space: nowrap;      /* ถ้าข้อความยาวมาก ให้ใช้ … แทนก็ได้ */
+  text-overflow: ellipsis;  /* (เลือกใช้ได้) */
+  overflow: hidden;         /* (เลือกใช้ได้) */
+}
+
+.tableScroll{
+  max-height: 633px;       /* ลดลงเล็กน้อยเพื่อเห็นเอฟเฟ็กต์ไวขึ้น */
+  overflow-y: scroll;        /* เลื่อนแนวตั้ง */
+  overflow-x: hidden;      /* ไม่ให้เลื่อนแนวนอน */
+  border: 1px solid #e8f2eb;
+  border-radius: 13px;
+  box-shadow: inset 0 0 0 1px rgba(16,128,5,0.03);
+  background: #fff;
+}
+
+.patientTable th,
+.patientTable td{
+  white-space: nowrap;      /* ถ้าข้อความยาวมาก ให้ใช้ … แทนก็ได้ */
+  text-overflow: ellipsis;  /* (เลือกใช้ได้) */
+  overflow: hidden;         /* (เลือกใช้ได้) */
+}
+
+.tableScroll::-webkit-scrollbar{
+  width: 10px;
+}
+.tableScroll::-webkit-scrollbar-track{
+  background: #f3f8f4;
+  border-radius: 10px;
+}
+.tableScroll::-webkit-scrollbar-thumb{
+  background: linear-gradient(180deg, #5fbf72, #2aa04d);
+  border-radius: 10px;
+  border: 2px solid #f3f8f4;
+}
+.tableScroll::-webkit-scrollbar-thumb:hover{
+  background: linear-gradient(180deg, #49b262, #218b40);
+}
+
+/* สไตล์สกอลล์บาร์สำหรับ Firefox */
+.tableScroll{
+  scrollbar-width: thin;
+  /* scrollbar-color: #2aa04d #f3f8f4; */
+}
+
+/* =========================================================
+   Modern Admin Layout Override
+   ให้ Header / Sidebar spacing เหมือนหน้า Dashboard
+   วางท้ายไฟล์ CSS module ของแต่ละหน้า
+========================================================= */
+
+.container {
+  height: 100dvh;
+  overflow: hidden;
+  background: #f8fafc;
+  font-family: "Prompt", sans-serif;
+}
+
+/* ===== Header แบบเดียวกับ Dashboard ===== */
+
+.header {
+  position: fixed;
+  top: 0;
+  left: var(--sidebar-current-width, 72px);
+  right: 0;
+  height: 78px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5eaf0;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  z-index: 900;
+  color: #172033;
+  transition: left 0.25s ease;
+}
+
+.leftHeader {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.rightHeader {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* ถ้าหน้าไหนยังใช้ logo + brand เดิม */
+.logoIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  object-fit: contain;
+  background: #f4f7fb;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.brand {
+  color: #172033;
+  font-size: 22px;
+  font-weight: 700;
+  font-family: "Prompt", sans-serif;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-shadow: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ถ้าหน้าไหนใช้โครง Header ใหม่แบบ Dashboard */
+.pageIcon {
+  color: #1559f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pageIcon span {
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.pageTitleBox {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #172033;
+  line-height: 1.1;
+}
+
+.pageDate {
+  margin: 5px 0 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: #8a97aa;
+}
+
+.notificationBtn {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 18px;
+  background: #f4f7fb;
+  color: #24344d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.notificationBtn:hover {
+  background: #edf3fb;
+}
+
+.redDot {
+  position: absolute;
+  top: 11px;
+  right: 12px;
+  width: 10px;
+  height: 10px;
+  background: #ff3b45;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+}
+
+.adminBox {
+  height: 54px;
+  padding: 0 16px 0 12px;
+  border-radius: 18px;
+  background: #f7f9fc;
+  border: 1px solid #edf0f5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.adminAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: #1559f6;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.adminText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.adminText span {
+  font-size: 15px;
+  font-weight: 700;
+  color: #172033;
+}
+
+.adminText small {
+  margin-top: 3px;
+  font-size: 12px;
+  color: #8a97aa;
+}
+
+/* ===== Layout หลัก ให้ไม่โดน Sidebar/Header ทับ ===== */
+
+.Wrapper,
+.wrapper {
+  margin-left: var(--sidebar-current-width, 72px);
+  padding-top: 78px;
+  width: auto;
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  transition: margin-left 0.25s ease;
+}
+
+/* หน้า admin / appointment / help / medicalrecords ส่วนมากใช้ contentArea */
+.contentArea {
+  flex: 1;
+  min-width: 0;
+  height: calc(100dvh - 78px);
+  overflow: auto;
+  padding: 24px clamp(24px, 2.2vw, 42px);
+  border-radius: 0;
+  text-align: initial;
+  font-size: initial;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(219, 234, 254, 0.8),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(254, 243, 199, 0.5),
+      transparent 28%
+    ),
+    #f8fafc;
+  font-family: "Prompt", sans-serif;
+}
+
+/* หน้า compile ใช้ dashboard เป็น content หลัก */
+.dashboard {
+  flex: 1;
+  min-width: 0;
+  height: calc(100dvh - 78px);
+  overflow: auto;
+  padding: 24px clamp(24px, 2.2vw, 42px);
+  border-radius: 0;
+  text-align: initial;
+  font-size: initial;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(219, 234, 254, 0.8),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(254, 243, 199, 0.5),
+      transparent 28%
+    ),
+    #f8fafc;
+  font-family: "Prompt", sans-serif;
+}
+
+/* ถ้าหน้าไหนใช้ main เป็น content หลัก */
+.main {
+  flex: 1;
+  min-width: 0;
+  height: calc(100dvh - 78px);
+  overflow: auto;
+  padding: 24px clamp(24px, 2.2vw, 42px);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(219, 234, 254, 0.8),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(254, 243, 199, 0.5),
+      transparent 28%
+    ),
+    #f8fafc;
+}
+
+/* scrollbar ให้เหมือน dashboard */
+.contentArea::-webkit-scrollbar,
+.dashboard::-webkit-scrollbar,
+.main::-webkit-scrollbar {
+  width: 7px;
+}
+
+.contentArea::-webkit-scrollbar-thumb,
+.dashboard::-webkit-scrollbar-thumb,
+.main::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+/* ===== Search ในหน้า admin ให้เข้ากับ header ใหม่ ===== */
+
+.searchInput {
+  height: 42px;
+  padding: 0 14px;
+  font-size: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  outline: none;
+  width: min(300px, 32vw);
+  background-color: #f8fafc;
+  color: #172033;
+  box-shadow: none;
+  transition: all 0.2s ease;
+}
+
+.searchInput:focus {
+  background-color: #ffffff;
+  border-color: #1559f6;
+  box-shadow: 0 0 0 3px rgba(21, 89, 246, 0.12);
+}
+
+.searchButton {
+  height: 42px;
+  border: none;
+  color: #ffffff;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 14px;
+  background: #1559f6;
+  transition: 0.2s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.searchButton:hover {
+  background: #0f46c8;
+}
+
+/* ===== Responsive ===== */
+
+@media (max-width: 768px) {
+  .header {
+    left: 64px;
+    height: 70px;
+    padding: 0 14px;
+  }
+
+  .Wrapper,
+  .wrapper {
+    margin-left: 64px;
+    padding-top: 70px;
+  }
+
+  .contentArea,
+  .dashboard,
+  .main {
+    height: calc(100dvh - 70px);
+    padding: 16px 14px;
+  }
+
+  .brand,
+  .pageTitle {
+    font-size: 18px;
+  }
+
+  .pageDate {
+    font-size: 11px;
+  }
+
+  .notificationBtn {
+    width: 42px;
+    height: 42px;
+    border-radius: 15px;
+  }
+
+  .adminBox {
+    height: 46px;
+    padding: 0 8px;
+  }
+
+  .adminText {
+    display: none;
+  }
+
+  .adminAvatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+  }
+
+  .searchInput {
+    width: 100%;
+    max-width: 180px;
+  }
+}
+
+/* =========================================================
+   Medical Records UI from Figma
+========================================================= */
+
+.pageIcon {
+  color: #1559f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.medicalPanel {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e6edf5;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+}
+
+.medicalPanelHeader {
+  min-height: 96px;
+  padding: 26px 28px 22px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #eef3f8;
+  background: #ffffff;
+}
+
+.medicalTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #1559f6;
+}
+
+.medicalTitleGroup h2 {
+  margin: 0;
+  color: #102033;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.medicalTitleGroup p {
+  margin: 6px 0 0;
+  color: #8a9bb8;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.medicalTableWrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.modernMedicalTable {
+  width: 100%;
+  min-width: 1080px;
+  border-collapse: collapse;
+  font-family: "Prompt", sans-serif;
+}
+
+.modernMedicalTable thead tr {
+  background: #1f5ff2;
+}
+
+.modernMedicalTable th {
+  padding: 19px 22px;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.modernMedicalTable td {
+  padding: 18px 22px;
+  color: #334f70;
+  font-size: 16px;
+  vertical-align: middle;
+  border-bottom: 1px solid #eef3f8;
+  background: #ffffff;
+}
+
+.modernMedicalTable tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+.modernMedicalTable tbody tr:hover td {
+  background: #eef5ff;
+}
+
+.modernMedicalTable .dateGroupRow td,
+.modernMedicalTable .dateGroupRow:hover td {
+  padding: 13px 22px;
+  border-top: 1px solid #cfddf0;
+  border-bottom: 1px solid #cfddf0;
+  background: linear-gradient(90deg, #eaf2ff, #f6f9ff);
+}
+
+.modernMedicalTable .todayGroupRow td,
+.modernMedicalTable .todayGroupRow:hover td {
+  padding-top: 16px;
+  padding-bottom: 16px;
+  border-top: 2px solid #2563eb;
+  border-bottom: 2px solid #2563eb;
+  background: linear-gradient(90deg, #dbeafe 0%, #eff6ff 58%, #ffffff 100%);
+  box-shadow: inset 5px 0 0 #2563eb;
+}
+
+.todayGroupRow .dateGroupHeader {
+  color: #1d4ed8;
+}
+
+.todayGroupRow .dateGroupHeader strong {
+  color: #12376b;
+  font-size: 17px;
+}
+
+.todayGroupBadge {
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.22);
+}
+
+.dateGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #1f5ff2;
+}
+
+.dateGroupHeader strong {
+  color: #173b73;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.dateGroupHeader span {
+  margin-left: auto;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #6480a7;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(31, 95, 242, 0.08);
+}
+
+.queueBadge {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: #dceafe;
+  color: #0b5cf0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.patientCodeBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  padding: 7px 12px;
+  border-radius: 12px;
+  background: #dceafe;
+  color: #0b5cf0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.patientNameCell {
+  color: #102033 !important;
+  font-size: 17px !important;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.visitDateCell {
+  white-space: nowrap;
+}
+
+.todayDateBadge {
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #16a34a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.morningBadgeModern,
+.afternoonBadgeModern {
+  height: 31px;
+  padding: 0 13px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.morningBadgeModern {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.afternoonBadgeModern {
+  background: #ffedd5;
+  color: #f97316;
+}
+
+.recordedStatus,
+.notRecordedStatus {
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.recordedStatus {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.notRecordedStatus {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.recordIconBtn,
+.recordIconDone,
+.recordIconLocked {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: 0.2s ease;
+}
+
+.recordIconBtn {
+  background: #eff6ff;
+  color: #0b63ff;
+}
+
+.recordIconBtn:hover {
+  background: #dbeafe;
+  transform: translateY(-1px);
+}
+
+.recordIconDone {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.recordIconDone:hover {
+  background: #bbf7d0;
+  transform: translateY(-1px);
+}
+
+.recordIconLocked {
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.hintText {
+  padding: 32px;
+  color: #64748b;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.emptyBox {
+  margin: 24px;
+  padding: 32px;
+  border-radius: 18px;
+  background: #f8fafc;
+  color: #94a3b8;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .medicalPanelHeader {
+    padding: 22px 20px;
+  }
+
+  .medicalTitleGroup h2 {
+    font-size: 18px;
+  }
+
+  .modernMedicalTable {
+    min-width: 980px;
+  }
+}
+
+
+
+/* =========================================================
+   Medical Record Form Page
+   เพิ่มส่วนนี้ท้ายไฟล์ Medicalrecords.module.css
+========================================================= */
+
+.medicalHeaderActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.historyLink {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #1559f6;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: 0.2s ease;
+}
+
+.historyLink:hover {
+  background: #dbeafe;
+  transform: translateY(-1px);
+}
+
+.medicalFooterText {
+  padding: 18px 24px;
+  border-top: 1px solid #eef3f8;
+  color: #8a9bb8;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.recordPage {
+  min-height: 100%;
+  background: transparent;
+  font-family: "Prompt", sans-serif;
+}
+
+.recordSubHeader {
+  position: sticky;
+  top: -24px;
+  z-index: 30;
+  min-height: 74px;
+  padding: 14px 18px;
+  margin: -24px -42px 24px;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid #e6edf5;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.recordSubHeaderLeft,
+.recordSubHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.backBtn,
+.cancelBtn,
+.saveBtn,
+.cancelBottomBtn,
+.saveBottomBtn {
+  border: none;
+  outline: none;
+  cursor: pointer;
+  font-family: "Prompt", sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  transition: 0.2s ease;
+  white-space: nowrap;
+}
+
+.backBtn {
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: transparent;
+  color: #64748b;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.backBtn:hover {
+  background: #f1f5f9;
+  color: #1559f6;
+}
+
+.recordDivider {
+  width: 1px;
+  height: 28px;
+  background: #e2e8f0;
+}
+
+.recordHeaderTitle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #1559f6;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.recordHeaderTitle span {
+  color: #334155;
+}
+
+.saveSuccessBadge {
+  height: 38px;
+  padding: 0 13px;
+  border-radius: 14px;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  color: #16a34a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  animation: fadePopup 0.25s ease;
+}
+
+.printRecordBtn {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #1559f6;
+  cursor: pointer;
+  font-family: "Prompt", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: 0.2s ease;
+}
+
+.printRecordBtn:hover {
+  background: #dbeafe;
+  transform: translateY(-1px);
+}
+
+.cancelBtn {
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.cancelBtn:hover {
+  background: #f8fafc;
+  color: #334155;
+}
+
+.saveBtn {
+  height: 42px;
+  padding: 0 20px;
+  border-radius: 14px;
+  background: #1559f6;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(21, 89, 246, 0.22);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.saveBtn:hover,
+.saveBottomBtn:hover {
+  background: #0f46c8;
+  transform: translateY(-1px);
+}
+
+.saveBtn:disabled,
+.saveBottomBtn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.recordContent {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.patientInfoCard,
+.doctorFormCard,
+.bottomActionBar {
+  background: #ffffff;
+  border: 1px solid #e6edf5;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+}
+
+.patientInfoHeader {
+  min-height: 64px;
+  padding: 18px 24px;
+  background: linear-gradient(90deg, #1559f6, #0f46c8);
+  display: flex;
+  align-items: center;
+}
+
+.patientInfoHeader p,
+.doctorFormHeader p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.patientInfoHeader p {
+  color: #bfdbfe;
+}
+
+.patientInfoBody {
+  padding: 24px;
+}
+
+.profileRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 22px;
+  padding-bottom: 22px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid #eef3f8;
+}
+
+.profileAvatar {
+  width: 86px;
+  height: 86px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #3b82f6, #1559f6);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 14px 24px rgba(21, 89, 246, 0.24);
+  font-size: 34px;
+  font-weight: 900;
+  overflow: hidden;
+}
+
+.profileAvatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profileText {
+  min-width: 0;
+}
+
+.profileText h2 {
+  margin: 0 0 8px;
+  color: #102033;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.profileMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.profileMeta span {
+  padding: 5px 10px;
+  border-radius: 10px;
+  background: #dceafe;
+  color: #0b5cf0;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.profileMeta small {
+  color: #cbd5e1;
+}
+
+.profileMeta p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.idText {
+  margin: 9px 0 0;
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.visitDateBox {
+  text-align: right;
+  min-width: 128px;
+}
+
+.visitDateBox small {
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.visitDateBox p {
+  margin: 4px 0 0;
+  color: #334155;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.infoMiniCard {
+  min-height: 86px;
+  padding: 14px;
+  border-radius: 17px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.infoMiniCard div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #94a3b8;
+}
+
+.infoMiniCard span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.infoMiniCard p {
+  margin: 10px 0 0;
+  color: #334155;
+  font-size: 15px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.infoDanger {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.infoDanger div,
+.infoDanger p {
+  color: #dc2626;
+}
+
+.infoWarning {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+.infoWarning div,
+.infoWarning p {
+  color: #ea580c;
+}
+
+.infoCondition {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+}
+
+.infoCondition div,
+.infoCondition p {
+  color: #4f46e5;
+}
+
+.infoBlue {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.infoBlue div,
+.infoBlue p {
+  color: #2563eb;
+}
+
+.infoGreen {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.infoGreen div,
+.infoGreen p {
+  color: #16a34a;
+}
+
+.infoCyan {
+  background: #ecfeff;
+  border: 1px solid #a5f3fc;
+}
+
+.infoCyan div,
+.infoCyan p {
+  color: #0891b2;
+}
+
+.infoTeal {
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+}
+
+.infoTeal div,
+.infoTeal p {
+  color: #0f766e;
+}
+
+.infoRose {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+}
+
+.infoRose div,
+.infoRose p {
+  color: #e11d48;
+}
+
+.doctorFormHeader {
+  min-height: 64px;
+  padding: 18px 24px;
+  background: linear-gradient(90deg, #334155, #1e293b);
+  display: flex;
+  align-items: center;
+}
+
+.doctorFormHeader p {
+  color: #cbd5e1;
+}
+
+.doctorFormBody {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.vitalInputGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid #dce6f2;
+  border-radius: 22px;
+  background: #f8fafc;
+}
+
+.vitalInputGrid .formGroup input {
+  max-width: none;
+}
+
+.drawingSummary {
+  border: 1px solid #dce6f2;
+  border-radius: 22px;
+  background: #f8fafc;
+  padding: 18px;
+}
+
+.drawingOpenButton {
+  width: 100%;
+  border: 0;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #172033;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.drawingOpenButton > span {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  background: #eaf2ff;
+  color: #1559f6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.drawingOpenButton strong,
+.drawingOpenButton small {
+  display: block;
+}
+
+.drawingOpenButton strong {
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.drawingOpenButton small {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.drawingPreviewBox {
+  margin-top: 14px;
+  border-radius: 18px;
+  border: 1px solid #dce6f2;
+  background: #ffffff;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.drawingPreviewBox img {
+  width: min(240px, 58%);
+  height: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.drawingPreviewActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.drawingPreviewBox button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 14px;
+  padding: 0 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.drawingPreviewEditBtn {
+  background: #1559f6;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(21, 89, 246, 0.2);
+}
+
+.drawingPreviewDeleteBtn {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.drawingEmptyPreview {
+  margin-top: 14px;
+  min-height: 74px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.drawingModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.drawingModal {
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  border-radius: 24px;
+  background: #ffffff;
+  border: 1px solid #dbe7f6;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28);
+  padding: 22px;
+}
+
+.drawingModalHeader,
+.drawingModalActions,
+.drawingToolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.drawingModalHeader {
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.drawingModalHeader strong,
+.drawingModalHeader span {
+  display: block;
+}
+
+.drawingModalHeader strong {
+  color: #172033;
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.drawingModalHeader span {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.drawingModalClose,
+.drawingToolbar button,
+.drawingCancelButton,
+.drawingSaveButton {
+  min-height: 42px;
+  border-radius: 14px;
+  padding: 0 15px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.drawingModalClose,
+.drawingCancelButton {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+}
+
+.drawingToolbar {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.drawingToolbar button {
+  border: 1px solid #dce6f2;
+  background: #f8fafc;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drawingToolbar .drawingToolActive {
+  border-color: #1559f6;
+  background: #eaf2ff;
+  color: #1559f6;
+}
+
+.drawingToolbar .drawingColorButton {
+  width: 42px;
+  min-width: 42px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 999px;
+  position: relative;
+}
+
+.drawingToolbar .drawingColorButton::before {
+  content: "";
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.16);
+}
+
+.drawingToolbar .drawingColorBlack::before {
+  background: #111827;
+}
+
+.drawingToolbar .drawingColorRed::before {
+  background: #dc2626;
+}
+
+.drawingToolbar .drawingColorActive {
+  border-color: #1559f6;
+  background: #eaf2ff;
+  box-shadow: 0 0 0 3px rgba(21, 89, 246, 0.12);
+}
+
+.bodyCanvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 600 / 390;
+  border: 1px solid #cbd5e1;
+  border-radius: 18px;
+  background: #ffffff;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.drawingModalActions {
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.drawingSaveButton {
+  border: 0;
+  background: #1559f6;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(21, 89, 246, 0.22);
+}
+
+.drawingConfirmOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.2), transparent 34%),
+    rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(4px);
+}
+
+.drawingConfirmDialog {
+  width: min(440px, 100%);
+  border: 1px solid #dbe7f6;
+  border-radius: 24px;
+  background: #ffffff;
+  padding: 28px;
+  text-align: center;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28);
+}
+
+.drawingConfirmIconSave,
+.drawingConfirmIconCancel {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drawingConfirmIconSave {
+  color: #1559f6;
+  background: #eaf2ff;
+}
+
+.drawingConfirmIconCancel {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.drawingConfirmDialog h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 21px;
+  font-weight: 900;
+}
+
+.drawingConfirmDialog p {
+  margin: 10px auto 24px;
+  max-width: 340px;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.drawingConfirmActions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.drawingConfirmGhostBtn,
+.drawingConfirmSaveBtn,
+.drawingConfirmDangerBtn {
+  min-height: 44px;
+  border-radius: 15px;
+  padding: 0 18px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.drawingConfirmGhostBtn {
+  border: 1px solid #dbe4ef;
+  background: #ffffff;
+  color: #64748b;
+}
+
+.drawingConfirmSaveBtn {
+  border: 0;
+  background: #1559f6;
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(21, 89, 246, 0.24);
+}
+
+.drawingConfirmDangerBtn {
+  border: 0;
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(220, 38, 38, 0.22);
+}
+
+.formGroup label {
+  margin-bottom: 10px;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.formGroup label span {
+  width: 31px;
+  height: 31px;
+  border-radius: 11px;
+  background: #eff6ff;
+  color: #1559f6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.formGroup textarea,
+.formGroup input {
+  width: 100%;
+  border: 1px solid #dce6f2;
+  border-radius: 17px;
+  outline: none;
+  background: #f8fafc;
+  color: #172033;
+  font-family: "Prompt", sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  transition: 0.2s ease;
+}
+
+.formGroup textarea {
+  min-height: 96px;
+  padding: 15px 17px;
+  resize: vertical;
+}
+
+.formGroup input {
+  max-width: 320px;
+  height: 48px;
+  padding: 0 17px;
+}
+
+.formGroup textarea:hover,
+.formGroup input:hover {
+  background: #ffffff;
+}
+
+.formGroup textarea:focus,
+.formGroup input:focus {
+  background: #ffffff;
+  border-color: #1559f6;
+  box-shadow: 0 0 0 4px rgba(21, 89, 246, 0.11);
+}
+
+.bottomActionBar {
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cancelBottomBtn {
+  height: 48px;
+  padding: 0 22px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.cancelBottomBtn:hover {
+  background: #f8fafc;
+  color: #334155;
+}
+
+.saveBottomBtn {
+  height: 48px;
+  padding: 0 30px;
+  border-radius: 16px;
+  background: #1559f6;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(21, 89, 246, 0.24);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.confirmOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.38);
+}
+
+.confirmDialog {
+  width: min(420px, 100%);
+  padding: 28px;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid #dbe7f6;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+  text-align: center;
+}
+
+.confirmIcon {
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 14px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1559f6;
+  background: #eaf2ff;
+}
+
+.confirmDialog h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.confirmDialog p {
+  margin: 10px 0 22px;
+  color: #64748b;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.confirmCancelBtn,
+.confirmSaveBtn {
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.confirmCancelBtn {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+.confirmSaveBtn {
+  background: #1559f6;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(21, 89, 246, 0.24);
+}
+
+.confirmSaveBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  box-shadow: none;
+}
+
+.recordIconBtn,
+.recordIconDone,
+.recordIconLocked {
+  border: none;
+  cursor: pointer;
+  font-family: "Prompt", sans-serif;
+}
+
+@media (max-width: 1180px) {
+  .infoGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .vitalInputGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .recordSubHeader {
+    margin-left: -24px;
+    margin-right: -24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .medicalHeaderActions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .medicalPanelHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .recordSubHeader {
+    top: -16px;
+    margin: -16px -14px 18px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .recordSubHeaderLeft,
+  .recordSubHeaderRight {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .saveBtn,
+  .cancelBtn {
+    flex: 1;
+  }
+
+  .profileRow {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+
+  .visitDateBox {
+    text-align: left;
+  }
+
+  .infoGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vitalInputGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bottomActionBar {
+    flex-direction: column-reverse;
+    gap: 12px;
+  }
+
+  .cancelBottomBtn,
+  .saveBottomBtn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .infoGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .vitalInputGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .profileAvatar {
+    width: 74px;
+    height: 74px;
+    border-radius: 21px;
+    font-size: 30px;
+  }
+
+  .profileText h2 {
+    font-size: 20px;
+  }
+}

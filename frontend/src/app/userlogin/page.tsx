@@ -9,9 +9,22 @@ import Swal from 'sweetalert2';
 import Link from 'next/link';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/navigation';
+import { API_BASE } from '@/lib/api';
+import ThaiDatePicker from '@/components/date/ThaiDatePicker';
 
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000';
 const RECAPTCHA_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? '';
+
+type ProvinceRow = {
+    name_th: string;
+};
+
+type LoginRequestBody =
+    | { email: string; password: string; remember_me: boolean }
+    | { username: string; password: string; remember_me: boolean };
+
+function getErrorMessage(error: unknown, fallback: string) {
+    return error instanceof Error ? error.message : fallback;
+}
 
 export default function LoginPage() {
     const [hasMounted, setHasMounted] = useState(false);
@@ -26,6 +39,8 @@ export default function LoginPage() {
     const [loginUsername, setLoginUsername] = useState('');
     const [loginPassword, setLoginPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+    const [rememberMe, setRememberMe] = useState(false);
 
     // recaptcha
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -38,9 +53,15 @@ export default function LoginPage() {
 
     useEffect(() => { setHasMounted(true); }, []);
     useEffect(() => {
+        const rememberedIdentifier = localStorage.getItem('rememberedLoginIdentifier');
+        if (rememberedIdentifier) {
+            setLoginUsername(rememberedIdentifier);
+            setRememberMe(true);
+        }
+    }, []);
+    useEffect(() => {
         const onResize = () => {
             setIsMobile(window.innerWidth <= 768);
-            setIsSignUp(false);
         };
         onResize();
         window.addEventListener('resize', onResize);
@@ -48,20 +69,20 @@ export default function LoginPage() {
     }, []);
 
     useEffect(() => {
-        fetch(`${BACKEND}/api/provinces`)
+        fetch(`${API_BASE}/provinces`)
             .then(r => r.json())
-            .then((rows: any[]) => setProvincesList(rows.map(it => it.name_th)))
+            .then((rows: ProvinceRow[]) => setProvincesList(rows.map(it => it.name_th)))
             .catch(() => setProvincesList([]));
-    }, [BACKEND]);
+    }, []);
 
     if (!hasMounted) return null;
 
     // ===== OAuth =====
     const handleGoogleLogin = () => {
-        window.location.href = `${BACKEND}/api/google/login`;
+        window.location.href = `${API_BASE}/google/login`;
     };
     const handleLineLogin = () => {
-        window.location.href = `${BACKEND}/api/line/login`;
+        window.location.href = `${API_BASE}/line/login`;
     };
 
     // ===== Register =====
@@ -100,21 +121,16 @@ export default function LoginPage() {
             national_id: fd.get('national_id') || '',
             phone: fd.get('phone') || '',
             address: fd.get('address') || '',
-            province_name: province,
+            province,
             birth_date: fd.get('birthdate') || '', // ฟอร์มเดิมชื่อ birthdate -> ส่งเป็น birth_date
             email, // emergency_email -> email (ให้ตรง backend)
             password,
             username: fd.get('username') || '', // ถ้าไม่ส่ง หลังบ้านจะ gen จากอีเมล
             ...(RECAPTCHA_KEY ? { captcha: captchaToken } : {})
         };
-        form.reset();
-        setProvince('');         // ✅ เคลียร์ค่าจังหวัดที่เลือก
-        setCaptchaToken(null);
-
-
         setLoadingReg(true);
         try {
-            const res = await fetch(`${BACKEND}/api/users/register`, {
+            const res = await fetch(`${API_BASE}/users/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -127,8 +143,8 @@ export default function LoginPage() {
             form.reset();
             setProvince('');
             setCaptchaToken(null);
-        } catch (err: any) {
-            Swal.fire({ icon: 'error', title: 'สมัครสมาชิกไม่สำเร็จ', text: err.message || 'เกิดข้อผิดพลาด' });
+        } catch (err: unknown) {
+            Swal.fire({ icon: 'error', title: 'สมัครสมาชิกไม่สำเร็จ', text: getErrorMessage(err, 'เกิดข้อผิดพลาด') });
         } finally {
             setLoadingReg(false);
         }
@@ -142,13 +158,14 @@ export default function LoginPage() {
             return;
         }
 
-        const body: any = { password: loginPassword };
-        if (loginUsername.includes('@')) body.email = loginUsername;
-        else body.username = loginUsername;
+        const identifier = loginUsername.trim();
+        const body: LoginRequestBody = identifier.includes('@')
+            ? { email: identifier, password: loginPassword, remember_me: rememberMe }
+            : { username: identifier, password: loginPassword, remember_me: rememberMe };
 
         setLoadingLogin(true);
         try {
-            const res = await fetch(`${BACKEND}/api/users/login`, {
+            const res = await fetch(`${API_BASE}/users/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -158,42 +175,50 @@ export default function LoginPage() {
             if (!res.ok) throw new Error(result?.error || result?.message || 'เข้าสู่ระบบไม่สำเร็จ');
 
             // { token, user:{ user_id, username, email, role } }
-            const remember = (document.getElementById('rememberMe') as HTMLInputElement | null)?.checked;
-            Cookies.set('adminToken', result.token, {
+            const role = String(result.user?.role || '').toLowerCase();
+            const isUser = role === 'user' || role === 'users';
+            Cookies.remove(isUser ? 'adminToken' : 'userToken');
+            Cookies.set(isUser ? 'userToken' : 'adminToken', result.token, {
                 sameSite: 'lax',
-                expires: remember ? 7 : 1
+                ...(rememberMe ? { expires: 7 } : {})
             });
 
             localStorage.setItem('user', JSON.stringify(result.user));
+            if (rememberMe) {
+                localStorage.setItem('rememberedLoginIdentifier', identifier);
+            } else {
+                localStorage.removeItem('rememberedLoginIdentifier');
+            }
 
             Swal.fire({ icon: 'success', title: 'เข้าสู่ระบบสำเร็จ', timer: 1200, showConfirmButton: false });
 
             // ส่งไปหน้า home ตาม role
-            const role = result.user?.role;
             const roleHome: Record<string, string> = {
-                super_admin: '/dashboard',
-                admin: '/admins',
-                doctor: '/doctor',
-                user: '/appointment'
+                super_admin: '/admin/dashboard',
+                superadmin: '/admin/dashboard',
+                admin: '/admin/dashboard',
+                doctor: '/admin/dashboard',
+                assistant: '/admin/dashboard',
+                user: '/users/userHome',
+                users: '/users/userHome'
             };
             setTimeout(() => router.push(roleHome[role] || '/'), 1300);
-        } catch (err: any) {
-            Swal.fire({ icon: 'error', title: 'เข้าสู่ระบบไม่สำเร็จ', text: err.message || 'เกิดข้อผิดพลาด' });
+        } catch (err: unknown) {
+            Swal.fire({ icon: 'error', title: 'เข้าสู่ระบบไม่สำเร็จ', text: getErrorMessage(err, 'เกิดข้อผิดพลาด') });
         } finally {
             setLoadingLogin(false);
         }
     };
 
     // ===== UI =====
-    const verifyOTPForm = null; // (ปิดไว้ก่อน เพราะ backend ยังไม่มี /verify-otp)
-
     const loginForm = (
         <form className={styles.formStyle} onSubmit={handleLogin}>
             <h1 className={styles.formTitle}>เข้าสู่ระบบ</h1>
 
             <input
                 type="text"
-                name="emergency_email"
+                name="username"
+                autoComplete="username"
                 placeholder="อีเมล หรือ ชื่อผู้ใช้"
                 required
                 className={styles.formInput}
@@ -205,24 +230,29 @@ export default function LoginPage() {
                 <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
+                    autoComplete="current-password"
                     placeholder="รหัสผ่าน"
                     required
                     className={styles.formInput}
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleLogin(e)}
                 />
-                <span className={styles.togglePasswordIcon} onClick={() => setShowPassword(prev => !prev)}>
-                    {showPassword ? <FaEyeSlash /> : <FaEye />}
-                </span>
+                <button type="button" className={styles.togglePasswordIcon}
+                    onClick={() => setShowPassword(prev => !prev)}
+                    aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                    aria-pressed={showPassword}>
+                    {showPassword ? <FaEye /> : <FaEyeSlash />}
+                </button>
             </div>
 
-            <div className={styles.rememberMeContainer}>
-                <input type="checkbox" id="rememberMe" className={styles.rememberMeCheckbox} />
-                <label htmlFor="rememberMe" className={styles.rememberMeLabel}>จำรหัสผ่าน</label>
+            <div className={styles.loginOptions}>
+                <div className={styles.rememberMeContainer}>
+                    <input type="checkbox" id="rememberMe" className={styles.rememberMeCheckbox}
+                        checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} />
+                    <label htmlFor="rememberMe" className={styles.rememberMeLabel}>จำรหัสผ่าน</label>
+                </div>
+                <Link href="/forgotpassword" className={styles.forgotPasswordLink}>ลืมรหัสผ่าน?</Link>
             </div>
-
-            <Link href="/forgotpassword" className={styles.forgotPasswordLink}>ลืมรหัสผ่าน?</Link>
 
             <div className={styles.socialLoginButtons}>
                 <button type="button" onClick={handleGoogleLogin} className={styles.iconCircleButton}>
@@ -271,28 +301,35 @@ export default function LoginPage() {
                 ))}
             </select>
 
-            <input type="date" name="birthdate" required className={styles.formInput} />
+            <ThaiDatePicker name="birthdate" required endYear={new Date().getFullYear()} />
 
             {/* อีเมล: ฟอร์มเดิมใช้ emergency_email แต่ backend ต้องการ email -> map แล้วตอนส่ง */}
             <input type="email" name="emergency_email" placeholder="อีเมล" required className={styles.formInput} />
 
             <div className={styles.passwordInputWrapper}>
                 <input
-                    type={showPassword ? 'text' : 'password'}
+                    type={showRegisterPassword ? 'text' : 'password'}
                     name="password"
+                    autoComplete="new-password"
                     placeholder="รหัสผ่าน (อย่างน้อย 6 ตัว)"
                     required
                     className={styles.formInput}
                 />
-                <span className={styles.togglePasswordIcon} onClick={() => setShowPassword(prev => !prev)}>
-                    {showPassword ? <FaEyeSlash /> : <FaEye />}
-                </span>
+                <button type="button" className={styles.togglePasswordIcon}
+                    onClick={() => setShowRegisterPassword(prev => !prev)}
+                    aria-label={showRegisterPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                    aria-pressed={showRegisterPassword}>
+                    {showRegisterPassword ? <FaEye /> : <FaEyeSlash />}
+                </button>
             </div>
 
-            <input type={showPassword ? 'text' : 'password'} name="confirm_password" placeholder="ยืนยันรหัสผ่าน" required className={styles.formInput} />
+            <input type="password" name="confirm_password" autoComplete="new-password"
+                placeholder="ยืนยันรหัสผ่าน" required className={styles.formInput} />
 
             {RECAPTCHA_KEY ? (
-                <ReCAPTCHA sitekey={RECAPTCHA_KEY} onChange={(token) => setCaptchaToken(token)} />
+                <div className={styles.recaptchaWrapper}>
+                    <ReCAPTCHA sitekey={RECAPTCHA_KEY} onChange={(token) => setCaptchaToken(token)} />
+                </div>
             ) : (
                 <small style={{ color: '#666' }}>
                     *ยังไม่ได้ตั้งค่า reCAPTCHA (กำหนด <code>NEXT_PUBLIC_RECAPTCHA_SITE_KEY</code> ใน <code>.env.local</code> เพื่อเปิดใช้งาน)
@@ -322,14 +359,20 @@ export default function LoginPage() {
                         <button
                             onClick={() => setIsSignUp(false)}
                             className={styles.formButton}
-                            style={{ marginRight: '10px', backgroundColor: isSignUp ? '#aaa' : '#000066' }}
+                            style={{
+                                backgroundColor: isSignUp ? 'transparent' : '#000066',
+                                color: isSignUp ? '#64748b' : '#fff'
+                            }}
                         >
                             เข้าสู่ระบบ
                         </button>
                         <button
                             onClick={() => setIsSignUp(true)}
                             className={styles.formButton}
-                            style={{ backgroundColor: isSignUp ? '#000066' : '#aaa' }}
+                            style={{
+                                backgroundColor: isSignUp ? '#000066' : 'transparent',
+                                color: isSignUp ? '#fff' : '#64748b'
+                            }}
                         >
                             สมัครสมาชิก
                         </button>

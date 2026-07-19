@@ -4,7 +4,7 @@ export function middleware(request: NextRequest) {
     const token = request.cookies.get("adminToken")?.value;
 
     if (request.nextUrl.pathname.startsWith("/admin") && !token) {
-    return NextResponse.redirect(new URL("/admin/login", request.url));
+    return NextResponse.redirect(new URL("/userlogin", request.url));
     }
 
     return NextResponse.next();

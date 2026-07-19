@@ -1,0 +1,582 @@
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700;800&display=swap');
+
+.wrapper {
+  min-height: calc(100vh - 135px);
+  padding: 24px clamp(16px, 4vw, 56px) 72px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: 'Prompt', sans-serif;
+  box-sizing: border-box;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  max-width: 1180px;
+  margin: 0 auto 18px;
+}
+
+.pageHeader > div:first-child {
+  min-width: 0;
+}
+
+.pageHeader h1 {
+  margin: 0;
+  font-size: clamp(20px, 3.4vw, 28px);
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1.2;
+}
+
+.pageHeader p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: clamp(11px, 1.6vw, 14px);
+  line-height: 1.45;
+}
+
+.toggleButtons {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #e2e8f0;
+  border-radius: 16px;
+  width: fit-content;
+}
+
+.activeButton,
+.inactiveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 clamp(10px, 1.7vw, 16px);
+  border: 0;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: clamp(12px, 1.5vw, 14px);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.activeButton {
+  background: #ffffff;
+  color: #0f766e;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.inactiveButton {
+  background: transparent;
+  color: #64748b;
+}
+
+.inactiveButton:hover {
+  color: #334155;
+}
+
+.main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  max-width: 1180px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.leftPanel,
+.rightPanel {
+  position: relative;
+  min-width: 0;
+}
+
+.dateFilterCard {
+  position: relative;
+  min-height: 360px;
+  padding: 22px;
+  overflow: visible;
+  background:
+    linear-gradient(180deg, rgba(240, 253, 250, 0.72), rgba(255, 255, 255, 0) 44%),
+    #ffffff;
+  border: 1px solid #dbe7f1;
+  border-radius: 20px;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
+}
+
+.dateFilterCard::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 5px;
+  background: linear-gradient(90deg, #14b8a6, #2563eb);
+}
+
+.filterPanelHeader {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.filterIconBox {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  color: #0f766e;
+  background: #ccfbf1;
+  box-shadow: inset 0 0 0 1px rgba(20, 184, 166, 0.18);
+}
+
+.filterPanelHeader h2,
+.filterPanelHeader p {
+  margin: 0;
+}
+
+.filterPanelHeader h2 {
+  color: #0f2f5f;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.filterPanelHeader p {
+  margin-top: 3px;
+  color: #66809d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dateControls {
+  position: relative;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: minmax(86px, 0.85fr) minmax(140px, 1.25fr) minmax(96px, 0.9fr) 56px;
+  gap: 12px;
+  align-items: center;
+}
+
+.dateControls select {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 42px 0 14px;
+  border: 1px solid #dbe7f1;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #24466d;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  outline: none;
+  transition: border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.dateControls select:focus {
+  border-color: #14b8a6;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
+}
+
+.datePreview {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 50px;
+  border: 0;
+  border-radius: 14px;
+  background: #0f766e;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 12px 22px rgba(15, 118, 110, 0.18);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.datePreview:hover {
+  background: #115e59;
+  transform: translateY(-1px);
+}
+
+.calendarPopoverOverlay {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 3000;
+  padding-top: 6px;
+}
+
+.calendarPopover {
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 210px));
+  overflow: auto;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid #dbe7f1;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.2);
+}
+
+.calendarPopover :global(.calendarWrapper) {
+  width: 100%;
+}
+
+.calendarPopover :global(.headerRow) {
+  padding: 12px 14px;
+}
+
+.calendarPopover :global(.monthSection) {
+  font-size: 16px;
+}
+
+.calendarPopover :global(.dropdownToggle),
+.calendarPopover :global(.navButtons button) {
+  width: 30px;
+  height: 30px;
+}
+
+.calendarPopover :global(.infoBanner),
+.calendarPopover :global(.legend) {
+  display: none;
+}
+
+.calendarPopover :global(.dayLabels) {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+}
+
+.calendarPopover :global(.dayLabel) {
+  min-height: 22px;
+}
+
+.calendarPopover :global(.dayGrid) {
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+.calendarPopover :global(.dayCell) {
+  min-height: 52px;
+  border-radius: 8px;
+}
+
+.calendarPopover :global(.emptyCell) {
+  min-height: 52px;
+}
+
+.calendarPopover :global(.dayNumber) {
+  font-size: 14px;
+}
+
+.calendarPopover :global(.statusLabel) {
+  font-size: 9px;
+}
+
+.allQueueButton {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 22px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #1559f6;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px #dbeafe;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.allQueueButton:hover {
+  background: #1559f6;
+  color: #ffffff;
+}
+
+.filterHint {
+  min-height: 52px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border: 1px solid #dbe7f1;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #66809d;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.appointmentResults {
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e6eef7;
+}
+
+.rightPanel {
+  display: none;
+}
+
+.rightPanel > .panelHeader {
+  display: none;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+}
+
+.iconBox {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  color: #14b8a6;
+  background: #ccfbf1;
+}
+
+.panelHeader h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.panelHeader p {
+  margin: 3px 0 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.appointmentList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.appointmentCard {
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+}
+
+.sessionMorning,
+.sessionAfternoon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+}
+
+.sessionMorning {
+  color: #d97706;
+  background: #fef3c7;
+}
+
+.sessionAfternoon {
+  color: #4f46e5;
+  background: #e0e7ff;
+}
+
+.cardContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardTop h3 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.statusBadge {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.status_approved {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status_cancelled,
+.status_rejected {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.metaRow span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.reason {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 13px;
+}
+
+.emptyState,
+.errorState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  padding: 28px;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  color: #94a3b8;
+}
+
+.emptyState svg {
+  margin-bottom: 10px;
+  color: #14b8a6;
+  opacity: 0.65;
+}
+
+.emptyState strong {
+  color: #334155;
+  font-size: 15px;
+}
+
+.emptyState span {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.errorState {
+  min-height: auto;
+  color: #dc2626;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+@media (max-width: 960px) {
+  .pageHeader {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .main {
+    grid-template-columns: 1fr;
+  }
+
+  .dateFilterCard {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .wrapper {
+    padding: 18px 12px 68px;
+  }
+
+  .pageHeader {
+    gap: 8px;
+  }
+
+  .toggleButtons {
+    width: auto;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 12px;
+  }
+
+  .activeButton,
+  .inactiveButton {
+    flex: 0 0 auto;
+    min-height: 31px;
+    gap: 5px;
+    padding: 0 7px;
+    border-radius: 9px;
+    font-size: 11px;
+  }
+
+  .activeButton svg,
+  .inactiveButton svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .appointmentCard {
+    padding: 14px;
+  }
+
+  .dateControls {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .datePreview {
+    width: 100%;
+  }
+
+  .calendarPopoverOverlay {
+    left: 0;
+    right: 0;
+  }
+
+  .calendarPopover {
+    width: 100%;
+    max-height: min(500px, calc(100vh - 210px));
+  }
+
+  .allQueueButton {
+    width: 100%;
+    margin-top: 18px;
+  }
+
+  .cardTop {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

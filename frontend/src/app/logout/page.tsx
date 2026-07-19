@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState } from 'react';
 import Cookies from 'js-cookie';
@@ -48,7 +49,7 @@ export default function LogoutPage() {
         localStorage.clear();               // เคลียร์ cache เพิ่มเติม
 
         // ใช้ replace() ป้องกัน user กด Back แล้วกลับเข้าไป dashboard ได้
-        router.replace('login');
+        router.replace('userlogin');
     };
 
     // ปุ่มยกเลิก → กลับหน้าก่อนหน้า

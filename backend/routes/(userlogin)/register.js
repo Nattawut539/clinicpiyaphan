@@ -33,21 +33,24 @@ router.post("/register", async (req, res) => {
       username,
     } = req.body || {};
 
-    if (!email || !password || !first_name || !last_name) {
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedUsername = username ? String(username).trim() : "";
+
+    if (!normalizedEmail || !password || !first_name || !last_name) {
       return res.status(400).json({ error: "ข้อมูลไม่ครบถ้วน" });
     }
 
     // ตรวจซ้ำ username / email
-    if (username) {
+    if (normalizedUsername) {
       const q1 = await client.query(
-        "SELECT 1 FROM clinic.users WHERE username=$1",
-        [username]
+        "SELECT 1 FROM clinic.users WHERE LOWER(username) = LOWER($1)",
+        [normalizedUsername]
       );
       if (q1.rowCount)
         return res.status(409).json({ error: "Username นี้ถูกใช้แล้ว" });
     }
-    const q2 = await client.query("SELECT 1 FROM clinic.users WHERE email=$1", [
-      email,
+    const q2 = await client.query("SELECT 1 FROM clinic.users WHERE LOWER(email) = $1", [
+      normalizedEmail,
     ]);
     if (q2.rowCount)
       return res.status(409).json({ error: "Email นี้ถูกใช้แล้ว" });
@@ -65,18 +68,18 @@ router.post("/register", async (req, res) => {
     }
 
     // gen username ถ้าไม่ส่งมา
-    let finalUsername = username;
+    let finalUsername = normalizedUsername;
     if (!finalUsername) {
-      finalUsername = email.split("@")[0].toLowerCase();
+      finalUsername = normalizedEmail.split("@")[0].toLowerCase();
       // กันชนกับของเดิม
       let i = 1;
       while (true) {
         const chk = await client.query(
-          "SELECT 1 FROM clinic.users WHERE username=$1",
+          "SELECT 1 FROM clinic.users WHERE LOWER(username)=LOWER($1)",
           [finalUsername]
         );
         if (!chk.rowCount) break;
-        finalUsername = `${email.split("@")[0].toLowerCase()}${++i}`;
+        finalUsername = `${normalizedEmail.split("@")[0].toLowerCase()}${++i}`;
       }
     }
 
@@ -86,7 +89,7 @@ router.post("/register", async (req, res) => {
     const u = await client.query(
       `INSERT INTO clinic.users (username, email, password_hash, role)
        VALUES ($1,$2,$3,'user') RETURNING user_id, username, email, role`,
-      [finalUsername, email, password_hash]
+      [finalUsername, normalizedEmail, password_hash]
     );
     const user_id = u.rows[0].user_id;
 
@@ -105,7 +108,7 @@ router.post("/register", async (req, res) => {
         address || null,
         province_code,
         birth_date || null,
-        email,
+        normalizedEmail,
       ]
     );
 
