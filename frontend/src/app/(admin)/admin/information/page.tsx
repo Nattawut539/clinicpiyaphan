@@ -108,6 +108,7 @@ function PatientProfileContent() {
     const isPatientDirty = (next: Patient, original: Patient | null) => {
         if (!original) return false;
         const keys: (keyof Patient)[] = [
+            'national_id',
             'dob',
             'address',
             'nationality',
@@ -129,8 +130,9 @@ function PatientProfileContent() {
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
     ) => {
         const { name, value } = e.target;
+        const nextValue = name === 'national_id' ? value.replace(/\D/g, '').slice(0, 13) : value;
         setPatient(prev => {
-            const next = { ...prev, [name]: value } as Patient;
+            const next = { ...prev, [name]: nextValue } as Patient;
             setIsDirty(isPatientDirty(next, originalPatient));
             return next;
         });
@@ -185,6 +187,14 @@ function PatientProfileContent() {
     }
 
     const requestSave = () => {
+        if (patient.national_id && !/^\d{13}$/.test(patient.national_id)) {
+            setPopupMessage('เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก');
+            setPopupType('error');
+            setShowPopup(true);
+            setTimeout(() => setShowPopup(false), 2000);
+            return;
+        }
+
         if (!isDirty && !preview) {
             setPopupMessage('กรุณาแก้ไข หรือเพิ่มเติมข้อมูลก่อนบันทึก');
             setPopupType('error');
@@ -200,6 +210,7 @@ function PatientProfileContent() {
         try {
             setUploading(true);
             const body = {
+                national_id: patient.national_id,
                 birth_date: patient.dob,
                 address: patient.address,
                 nationality: patient.nationality,
@@ -438,6 +449,20 @@ function PatientProfileContent() {
 
                             <hr className={styles.divider} />
                             <div className={styles.infoGroup}>
+                                <div className={styles.inlineGroup}>
+                                    <span>เลขบัตรประชาชน :</span>
+                                    <input
+                                        name="national_id"
+                                        value={patient.national_id || ''}
+                                        onChange={handleChange}
+                                        maxLength={13}
+                                        inputMode="numeric"
+                                        pattern="[0-9]{13}"
+                                        placeholder="กรอกเลขบัตรประชาชน 13 หลัก"
+                                        className={styles.inputmessage}
+                                    />
+                                </div>
+
                                 <div className={styles.inlineGroup}>
                                     <span>วันเดือนปีเกิด :</span>
                                     <ThaiDatePicker

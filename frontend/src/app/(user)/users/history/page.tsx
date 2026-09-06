@@ -23,6 +23,21 @@ dayjs.locale('th');
 
 const API = API_BASE.endsWith('/api') ? API_BASE : `${API_BASE}/api`;
 
+const THAI_MONTHS = [
+  'มกราคม',
+  'กุมภาพันธ์',
+  'มีนาคม',
+  'เมษายน',
+  'พฤษภาคม',
+  'มิถุนายน',
+  'กรกฎาคม',
+  'สิงหาคม',
+  'กันยายน',
+  'ตุลาคม',
+  'พฤศจิกายน',
+  'ธันวาคม',
+];
+
 type MedicalRecord = {
   record_id: number | string;
   feedback_record_id?: number | string;
@@ -149,9 +164,37 @@ export default function UserHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [openFeedbackKeys, setOpenFeedbackKeys] = useState<Record<string, boolean>>({});
+  const [filterDay, setFilterDay] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
+  const [filterYear, setFilterYear] = useState('');
 
   const groupedRecords = useMemo(() => groupRecordsByVisitDate(records), [records]);
   const latestRecord = groupedRecords[0];
+
+  const availableYears = useMemo(() => {
+    const years = groupedRecords
+      .map((record) => dayjs(record.visit_date))
+      .filter((date) => date.isValid())
+      .map((date) => date.year() + 543);
+    return Array.from(new Set(years)).sort((a, b) => b - a);
+  }, [groupedRecords]);
+
+  const hasDateFilter = Boolean(filterDay || filterMonth || filterYear);
+  const filteredRecords = useMemo(
+    () => groupedRecords.filter((record) => {
+      if (!hasDateFilter) return true;
+      if (!record.visit_date) return false;
+      const visitDate = dayjs(record.visit_date);
+      if (!visitDate.isValid()) return false;
+
+      return (
+        (!filterDay || visitDate.date() === Number(filterDay)) &&
+        (!filterMonth || visitDate.month() + 1 === Number(filterMonth)) &&
+        (!filterYear || visitDate.year() + 543 === Number(filterYear))
+      );
+    }),
+    [filterDay, filterMonth, filterYear, groupedRecords, hasDateFilter]
+  );
 
   const feedbackByRecord = useMemo(() => {
     const map = new Map<string, Feedback>();
@@ -313,12 +356,41 @@ export default function UserHistoryPage() {
 
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
-          <div className={styles.iconBox}>
-            <FileClock size={26} />
+          <div className={styles.panelHeaderMain}>
+            <div className={styles.iconBox}>
+              <FileClock size={26} />
+            </div>
+            <div>
+              <h2>รายการรักษาของฉัน</h2>
+              <p>
+                {loading
+                  ? 'กำลังโหลดข้อมูล...'
+                  : hasDateFilter
+                    ? `พบ ${filteredRecords.length} จาก ${groupedRecords.length} รายการ`
+                    : `${groupedRecords.length} รายการ`}
+              </p>
+            </div>
           </div>
-          <div>
-            <h2>รายการรักษาของฉัน</h2>
-            <p>{loading ? 'กำลังโหลดข้อมูล...' : `${groupedRecords.length} รายการ`}</p>
+
+          <div className={styles.dateSearchBox}>
+            <select value={filterDay} onChange={(event) => setFilterDay(event.target.value)} aria-label="เลือกวันที่">
+              <option value="">วันทั้งหมด</option>
+              {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
+                <option key={day} value={day}>{day}</option>
+              ))}
+            </select>
+            <select value={filterMonth} onChange={(event) => setFilterMonth(event.target.value)} aria-label="เลือกเดือน">
+              <option value="">เดือนทั้งหมด</option>
+              {THAI_MONTHS.map((month, index) => (
+                <option key={month} value={index + 1}>{month}</option>
+              ))}
+            </select>
+            <select value={filterYear} onChange={(event) => setFilterYear(event.target.value)} aria-label="เลือกปี พ.ศ.">
+              <option value="">ปีทั้งหมด</option>
+              {availableYears.map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -334,8 +406,16 @@ export default function UserHistoryPage() {
           </div>
         )}
 
+        {!loading && !error && groupedRecords.length > 0 && filteredRecords.length === 0 && (
+          <div className={styles.emptyState}>
+            <FileClock size={44} />
+            <strong>ไม่พบประวัติในวันที่เลือก</strong>
+            <span>ลองเปลี่ยนวัน เดือน หรือปี แล้วค้นหาอีกครั้ง</span>
+          </div>
+        )}
+
         <div className={styles.recordList}>
-          {groupedRecords.map((record) => {
+          {filteredRecords.map((record) => {
             const key = getFeedbackKey(record);
             const draft = getDraft(record);
             const hasSavedFeedback = feedbackByRecord.has(key);

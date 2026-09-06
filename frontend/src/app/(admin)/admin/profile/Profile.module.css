@@ -8,7 +8,7 @@
 .backLink { display: inline-flex; align-items: center; gap: 7px; color: #1559f6; font-size: 14px; font-weight: 700; text-decoration: none; }
 .editButton { padding: 10px 15px; border: 0; border-radius: 13px; background: #1559f6; color: #fff; display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .stateCard, .profileCard { width: min(900px, 100%); margin: 0 auto; padding: 30px; border: 1px solid #e1eaf4; border-radius: 24px; background: rgba(255,255,255,.97); box-shadow: 0 14px 36px rgba(30,64,175,.07); }
-.stateCard { text-align: center; color: #64748b; }.error { color: #dc2626; }
+.stateCard { text-align: center; color: #64748b; }
 .profileHero { display: flex; align-items: center; gap: 24px; padding: 4px 4px 30px; border-bottom: 1px solid #e8eef5; }
 .avatar { position: relative; width: 104px; height: 104px; overflow: visible; border-radius: 28px; flex-shrink: 0; background: linear-gradient(135deg,#1559f6,#4c82ff); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 44px; font-weight: 800; box-shadow: 0 12px 26px rgba(21,89,246,.22); }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }

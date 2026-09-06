@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../tools/db");
-const { authRequired, requireStaff } = require("../tools/_utils");
+const { authRequired, requireStaff, requireRole, withContext } = require("../tools/_utils");
 
 /* =====================================================
    Helper
@@ -26,6 +26,8 @@ router.post("/help", authRequired, async (req, res) => {
     visibility,
     related_feedback_id,
   } = req.body;
+  const normalizedCategory = String(category || "").trim().toLowerCase();
+  const isDeactivationRequest = normalizedCategory === "account_deactivation";
 
   if (!title || title.trim() === "") {
     return res.status(400).json({ message: "กรุณาระบุหัวข้อคำถาม" });
@@ -44,9 +46,9 @@ router.post("/help", authRequired, async (req, res) => {
         req.user.user_id,
         title.trim(),
         description || null,
-        category || null,
+        normalizedCategory || null,
         tags || [],
-        visibility || "private",
+        isDeactivationRequest ? "private" : visibility || "private",
         related_feedback_id || null,
       ]
     );
@@ -57,6 +59,92 @@ router.post("/help", authRequired, async (req, res) => {
     res.status(500).json({ message: "ไม่สามารถส่งคำถามได้" });
   }
 });
+
+router.put(
+  "/help/:id/status",
+  requireRole("admin", "super_admin", "superadmin"),
+  async (req, res, next) => {
+    const helpId = Number(req.params.id);
+    const requestStatus = String(req.body?.request_status || "").trim().toLowerCase();
+    const reviewNote = String(req.body?.review_note || "").trim();
+    const verificationMethod = String(req.body?.verification_method || "").trim();
+    if (!helpId || !["approved", "rejected", "cancelled"].includes(requestStatus)) {
+      return res.status(400).json({ message: "สถานะคำร้องไม่ถูกต้อง" });
+    }
+    if (["approved", "rejected"].includes(requestStatus) && !reviewNote) {
+      return res.status(400).json({ message: "กรุณาระบุผลหรือเหตุผลการตรวจสอบ" });
+    }
+    try {
+      await withContext(req, async (client) => {
+        const requestResult = await client.query(
+          `SELECT help_id, user_id, category, request_status
+           FROM clinic.help_requests WHERE help_id = $1 FOR UPDATE`,
+          [helpId],
+        );
+        if (!requestResult.rowCount) return res.status(404).json({ message: "ไม่พบคำร้อง" });
+        const request = requestResult.rows[0];
+        if (request.request_status !== "pending") {
+          return res.status(409).json({ message: "คำร้องนี้ได้รับการดำเนินการแล้ว" });
+        }
+        if (request.category === "account_deactivation" && requestStatus === "approved") {
+          if (!verificationMethod) {
+            return res.status(400).json({ message: "กรุณาระบุวิธีตรวจสอบตัวตน" });
+          }
+          await client.query(
+            `UPDATE clinic.users
+             SET account_status = 'deactivated', deactivated_at = now(),
+                 status_reason = $1, status_changed_at = now(), status_changed_by = $2,
+                 session_version = session_version + 1
+             WHERE user_id = $3`,
+            [reviewNote, req.user.user_id, request.user_id],
+          );
+          const appointments = await client.query(
+            `UPDATE clinic.appointments a
+             SET status = 'cancelled', action_taken = true,
+                 cancellation_reason = 'บัญชีถูกปิดใช้งานตามคำขอของผู้ใช้'
+             FROM clinic.appointment_slots s
+             WHERE a.slot_id = s.slot_id AND a.user_id = $1
+               AND s.service_date >= CURRENT_DATE
+               AND a.status IN ('pending','waiting')
+             RETURNING a.appointment_id, a.slot_id`,
+            [request.user_id],
+          );
+          const appointmentIds = appointments.rows.map((row) => row.appointment_id);
+          const slotIds = appointments.rows.map((row) => row.slot_id);
+          if (appointmentIds.length) {
+            await client.query(
+              `UPDATE clinic.queue_tickets SET status = 'cancelled'
+               WHERE appointment_id = ANY($1::int[])`,
+              [appointmentIds],
+            );
+            await client.query(
+              `DELETE FROM clinic.appointment_access_codes
+               WHERE appointment_id = ANY($1::int[])`,
+              [appointmentIds],
+            );
+          }
+          if (slotIds.length) {
+            await client.query(
+              `UPDATE clinic.appointment_slots SET status = 'open'
+               WHERE slot_id = ANY($1::int[])`,
+              [slotIds],
+            );
+          }
+        }
+        const updated = await client.query(
+          `UPDATE clinic.help_requests
+           SET request_status = $1, reviewed_by = $2, reviewed_at = now(),
+               review_note = $3, verification_method = NULLIF($4, ''), updated_at = now()
+           WHERE help_id = $5 RETURNING *`,
+          [requestStatus, req.user.user_id, reviewNote, verificationMethod, helpId],
+        );
+        return res.json(updated.rows[0]);
+      });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 // PUT /api/help/:id
 router.put("/help/:id", requireStaff, async (req, res) => {
   const id = Number(req.params.id);

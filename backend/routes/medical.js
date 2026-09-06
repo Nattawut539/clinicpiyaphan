@@ -2,7 +2,41 @@
 const express = require("express");
 const router = express.Router();
 
-const { authRequired, requireStaff, withContext } = require("../tools/_utils");
+const { authRequired, requireRole, withContext } = require("../tools/_utils");
+
+const requireMedicalRole = requireRole("doctor", "super_admin", "superadmin");
+
+async function requireTodayVisit(client, { queueId, userId, visitDate }) {
+  const todayResult = await client.query(
+    `SELECT (now() AT TIME ZONE 'Asia/Bangkok')::date::text AS today`,
+  );
+  const today = todayResult.rows[0].today;
+  const requestedDate = visitDate ? String(visitDate).slice(0, 10) : today;
+  if (requestedDate !== today) {
+    const error = new Error("บันทึกเวชระเบียนได้เฉพาะวันเข้าตรวจเท่านั้น ไม่สามารถบันทึกย้อนหลังหรือก่อนวันนัดได้");
+    error.status = 409;
+    throw error;
+  }
+
+  if (queueId) {
+    const queue = await client.query(
+      `SELECT queue_id
+       FROM clinic.queue_tickets
+       WHERE queue_id = $1 AND user_id = $2
+         AND service_date = (now() AT TIME ZONE 'Asia/Bangkok')::date
+         AND status <> 'cancelled'
+       LIMIT 1`,
+      [queueId, userId],
+    );
+    if (!queue.rowCount) {
+      const error = new Error("คิวนี้ไม่ใช่คิวสำหรับวันปัจจุบัน จึงไม่สามารถบันทึกเวชระเบียนได้");
+      error.status = 409;
+      throw error;
+    }
+  }
+
+  return today;
+}
 
 // ผู้ใช้ดูเวชระเบียนของตัวเอง
 router.get("/medical/my", authRequired, async (req, res, next) => {
@@ -27,10 +61,10 @@ router.get("/medical/my", authRequired, async (req, res, next) => {
   }
 });
 
-// บุคลากรดูเวชระเบียนของผู้ใช้งานรายหนึ่ง
+// เฉพาะแพทย์และผู้ดูแลระบบสูงสุดเท่านั้นที่ดูเวชระเบียนผู้ป่วยได้
 router.get(
   "/medical/by-user/:user_id",
-  requireStaff,
+  requireMedicalRole,
   async (req, res, next) => {
     try {
       await withContext(req, async (client) => {
@@ -48,8 +82,8 @@ router.get(
   }
 );
 
-// สร้างเวชระเบียน (เฉพาะ staff)
-router.get("/medical-records", requireStaff, async (req, res, next) => {
+// รายการเวชระเบียนสำหรับแพทย์และผู้ดูแลระบบสูงสุด
+router.get("/medical-records", requireMedicalRole, async (req, res, next) => {
   const { appointment_id, start_date, end_date, recorded_only } = req.query;
 
   try {
@@ -183,7 +217,7 @@ router.get("/medical-records", requireStaff, async (req, res, next) => {
   }
 });
 
-router.post("/medical-records", requireStaff, async (req, res, next) => {
+router.post("/medical-records", requireMedicalRole, async (req, res, next) => {
   const {
     user_id,
     queue_id = null,
@@ -205,6 +239,11 @@ router.post("/medical-records", requireStaff, async (req, res, next) => {
 
   try {
     await withContext(req, async (client) => {
+      const validVisitDate = await requireTodayVisit(client, {
+        queueId: queue_id,
+        userId: user_id,
+        visitDate: visit_date,
+      });
       const meds = Array.isArray(medications)
         ? medications
         : [medications].filter(Boolean);
@@ -217,7 +256,7 @@ router.post("/medical-records", requireStaff, async (req, res, next) => {
          RETURNING *`,
         [
           user_id,
-          visit_date,
+          validVisitDate,
           symptoms,
           diagnosis,
           treatment,
@@ -247,7 +286,7 @@ router.post("/medical-records", requireStaff, async (req, res, next) => {
   }
 });
 
-router.post("/medical", requireStaff, async (req, res, next) => {
+router.post("/medical", requireMedicalRole, async (req, res, next) => {
   const {
     user_id,
     queue_id = null,
@@ -268,6 +307,11 @@ router.post("/medical", requireStaff, async (req, res, next) => {
 
   try {
     await withContext(req, async (client) => {
+      const validVisitDate = await requireTodayVisit(client, {
+        queueId: queue_id,
+        userId: user_id,
+        visitDate: visit_date,
+      });
       const ins = await client.query(
         `INSERT INTO clinic.medical_records
          (user_id, visit_date, symptoms, diagnosis, treatment, medications,
@@ -276,7 +320,7 @@ router.post("/medical", requireStaff, async (req, res, next) => {
          RETURNING *`,
         [
           user_id,
-          visit_date,
+          validVisitDate,
           symptoms,
           diagnosis,
           treatment,
@@ -304,8 +348,8 @@ router.post("/medical", requireStaff, async (req, res, next) => {
   }
 });
 
-// แก้ไขเวชระเบียนบางส่วน (เฉพาะ staff)
-router.patch("/medical/:record_id", requireStaff, async (req, res, next) => {
+// แก้ไขเวชระเบียนบางส่วน (เฉพาะแพทย์และผู้ดูแลระบบสูงสุด)
+router.patch("/medical/:record_id", requireMedicalRole, async (req, res, next) => {
   const fields = [
     "symptoms",
     "diagnosis",
@@ -348,10 +392,11 @@ router.patch("/medical/:record_id", requireStaff, async (req, res, next) => {
         `UPDATE clinic.medical_records
          SET ${sets.join(", ")}
          WHERE record_id = $${params.length}
+           AND visit_date::date = (now() AT TIME ZONE 'Asia/Bangkok')::date
          RETURNING *`,
         params
       );
-      if (!up.rowCount) return res.status(404).json({ message: "ไม่พบบันทึก" });
+      if (!up.rowCount) return res.status(409).json({ message: "แก้ไขเวชระเบียนได้เฉพาะวันเข้าตรวจเท่านั้น" });
       res.json(up.rows[0]);
     });
   } catch (e) {

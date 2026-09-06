@@ -11,6 +11,7 @@ function signToken(user) {
       user_id: user.user_id,
       role: String(user.role || "").toLowerCase(),
       email: user.email,
+      sv: Number(user.session_version || 1),
     },
     JWT_SECRET,
     { expiresIn: "7d" }
@@ -49,6 +50,7 @@ function parseUser(req, { optional = false } = {}) {
       user_id: uid,
       role: String(p.role || "").toLowerCase(),
       email: p.email,
+      session_version: Number(p.sv || 1),
     };
     // };
   } catch {
@@ -56,6 +58,76 @@ function parseUser(req, { optional = false } = {}) {
     e.status = 401;
     throw e;
   }
+}
+
+async function validateSessionUser(user) {
+  if (!user?.user_id) {
+    const error = new Error("Invalid token payload");
+    error.status = 401;
+    throw error;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await setAppContext(client, user);
+    const result = await client.query(
+      `SELECT user_id, role::text AS role, email, account_status, session_version,
+              profile_completed_at, registration_source
+       FROM clinic.users
+       WHERE user_id = $1
+       LIMIT 1`,
+      [user.user_id]
+    );
+    await client.query("COMMIT");
+
+    if (!result.rowCount) {
+      const error = new Error("Account no longer exists");
+      error.status = 401;
+      throw error;
+    }
+
+    const accountStatus = String(result.rows[0].account_status || "active").toLowerCase();
+    if (accountStatus !== "active") {
+      const error = new Error(
+        accountStatus === "pending_verification"
+          ? "Email verification required"
+          : "Account is not active",
+      );
+      error.status = 403;
+      error.code = accountStatus === "pending_verification" ? "EMAIL_VERIFICATION_REQUIRED" : "ACCOUNT_INACTIVE";
+      throw error;
+    }
+    if (Number(user.session_version || 1) !== Number(result.rows[0].session_version || 1)) {
+      const error = new Error("Session has been revoked");
+      error.status = 401;
+      error.code = "SESSION_REVOKED";
+      throw error;
+    }
+
+    return {
+      user_id: result.rows[0].user_id,
+      role: String(result.rows[0].role || "").toLowerCase(),
+      email: result.rows[0].email,
+      account_status: accountStatus,
+      session_version: Number(result.rows[0].session_version || 1),
+      profile_completed: Boolean(result.rows[0].profile_completed_at),
+      registration_source: String(result.rows[0].registration_source || "local").toLowerCase(),
+    };
+  } catch (error) {
+    try { await client.query("ROLLBACK"); } catch {}
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function resolveVerifiedUser(req) {
+  if (req.authenticatedUserVerified && req.user) return req.user;
+  const verified = await validateSessionUser(parseUser(req));
+  req.user = verified;
+  req.authenticatedUserVerified = true;
+  return verified;
 }
 
 /* ---------- Middlewares ---------- */
@@ -70,39 +142,39 @@ function authOptional(req, _res, next) {
 }
 
 // บังคับต้องมี token
-function authRequired(req, res, next) {
+async function authRequired(req, res, next) {
   try {
-    req.user = parseUser(req);
-    next();
+    await resolveVerifiedUser(req);
+    return next();
   } catch (e) {
-    res.status(e.status || 401).json({ message: e.message });
+    return res.status(e.status || 500).json({ message: e.status ? e.message : "Authentication service unavailable" });
   }
 }
 
 // บังคับสิทธิ์อย่างน้อยเป็น staff
-function requireStaff(req, res, next) {
+async function requireStaff(req, res, next) {
   try {
-    req.user = parseUser(req);
+    await resolveVerifiedUser(req);
     const ok = ["doctor", "assistant", "admin", "super_admin", "superadmin"].includes(
       req.user.role
     );
     if (!ok) return res.status(403).json({ message: "forbidden" });
-    next();
+    return next();
   } catch (e) {
-    res.status(e.status || 401).json({ message: e.message });
+    return res.status(e.status || 500).json({ message: e.status ? e.message : "Authentication service unavailable" });
   }
 }
 
 // ระบุสิทธิ์ที่อนุญาตแบบเจาะจง
 function requireRole(...roles) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     try {
-      req.user = parseUser(req);
+      await resolveVerifiedUser(req);
       if (!roles.includes(req.user.role))
         return res.status(403).json({ message: "forbidden" });
-      next();
+      return next();
     } catch (e) {
-      res.status(e.status || 401).json({ message: e.message });
+      return res.status(e.status || 500).json({ message: e.status ? e.message : "Authentication service unavailable" });
     }
   };
 }
@@ -115,8 +187,8 @@ async function setAppContext(client, user) {
   await client.query(
     `
     SELECT
-      set_config('app.user_id', $1::text, false),
-      set_config('app.role', $2::text, false)
+      set_config('app.user_id', $1::text, true),
+      set_config('app.role', $2::text, true)
     `,
     [String(user.user_id), String(user.role)]
   );
@@ -197,6 +269,7 @@ module.exports = {
   signToken,
   getToken,
   parseUser,
+  validateSessionUser,
   // middlewares
   authOptional,
   authRequired,

@@ -1,0 +1,199 @@
+.screen {
+  min-height: 100vh;
+  padding: 32px;
+  background: #f6f8fb;
+}
+
+.content {
+  width: 100%;
+  min-height: calc(100vh - 120px);
+  padding: 28px;
+  background: #f6f8fb;
+}
+
+.adminScreen {
+  min-height: 100vh;
+  padding: 96px 32px 32px 112px;
+  background: #f6f8fb;
+}
+
+.shell {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.titleGroup {
+  flex: 1;
+  max-width: 440px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.card,
+.wideCard {
+  padding: 22px;
+  border: 1px solid #e6ebf2;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+.wideCard {
+  grid-column: span 2;
+}
+
+.line,
+.circle,
+.button,
+.chart {
+  position: relative;
+  overflow: hidden;
+  background: #e8edf4;
+}
+
+.line::after,
+.circle::after,
+.button::after,
+.chart::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+  animation: shimmer 1.35s ease-in-out infinite;
+}
+
+.line {
+  width: 100%;
+  height: 13px;
+  margin-top: 13px;
+  border-radius: 999px;
+}
+
+.line:first-child {
+  height: 22px;
+  margin-top: 0;
+}
+
+.short {
+  width: 52%;
+}
+
+.medium {
+  width: 76%;
+}
+
+.circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+}
+
+.button {
+  width: 92px;
+  height: 42px;
+  border-radius: 14px;
+}
+
+.chart {
+  height: 190px;
+  margin-top: 22px;
+  border-radius: 16px;
+}
+
+.rows {
+  margin-top: 24px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 48px 1.3fr 1fr 0.7fr;
+  align-items: center;
+  gap: 16px;
+  padding: 15px 0;
+  border-top: 1px solid #edf1f6;
+}
+
+.row .line {
+  margin-top: 0;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+@media (max-width: 768px) {
+  .screen,
+  .content,
+  .adminScreen {
+    padding: 20px 16px 88px;
+  }
+
+  .content {
+    min-height: calc(100vh - 140px);
+  }
+
+  .topbar {
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+
+  .actions .button:not(:first-child) {
+    display: none;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .wideCard {
+    grid-column: auto;
+  }
+
+  .row {
+    grid-template-columns: 40px 1fr 0.7fr;
+  }
+
+  .row .line:last-child {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line::after,
+  .circle::after,
+  .button::after,
+  .chart::after {
+    animation: none;
+  }
+}

@@ -35,6 +35,7 @@ type Profile = {
   position: string;
   role?: string | null;
   profile_image?: string | null;
+  profile_completed?: boolean;
 };
 
 const EMPTY_PROFILE: Profile = {
@@ -67,24 +68,32 @@ const fields: Array<{
   required?: boolean;
 }> = [
   { name: 'title', label: 'คำนำหน้า' },
-  { name: 'national_id', label: 'เลขบัตรประชาชน' },
+  { name: 'national_id', label: 'เลขบัตรประชาชน', required: true },
   { name: 'first_name', label: 'ชื่อ', required: true },
   { name: 'last_name', label: 'นามสกุล', required: true },
-  { name: 'birth_date', label: 'วันเกิด', type: 'date' },
+  { name: 'birth_date', label: 'วันเกิด', type: 'date', required: true },
   { name: 'gender', label: 'เพศ' },
   { name: 'blood_type', label: 'กรุ๊ปเลือด' },
   { name: 'nationality', label: 'สัญชาติ' },
   { name: 'ethnicity', label: 'เชื้อชาติ' },
   { name: 'position', label: 'อาชีพ' },
-  { name: 'phone', label: 'เบอร์โทรศัพท์' },
+  { name: 'phone', label: 'เบอร์โทรศัพท์', required: true },
   { name: 'emergency_phone', label: 'เบอร์ฉุกเฉิน' },
   { name: 'email', label: 'อีเมล', type: 'email', required: true },
-  { name: 'province_code', label: 'รหัสจังหวัด' },
   { name: 'address', label: 'ที่อยู่', full: true, multiline: true },
   { name: 'congenital_disease', label: 'โรคประจำตัว', full: true, multiline: true },
   { name: 'drug_allergy', label: 'ประวัติแพ้ยา', full: true, multiline: true },
   { name: 'food_allergy', label: 'ประวัติแพ้อาหาร', full: true, multiline: true },
 ];
+
+const MEDICAL_FIELD_NAMES = new Set<keyof Profile>([
+  'congenital_disease',
+  'drug_allergy',
+  'food_allergy',
+]);
+
+const personalFields = fields.filter((field) => !MEDICAL_FIELD_NAMES.has(field.name));
+const medicalFields = fields.filter((field) => MEDICAL_FIELD_NAMES.has(field.name));
 
 function normalizeProfile(data: Partial<Profile>): Profile {
   return {
@@ -137,6 +146,10 @@ export default function UserprofilePage() {
         const nextProfile = normalizeProfile(data);
         setProfile(nextProfile);
         setForm(nextProfile);
+        if (new URLSearchParams(window.location.search).get('complete') === '1' && !nextProfile.profile_completed) {
+          setEditing(true);
+          setNotice('กรุณากรอกเลขบัตรประชาชน ชื่อ นามสกุล วันเกิด และเบอร์โทรให้ครบก่อนใช้งาน');
+        }
       })
       .catch((reason) => setError(reason instanceof Error ? reason.message : 'โหลดโปรไฟล์ไม่สำเร็จ'))
       .finally(() => setLoading(false));
@@ -195,6 +208,10 @@ export default function UserprofilePage() {
       setImageFile(null);
       setEditing(false);
       setNotice('บันทึกข้อมูลผู้ป่วยเรียบร้อยแล้ว');
+      if (new URLSearchParams(window.location.search).get('complete') === '1' && nextProfile.profile_completed) {
+        router.replace('/users/userHome');
+        router.refresh();
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'บันทึกข้อมูลผู้ป่วยไม่สำเร็จ');
     } finally {
@@ -206,9 +223,7 @@ export default function UserprofilePage() {
     <div className={styles.page}>
       <div className={styles.headerBlock}>
         <div>
-          <span>บัญชีผู้ป่วย</span>
           <h1>ข้อมูลส่วนตัว</h1>
-          <p>ดึงข้อมูลจากตาราง user_details และแก้ไขได้ทุกช่องยกเว้นรหัสผู้ป่วย</p>
         </div>
         {profile && !editing && (
           <button type="button" className={styles.editButton} onClick={() => setEditing(true)}>
@@ -224,46 +239,35 @@ export default function UserprofilePage() {
       {loading ? (
         <div className={styles.stateCard}>กำลังโหลดข้อมูลผู้ป่วย...</div>
       ) : profile ? (
-        <form className={styles.profileGrid} onSubmit={saveProfile}>
-          <section className={styles.profileCard}>
-            <div className={styles.avatarWrap}>
-              <div className={styles.avatar}>
-                {imageSrc && !imageFailed ? (
-                  <Image src={imageSrc} alt={fullName} fill sizes="132px" unoptimized onError={() => setImageFailed(true)} />
-                ) : (
-                  <UserRound size={54} />
-                )}
-                {editing && (
-                  <label className={styles.cameraButton} title="เลือกรูปโปรไฟล์">
-                    <Camera size={18} />
-                    <input type="file" accept="image/*" onChange={chooseImage} />
-                  </label>
-                )}
-              </div>
-              <div className={styles.patientBadge}>รหัสผู้ป่วย: {profile.patient_code || '-'}</div>
-            </div>
+        <form className={styles.cardContainer} onSubmit={saveProfile}>
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>ข้อมูลส่วนตัว</div>
 
-            <div className={styles.identity}>
-              <strong>{fullName}</strong>
-              <span>บัญชีผู้ป่วย</span>
-            </div>
-          </section>
-
-          <section className={styles.detailsCard}>
-            <div className={styles.cardHeader}>
-              {editing && (
-                <div className={styles.actionGroup}>
-                  <button type="button" className={styles.cancelButton} onClick={cancelEditing} disabled={saving}>
-                    <X size={17} />
-                    ยกเลิก
-                  </button>
-                  <button type="submit" className={styles.saveButton} disabled={saving}>
-                    <Save size={17} />
-                    {saving ? 'กำลังบันทึก...' : 'บันทึก'}
-                  </button>
+            <div className={styles.topSection}>
+              <div className={styles.photoColumn}>
+                <div className={styles.avatar}>
+                  {imageSrc && !imageFailed ? (
+                    <Image src={imageSrc} alt={fullName} fill sizes="128px" unoptimized onError={() => setImageFailed(true)} />
+                  ) : (
+                    <UserRound size={54} />
+                  )}
+                  {editing && (
+                    <label className={styles.cameraButton} title="เลือกรูปโปรไฟล์">
+                      <Camera size={18} />
+                      <input type="file" accept="image/*" onChange={chooseImage} />
+                    </label>
+                  )}
                 </div>
-              )}
+              </div>
+
+              <div className={styles.nameSection}>
+                <strong>{fullName}</strong>
+                <span>รหัสผู้ป่วย : {profile.patient_code || '-'}</span>
+                <em>บัญชีผู้ป่วย</em>
+              </div>
             </div>
+
+            <div className={styles.divider} />
 
             <div className={styles.fieldGrid}>
               <label className={styles.field}>
@@ -271,11 +275,32 @@ export default function UserprofilePage() {
                 <p>{profile.patient_code || '-'}</p>
               </label>
 
-              {fields.map((field) => (
+              {personalFields.map((field) => (
                 <label key={field.name} className={`${styles.field} ${field.full ? styles.fullWidth : ''}`}>
-                  <span>{field.label}</span>
+                  <span>{field.label}{field.required ? ' *' : ''}</span>
                   {editing ? (
-                    field.multiline ? (
+                    field.name === 'gender' ? (
+                      <select
+                        value={String(form.gender || '')}
+                        onChange={(event) => updateField('gender', event.target.value)}
+                      >
+                        <option value="">--- เลือกเพศกำเนิด ---</option>
+                        <option value="เพศชาย">ชาย</option>
+                        <option value="เพศหญิง">หญิง</option>
+                        <option value="ไม่ระบุ">ไม่ระบุ</option>
+                      </select>
+                    ) : field.name === 'blood_type' ? (
+                      <select
+                        value={String(form.blood_type || '')}
+                        onChange={(event) => updateField('blood_type', event.target.value)}
+                      >
+                        <option value="">--- เลือกกรุ๊ปเลือด ---</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="O">O</option>
+                        <option value="AB">AB</option>
+                      </select>
+                    ) : field.multiline ? (
                       <textarea
                         value={String(form[field.name] || '')}
                         onChange={(event) => updateField(field.name, event.target.value)}
@@ -302,6 +327,39 @@ export default function UserprofilePage() {
                 </label>
               ))}
             </div>
+          </section>
+
+          <section className={`${styles.card} ${styles.medicalCard}`}>
+            <div className={styles.cardHeader}>ข้อมูลการแพทย์</div>
+
+            <div className={styles.medicalFieldList}>
+              {medicalFields.map((field) => (
+                <label key={field.name} className={styles.field}>
+                  <span>{field.label}</span>
+                  {editing ? (
+                    <textarea
+                      value={String(form[field.name] || '')}
+                      onChange={(event) => updateField(field.name, event.target.value)}
+                    />
+                  ) : (
+                    <p>{String(profile[field.name] || '') || '-'}</p>
+                  )}
+                </label>
+              ))}
+            </div>
+
+            {editing && (
+              <div className={styles.actionGroup}>
+                <button type="button" className={styles.cancelButton} onClick={cancelEditing} disabled={saving}>
+                  <X size={17} />
+                  ยกเลิก
+                </button>
+                <button type="submit" className={styles.saveButton} disabled={saving}>
+                  <Save size={17} />
+                  {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+                </button>
+              </div>
+            )}
           </section>
         </form>
       ) : (

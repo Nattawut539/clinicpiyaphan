@@ -1,233 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap');
-
-.wrapper {
-  --bg-top:    #f0fbff;
-  --bg-bottom: #e7f5ff;
-  --line-a:    rgba(2,132,199,.18);
-  --line-b:    rgba(14,165,233,.15);
-  --bar:       #22d3ee;
-  --panel-radius: 18px;
-  --grid-gap: 40px;
-  --line-w:   1px;
-  font-family: 'Prompt', sans-serif;
-}
-
-/* ===== HERO (ส่วนบน) ===== */
-.topSection{
-  position: relative;
-  height: 100vh;
-  height: 100svh;
-  height: 140dvh;
-  border-radius: var(--panel-radius);
-  background: linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.topSection::before{
-  content:"";
-  position:absolute; inset:0;
-  background:
-    repeating-linear-gradient(135deg,
-      var(--line-a) 0 calc(var(--line-w)),
-      transparent calc(var(--line-w)) var(--grid-gap)
-    );
-  filter: blur(.4px);
-  pointer-events:none;
-  z-index: 0;
-}
-
-.gridB{
-  position:absolute; inset:0;
-  background:
-    repeating-linear-gradient(45deg,
-      var(--line-b) 0 calc(var(--line-w)),
-      transparent calc(var(--line-w)) var(--grid-gap)
-    );
-  filter: blur(.4px);
-  pointer-events:none;
-  z-index: 0;
-}
-
-.accentBar{
-  position:absolute; inset:0 0 auto 0;
-  height: 160px;
-  background: linear-gradient(180deg, color-mix(in oklab, var(--bar) 55%, transparent), transparent);
-  z-index: 1;
-}
-
-.centerGlow{
-  position:absolute; inset:0;
-  background: radial-gradient(ellipse at 50% 58%,
-    rgba(255,255,255,.85) 0%,
-    rgba(255,255,255,.55) 38%,
-    rgba(255,255,255,0)   68%);
-  pointer-events:none;
-  z-index: 1;
-}
-
-.topContent{
-  position: relative;
-  z-index: 2;
-  min-height: inherit;
-  display: grid;
-  place-items: center;
-  gap: 16px;
-  padding: clamp(16px, 3vw, 40px);
-}
-
-/* รูปโปรไฟล์ */
-.doctorImage{
-  width: clamp(300px, 40vw, 550px);
-  height: clamp(300px, 40vw, 550px);
-  border-radius: 50%;
-  background: rgba(255,255,255,.92);
-  border: 2px solid rgba(0,0,0,.06);
-  box-shadow: 0 20px 50px rgba(2,132,199,.15);
-  object-fit: cover;
-  overflow: hidden;
-  object-position: 95% 5%;
-  margin: 260px 0 4px;
-
-  /* Scroll-driven */
-  animation-name: heroFadeInSD;
-  animation-duration: 900ms;
-  animation-timing-function: cubic-bezier(.18,.92,.18,1.02);
-  animation-fill-mode: both;
-  animation-timeline: view(block);
-  animation-range: entry 0% cover 30%;
-}
-
-@keyframes heroFadeInSD {
-  0%   { opacity: 0; transform: scale(0.985); }
-  60%  { opacity: 1; transform: scale(1.01); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-.sectionLabel{
-  display: block;
-  font-weight: 700;
-  font-size: clamp(28px, 4.6vw, 56px);
-  line-height: 1.15;
-  color: #2b2e33;
-  margin: 21px 0 4px;
-}
-
-.sectionTitle{
-  font-weight: 700;
-  font-size: clamp(18px, 2.4vw, 28px);
-  line-height: 1.25;
-  color: #1f2937;
-  margin: 4px 0 10px;
-}
-
-.topContent p{
-  font-size: clamp(13px, 1.5vw, 16px);
-  color: #4b5563;
-  margin: 6px 0;
-}
-
-/* ===== ส่วนล่าง ===== */
-.bottomSection{
-  margin-top: 22px;
-  background: #ffffff;
-  border-radius: var(--panel-radius);
-  padding: clamp(18px, 3vw, 32px);
-  box-shadow: 0 10px 30px rgba(15, 23, 42, .06);
-
-  padding-block-start: clamp(72px, 14vh, 180px);
-  padding-block-end: clamp(40px, 8vh, 96px);
-}
-
-.bottomSection > p{
-  width: min(100%, 860px);
-  margin-inline: auto;
-  font-size: clamp(16px, 1.25vw, 20px);
-  line-height: 1.9;
-  letter-spacing: .1px;
-  color: #2b2e33;
-  margin-block: 0 clamp(12px, 1.4vw, 22px);
-}
-
-/* ===== Scroll-Driven: ข้อความเด้ง ===== */
-@keyframes bounceInSD {
-  0%   { transform: translate3d(0, 48px, 0) scale(.96); }
-  45%  { transform: translate3d(0,-10px, 0) scale(1.03); }
-  70%  { transform: translate3d(0,  6px, 0) scale(.998); }
-  100% { transform: translate3d(0,  0, 0) scale(1); }
-}
-
-.topContent .sectionLabel,
-.topContent .sectionTitle,
-.topContent p,
-.bottomSection > p {
-  transform-origin: 50% 100%;
-  will-change: transform;
-  animation-name: bounceInSD;
-  animation-duration: 720ms;
-  animation-timing-function: cubic-bezier(.18,.92,.18,1.02);
-  animation-fill-mode: both;
-  animation-timeline: view(block);
-  animation-range: entry 0% cover 15%;
-}
-
-/* stagger */
-.bottomSection > p:nth-child(1) { animation-range: entry 0%  cover 15%; }
-.bottomSection > p:nth-child(2) { animation-range: entry 2%  cover 17%; }
-.bottomSection > p:nth-child(3) { animation-range: entry 4%  cover 19%; }
-.bottomSection > p:nth-child(4) { animation-range: entry 6%  cover 21%; }
-.bottomSection > p:nth-child(5) { animation-range: entry 8%  cover 23%; }
-.bottomSection > p:nth-child(6) { animation-range: entry 10% cover 25%; }
-.bottomSection > p:nth-child(7) { animation-range: entry 12% cover 27%; }
-.bottomSection > p:nth-child(8) { animation-range: entry 14% cover 29%; }
-.bottomSection > p:nth-child(9) { animation-range: entry 16% cover 31%; }
-
-/* ===== Fallback: ถ้าไม่รองรับ scroll-driven ===== */
-@supports not (animation-timeline: view()) {
-  .doctorImage {
-    animation: heroFadeInSD 900ms cubic-bezier(.18,.92,.18,1.02) both;
-  }
-  .topContent .sectionLabel,
-  .topContent .sectionTitle,
-  .topContent p,
-  .bottomSection > p {
-    animation: bounceInSD 720ms cubic-bezier(.18,.92,.18,1.02) both;
-  }
-  .bottomSection > p:nth-child(1) { animation-delay: 40ms; }
-  .bottomSection > p:nth-child(2) { animation-delay: 90ms; }
-  .bottomSection > p:nth-child(3) { animation-delay: 140ms; }
-  .bottomSection > p:nth-child(4) { animation-delay: 190ms; }
-  .bottomSection > p:nth-child(5) { animation-delay: 240ms; }
-  .bottomSection > p:nth-child(6) { animation-delay: 290ms; }
-  .bottomSection > p:nth-child(7) { animation-delay: 340ms; }
-  .bottomSection > p:nth-child(8) { animation-delay: 390ms; }
-  .bottomSection > p:nth-child(9) { animation-delay: 440ms; }
-}
-
-/* ===== Responsive ===== */
-@media screen and (max-width: 768px) {
-  .doctorImage { width: 220px; height: 220px; }
-  .bottomSection { padding-top: 120px; }
-}
-
-
-
-/* =========================================================
-   User About UI from Figma
-========================================================= */
-
 .aboutPage {
   width: 100%;
-  padding: 16px;
+  max-width: 1480px;
+  min-height: calc(100vh - 120px);
+  min-height: calc(100dvh - 120px);
+  margin: 0 auto;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
   font-family: "Prompt", sans-serif;
   background: #f8fafc;
+  box-sizing: border-box;
 }
 
-.introCard,
 .staffCard {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: grid;
   background: #ffffff;
   border: 1px solid #f1f5f9;
   border-radius: 24px;
@@ -235,50 +25,42 @@
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 
-.introTopLine {
-  height: 12px;
+.staffCard::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  height: 6px;
   background: linear-gradient(90deg, #2dd4bf, #3b82f6);
 }
 
-.introBody {
-  padding: 20px;
-}
-
-.introBody h2 {
-  margin: 0 0 8px;
-  color: #1e293b;
-  font-size: 20px;
-  font-weight: 800;
-}
-
-.introBody p {
-  margin: 0;
-  color: #64748b;
-  font-size: 15px;
-  line-height: 1.65;
-}
-
 .staffGrid {
-  display: flex;
-  flex-direction: column;
-}
-
-.doctorPhotoArea,
-.assistantPhotoArea {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
 }
 
 .doctorPhotoArea {
-  padding: 32px 0;
-  background: linear-gradient(135deg, #eff6ff, #f0fdfa);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 28px;
 }
 
-.assistantPhotoArea {
-  padding: 28px 0;
-  background: linear-gradient(135deg, #fff1f2, #fff7ed);
+.doctorPhotoArea h3 {
+  max-width: 240px;
+  margin: 0;
+  color: #17355d;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.45;
+  text-align: center;
 }
 
 .staffAvatarGroup {
@@ -288,87 +70,65 @@
   gap: 12px;
 }
 
-.doctorAvatar,
-.assistantAvatar {
+.doctorImage {
   border-radius: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.15);
-}
-
-.doctorAvatar {
-  width: 80px;
-  height: 80px;
-  background: linear-gradient(135deg, #60a5fa, #14b8a6);
-}
-
-.assistantAvatar {
-  width: 72px;
-  height: 72px;
-  background: linear-gradient(135deg, #fda4af, #fb923c);
-}
-
-.doctorAvatar span {
-  font-size: 40px;
-}
-
-.assistantAvatar span {
-  font-size: 36px;
-}
-
-.ratingBox {
-  text-align: center;
-}
-
-.starRow {
-  display: flex;
-  justify-content: center;
-  gap: 2px;
-  margin-bottom: 4px;
-}
-
-.starRow span {
-  color: #fbbf24;
-  font-size: 14px;
-}
-
-.ratingBox p {
-  margin: 0;
-  color: #94a3b8;
-  font-size: 11px;
+  width: 260px;
+  max-width: calc(100% - 24px);
+  aspect-ratio: 4 / 5;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  background: #ffffff;
+  object-fit: cover;
+  object-position: center 18%;
+  flex-shrink: 0;
 }
 
 .staffInfo {
-  flex: 1;
-  padding: 20px;
+  width: 100%;
+  min-width: 0;
+  padding: clamp(32px, 4vw, 58px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: clamp(22px, 2.5vw, 34px);
+}
+
+.profileIntro {
+  flex: 0 0 auto;
+  padding: 4px 8px 0;
+}
+
+.profileIntro h2 {
+  margin: 0 0 8px;
+  color: #1e293b;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.profileIntro p {
+  max-width: 980px;
+  margin: 0;
+  color: #64748b;
+  font-size: 16px;
+  line-height: 1.7;
 }
 
 .staffHeader {
-  margin-bottom: 12px;
+  margin: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.staffHeader h3,
-.assistantHeader h3 {
-  margin: 0;
-  color: #1e293b;
-  font-size: 18px;
-  font-weight: 800;
-}
-
 .doctorBadge,
-.assistantBadge,
 .experienceBadge {
   display: inline-block;
   margin-top: 4px;
-  padding: 3px 10px;
+  padding: 5px 12px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -377,46 +137,38 @@
   color: #1d4ed8;
 }
 
-.assistantBadge {
-  background: #ffe4e6;
-  color: #be123c;
-}
-
 .experienceBadge {
   margin-top: 0;
   background: #f0fdfa;
   color: #0f766e;
   border: 1px solid #ccfbf1;
-  font-size: 13px;
-}
-
-.assistantHeader {
-  margin-bottom: 12px;
+  font-size: 14px;
 }
 
 .staffDescription {
-  margin: 0 0 16px;
+  margin: 0;
   color: #64748b;
-  font-size: 14px;
-  line-height: 1.65;
+  font-size: 16px;
+  line-height: 1.75;
 }
 
 .infoGrid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: clamp(18px, 3vw, 48px);
+  margin: 0;
 }
 
 .infoItem {
+  min-width: 0;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
 }
 
 .infoItem svg {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   margin-top: 3px;
   flex-shrink: 0;
 }
@@ -429,131 +181,97 @@
   color: #f59e0b;
 }
 
-.roseIcon {
-  color: #f43f5e;
-}
-
 .infoItem p {
-  margin: 0 0 4px;
+  margin: 0 0 6px;
   color: #94a3b8;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .infoItem span {
   display: block;
   color: #475569;
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.doctorSchedule,
-.assistantSchedule {
-  padding: 10px 16px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-size: 15px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .doctorSchedule {
-  background: #f0fdfa;
-  color: #0f766e;
+  width: 100%;
+  margin-top: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  color: #334155;
 }
 
-.assistantSchedule {
-  background: #fff1f2;
-  color: #be123c;
-}
-
-.doctorSchedule svg,
-.assistantSchedule svg {
-  width: 16px;
-  height: 16px;
+.doctorSchedule svg {
+  width: 20px;
+  height: 20px;
+  color: #0d9488;
   flex-shrink: 0;
 }
 
 .doctorSchedule strong,
-.doctorSchedule span,
-.assistantSchedule span {
-  font-size: 13px;
-}
-
-.contactCard {
-  padding: 20px;
-  border-radius: 24px;
-  background: #1e293b;
-  color: #ffffff;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.contactCard h3 {
-  margin: 0 0 4px;
+.doctorSchedule span {
   font-size: 15px;
-  font-weight: 700;
-}
-
-.contactCard p {
-  margin: 0;
-  color: #94a3b8;
-  font-size: 14px;
-}
-
-.callButton {
-  padding: 10px 16px;
-  border-radius: 14px;
-  background: #ffffff;
-  color: #1e293b;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 700;
-  transition: 0.2s ease;
-}
-
-.callButton:hover {
-  background: #f1f5f9;
-}
-
-.callButton svg {
-  width: 16px;
-  height: 16px;
+  line-height: 1.5;
 }
 
 @media (min-width: 640px) {
-  .staffGrid {
-    flex-direction: row;
-  }
-
-  .doctorPhotoArea,
-  .assistantPhotoArea {
-    width: 192px;
-    padding: 0;
-  }
-
   .infoGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
 
-  .contactCard {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+@media (min-width: 900px) {
+  .staffGrid {
+    grid-template-columns: 340px minmax(0, 1fr);
   }
 }
 
-@media (min-width: 768px) {
+@media (max-width: 639px) {
   .aboutPage {
-    padding: 24px;
+    min-height: calc(100vh - 140px);
+    min-height: calc(100dvh - 140px);
+    padding: 16px;
+    display: flex;
   }
 
-  .introBody,
+  .staffCard {
+    flex: none;
+    display: block;
+    height: auto;
+    min-height: auto;
+  }
+
+  .profileIntro {
+    padding: 2px 4px 0;
+  }
+
+  .doctorPhotoArea {
+    padding: 24px 20px;
+  }
+
+  .doctorImage {
+    width: 190px;
+  }
+
   .staffInfo {
-    padding: 24px;
+    padding: 20px;
+    justify-content: flex-start;
+    gap: 18px;
+  }
+
+  .staffHeader {
+    align-items: flex-start;
+  }
+
+  .doctorSchedule {
+    margin-top: 0;
+    align-items: flex-start;
+    justify-content: flex-start;
   }
 }

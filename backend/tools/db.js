@@ -1,18 +1,14 @@
-// const { Pool } = require("pg");
-
-// const pool = new Pool({
-//     user: process.env.DB_USER || "postgres",
-//     host: process.env.DB_HOST || "localhost",
-//     database: process.env.DB_NAME || "projectfinal",  // เปลี่ยนเป็น finalProject
-//     password: process.env.DB_PASSWORD || "120246",
-//     port: Number(process.env.DB_PORT) || 5432,
-// });
-
-// module.exports = pool;
-
 const { Pool } = require("pg");
 
 const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+    const required = ["DB_USER", "DB_NAME", "DB_PASSWORD"];
+    const missing = required.filter((name) => !process.env[name]);
+    if (missing.length) {
+        throw new Error(`Missing required database configuration: ${missing.join(", ")}`);
+    }
+}
 
 const cfg = connectionString
     ? {
@@ -20,10 +16,10 @@ const cfg = connectionString
         ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : false,
     }
     : {
-        user: process.env.DB_USER || "postgres",
+        user: process.env.DB_USER,
         host: process.env.DB_HOST || "localhost",
-        database: process.env.DB_NAME || "projectfinal", // เปลี่ยนเป็น finalProject
-        password: process.env.DB_PASSWORD || "120246",
+        database: process.env.DB_NAME,
+        password: process.env.DB_PASSWORD,
         port: parseInt(process.env.DB_PORT || "5432", 10),
         ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : false,
     };

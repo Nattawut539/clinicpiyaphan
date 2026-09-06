@@ -7,12 +7,14 @@ import {
   ChevronUp,
   HelpCircle,
   Mail,
-  MessageCircle,
   MessageCircleQuestion,
   Phone,
   Search,
+  Send,
+  ShieldOff,
 } from 'lucide-react';
 import { API_BASE } from '@/lib/api';
+import Cookies from 'js-cookie';
 
 type FaqItem = {
   help_id: number;
@@ -22,6 +24,15 @@ type FaqItem = {
   tags: string[] | null;
   view_count: number | null;
   updated_at: string | null;
+};
+
+type AccountRequest = {
+  help_id: number;
+  title: string;
+  description: string | null;
+  request_status: 'pending' | 'approved' | 'rejected' | 'cancelled' | string;
+  review_note?: string | null;
+  created_at?: string;
 };
 
 const API = API_BASE.endsWith('/api') ? API_BASE : `${API_BASE}/api`;
@@ -34,15 +45,9 @@ const contactCards = [
     tone: 'green',
   },
   {
-    icon: MessageCircle,
-    label: 'LINE Official',
-    value: '@cliniccare',
-    tone: 'lime',
-  },
-  {
     icon: Mail,
     label: 'อีเมล',
-    value: 'contact@cliniccare.th',
+    value: 'clinic.piyaphan@gmail.com',
     tone: 'blue',
   },
 ];
@@ -53,6 +58,9 @@ export default function UserHelpPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [accountRequests, setAccountRequests] = useState<AccountRequest[]>([]);
+  const [requestReason, setRequestReason] = useState('');
+  const [requestSaving, setRequestSaving] = useState(false);
 
   useEffect(() => {
     const loadFaq = async () => {
@@ -81,6 +89,63 @@ export default function UserHelpPage() {
 
     loadFaq();
   }, []);
+
+  const loadAccountRequests = async () => {
+    const token = Cookies.get('userToken');
+    if (!token) return;
+    const response = await fetch(`${API}/help/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (!response.ok) return;
+    const data = await response.json();
+    setAccountRequests(
+      (Array.isArray(data) ? data : []).filter((item) => item.category === 'account_deactivation'),
+    );
+  };
+
+  useEffect(() => {
+    void loadAccountRequests();
+  }, []);
+
+  const submitDeactivationRequest = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const reason = requestReason.trim();
+    if (reason.length < 10) {
+      setError('กรุณาระบุเหตุผลอย่างน้อย 10 ตัวอักษร');
+      return;
+    }
+    if (accountRequests.some((item) => item.request_status === 'pending')) {
+      setError('คุณมีคำร้องที่กำลังรอตรวจสอบอยู่แล้ว');
+      return;
+    }
+    const token = Cookies.get('userToken');
+    if (!token) return;
+    try {
+      setRequestSaving(true);
+      setError('');
+      const response = await fetch(`${API}/help`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: 'ขอหยุดใช้งานบัญชี',
+          description: reason,
+          category: 'account_deactivation',
+          visibility: 'private',
+        }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.message || 'ส่งคำร้องไม่สำเร็จ');
+      setRequestReason('');
+      await loadAccountRequests();
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'ส่งคำร้องไม่สำเร็จ');
+    } finally {
+      setRequestSaving(false);
+    }
+  };
 
   const filteredFaqs = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -220,7 +285,40 @@ export default function UserHelpPage() {
             );
           })}
         </div>
-        <p>เปิดให้บริการ จันทร์-เสาร์ 08:00-17:00 น.</p>
+      </section>
+
+      <section className={styles.accountRequestCard}>
+        <div className={styles.accountRequestHeading}>
+          <ShieldOff size={24} />
+          <div>
+            <h2>ขอหยุดใช้งานบัญชี</h2>
+            <p>ระบบจะเก็บประวัติการรักษาไว้ และเจ้าหน้าที่จะตรวจสอบคำร้องก่อนดำเนินการ</p>
+          </div>
+        </div>
+        <form onSubmit={submitDeactivationRequest}>
+          <textarea
+            value={requestReason}
+            onChange={(event) => setRequestReason(event.target.value)}
+            placeholder="ระบุเหตุผลที่ต้องการหยุดใช้งานบัญชี"
+            rows={4}
+            maxLength={500}
+          />
+          <button type="submit" disabled={requestSaving || accountRequests.some((item) => item.request_status === 'pending')}>
+            <Send size={17} />
+            {requestSaving ? 'กำลังส่ง...' : 'ส่งคำร้องให้เจ้าหน้าที่'}
+          </button>
+        </form>
+        {accountRequests.length > 0 && (
+          <div className={styles.accountRequestHistory}>
+            {accountRequests.map((item) => (
+              <article key={item.help_id}>
+                <strong>{item.title}</strong>
+                <span>สถานะ: {item.request_status}</span>
+                {item.review_note && <p>ผลการตรวจสอบ: {item.review_note}</p>}
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

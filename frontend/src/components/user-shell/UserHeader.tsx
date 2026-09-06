@@ -20,6 +20,7 @@ type UserProfile = {
   last_name?: string | null;
   role?: string | null;
   profile_image?: string | null;
+  account_status?: 'active' | 'pending_verification' | 'deactivated' | 'suspended' | 'unclaimed' | string;
 };
 
 type UserNotification = {
@@ -247,19 +248,26 @@ export default function Header() {
         )}
 
         <button className={styles.profileButton} type="button" onClick={() => router.push('/users/userprofile')}>
-          <span className={styles.avatar}>
-            {imageSrc && !imageFailed ? (
-              <Image
-                src={imageSrc}
-                alt={fullName}
-                width={36}
-                height={36}
-                unoptimized
-                onError={() => setImageFailed(true)}
-              />
-            ) : (
-              initial || <UserRound size={18} />
-            )}
+          <span className={styles.avatarWrap}>
+            <span className={styles.avatar}>
+              {imageSrc && !imageFailed ? (
+                <Image
+                  src={imageSrc}
+                  alt={fullName}
+                  width={36}
+                  height={36}
+                  unoptimized
+                  onError={() => setImageFailed(true)}
+                />
+              ) : (
+                initial || <UserRound size={18} />
+              )}
+            </span>
+            <span
+              className={`${styles.accountStatusDot} ${styles[`accountStatus_${profile?.account_status || 'active'}`] || ''}`}
+              title={`สถานะบัญชี: ${profile?.account_status || 'active'}`}
+              aria-label={`สถานะบัญชี ${profile?.account_status || 'active'}`}
+            />
           </span>
           <span className={styles.profileText}>
             <strong>{fullName}</strong>

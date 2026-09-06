@@ -1,4 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
+
+:root {
+  --font-prompt: "Prompt";
+}
 
 html,
 body {
@@ -12,7 +17,14 @@ body {
 }
 
 body {
-  font-family: "IBM Plex Sans Thai", sans-serif;
+  font-family: var(--font-prompt), sans-serif;
   height: 100vh;
   background: #f8fafc;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }

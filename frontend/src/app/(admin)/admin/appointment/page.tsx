@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import styles from './Appointment.module.css';
 import Cookies from 'js-cookie';
 import Swal from 'sweetalert2';
@@ -19,7 +19,6 @@ import {
     Pencil,
 } from 'lucide-react';
 
-/* ✅ โครงสร้างข้อมูลใหม่ (queue) */
 const API = API_BASE.endsWith('/api') ? API_BASE : `${API_BASE}/api`;
 
 interface Appointment {
@@ -49,6 +48,7 @@ function formatFullThaiDate(date: string) {
 export default function AppointmentPage() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [error, setError] = useState('');
+    const fetchingAppointmentsRef = useRef(false);
     dayjs.locale("th");
 
     const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
@@ -103,11 +103,11 @@ export default function AppointmentPage() {
     } | null>(null);
     const [rejectReason, setRejectReason] = useState('');
 
-    /* ===============================
-       โหลดข้อมูลคิว (แทน appointments)
-    =============================== */
-    const fetchAppointments = async () => {
+    const fetchAppointments = useCallback(async () => {
+        if (fetchingAppointmentsRef.current) return;
+
         try {
+            fetchingAppointmentsRef.current = true;
             const token = Cookies.get('adminToken');
 
             const res = await fetch(`${API}/appointments`, {
@@ -123,30 +123,32 @@ export default function AppointmentPage() {
 
             const data = await res.json();
             setAppointments(data);
+            setError('');
         } catch (err) {
             console.error('โหลดคิวล้มเหลว:', err);
             setError('ไม่สามารถโหลดข้อมูลได้');
+        } finally {
+            fetchingAppointmentsRef.current = false;
         }
-    };
-
-    /* ===============================
-       โหลดข้อมูล admin (users/me)
-    =============================== */
-    useEffect(() => {
-        const fetchAll = async () => {
-            try {
-                await fetchAppointments();
-            } catch (err) {
-                console.error('โหลดข้อมูลผิดพลาด:', err);
-            }
-        };
-
-        fetchAll();
     }, []);
 
-    /* ===============================
-       อนุมัติคิว
-    =============================== */
+    useEffect(() => {
+        const syncVisibleAppointments = () => {
+            if (document.visibilityState === 'visible') void fetchAppointments();
+        };
+        syncVisibleAppointments();
+        const intervalId = window.setInterval(syncVisibleAppointments, 5000);
+
+        window.addEventListener('focus', syncVisibleAppointments);
+        document.addEventListener('visibilitychange', syncVisibleAppointments);
+
+        return () => {
+            window.clearInterval(intervalId);
+            window.removeEventListener('focus', syncVisibleAppointments);
+            document.removeEventListener('visibilitychange', syncVisibleAppointments);
+        };
+    }, [fetchAppointments]);
+
     const handleApprove = async (appointmentId: number) => {
         try {
             const token = Cookies.get('adminToken');
@@ -174,9 +176,6 @@ export default function AppointmentPage() {
         }
     };
 
-    /* ===============================
-       ไม่อนุมัติคิว
-    =============================== */
     const handleReject = async (appointmentId: number, cancellationReason: string) => {
         try {
             const token = Cookies.get('adminToken');
@@ -217,9 +216,11 @@ export default function AppointmentPage() {
             if (!res.ok) throw new Error(data?.error || data?.message || 'ส่งรหัสไม่สำเร็จ');
 
             Swal.fire({
-                icon: 'success',
-                title: 'ส่งรหัสใหม่แล้ว',
-                text: 'รหัสเดิมถูกยกเลิก และส่งรหัสใหม่ให้ผู้ใช้ทางอีเมลแล้ว',
+                icon: data?.email_sent ? 'success' : 'warning',
+                title: 'ออกรหัสใหม่แล้ว',
+                html: `<p>${data?.email_sent ? 'ส่งรหัสใหม่ให้ผู้ใช้ทางอีเมลแล้ว' : data?.email_available === false ? 'ผู้ป่วยไม่มีอีเมล กรุณาแจ้งรหัสให้ผู้ป่วยโดยตรง' : 'ส่งอีเมลไม่สำเร็จ กรุณาแจ้งรหัสให้ผู้ป่วยโดยตรง'}</p>
+                    <p style="font-size:28px;font-weight:800;letter-spacing:5px;margin:12px 0">${data?.access_code || '-'}</p>
+                    <p>ใช้ได้ถึง ${data?.expires_at ? new Date(data.expires_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '-'}</p>`,
             });
             await fetchAppointments();
         } catch (err) {
@@ -431,114 +432,114 @@ export default function AppointmentPage() {
                                                 </tr>
 
                                                 {dateAppointments.map((item) => (
-                                            <tr key={item.appointment_id}>
-                                                {activeTab === 'pending' ? (
-                                                    <td>
-                                                        <div className={styles.actionButtons}>
-                                                            <button
-                                                                type="button"
-                                                                className={styles.approveBtn}
-                                                                onClick={() =>
-                                                                    setConfirmAction({
-                                                                        appointmentId: item.appointment_id,
-                                                                        action: 'approve',
-                                                                    })
+                                                    <tr key={item.appointment_id}>
+                                                        {activeTab === 'pending' ? (
+                                                            <td>
+                                                                <div className={styles.actionButtons}>
+                                                                    <button
+                                                                        type="button"
+                                                                        className={styles.approveBtn}
+                                                                        onClick={() =>
+                                                                            setConfirmAction({
+                                                                                appointmentId: item.appointment_id,
+                                                                                action: 'approve',
+                                                                            })
+                                                                        }
+                                                                    >
+                                                                        <CheckCircle size={17} strokeWidth={2.2} />
+                                                                        อนุมัติ
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        className={styles.rejectBtn}
+                                                                        onClick={() => {
+                                                                            setRejectReason('');
+                                                                            setConfirmAction({
+                                                                                appointmentId: item.appointment_id,
+                                                                                action: 'reject',
+                                                                            });
+                                                                        }}
+                                                                    >
+                                                                        <XCircle size={17} strokeWidth={2.2} />
+                                                                        ยกเลิก
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        ) : (
+                                                            <td>
+                                                                {item.status === 'approved' ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        className={styles.approveBtn}
+                                                                        onClick={() => handleResendCode(item.appointment_id)}
+                                                                    >
+                                                                        ส่งรหัสอีกครั้ง
+                                                                    </button>
+                                                                ) : item.status === 'cancelled' || item.status === 'rejected' ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        className={styles.editNoteBtn}
+                                                                        onClick={() => handleEditCancellationReason(item)}
+                                                                    >
+                                                                        <Pencil size={15} strokeWidth={2.2} />
+                                                                        แก้หมายเหตุ
+                                                                    </button>
+                                                                ) : '-'}
+                                                            </td>
+                                                        )}
+
+                                                        <td>
+                                                            <span className={styles.patientCodeBadge}>
+                                                                P{String(item.user_id).padStart(3, '0')}
+                                                            </span>
+                                                        </td>
+
+                                                        <td>
+                                                            <span className={styles.patientName}>
+                                                                {`${item.first_name || ''} ${item.last_name || ''}`.trim() || '-'}
+                                                            </span>
+                                                        </td>
+
+                                                        <td className={styles.dateCell}>
+                                                            {item.service_date
+                                                                ? dayjs(item.service_date).format('dd. D MMM. ') +
+                                                                (dayjs(item.service_date).year() + 543)
+                                                                : '-'}
+                                                        </td>
+
+                                                        <td className={styles.timeCell}>
+                                                            <Clock size={16} strokeWidth={2} />
+                                                            {item.hour_of_day ? `${String(item.hour_of_day).padStart(2, '0')}:00` : '-'} น.
+                                                        </td>
+
+                                                        <td>
+                                                            <span
+                                                                className={
+                                                                    item.status === 'approved'
+                                                                        ? styles.statusApproved
+                                                                        : item.status === 'cancelled' || item.status === 'rejected'
+                                                                            ? styles.statusCancelled
+                                                                            : styles.statusPending
                                                                 }
                                                             >
-                                                                <CheckCircle size={17} strokeWidth={2.2} />
-                                                                อนุมัติ
-                                                            </button>
+                                                                {item.status === 'approved'
+                                                                    ? 'อนุมัติแล้ว'
+                                                                    : item.status === 'cancelled' || item.status === 'rejected'
+                                                                        ? item.status === 'rejected' ? 'ไม่อนุมัติ' : 'ยกเลิก'
+                                                                        : 'รอดำเนินการ'}
+                                                            </span>
+                                                        </td>
 
-                                                            <button
-                                                                type="button"
-                                                                className={styles.rejectBtn}
-                                                                onClick={() => {
-                                                                    setRejectReason('');
-                                                                    setConfirmAction({
-                                                                        appointmentId: item.appointment_id,
-                                                                        action: 'reject',
-                                                                    });
-                                                                }}
-                                                            >
-                                                                <XCircle size={17} strokeWidth={2.2} />
-                                                                ยกเลิก
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                ) : (
-                                                    <td>
-                                                        {item.status === 'approved' ? (
-                                                            <button
-                                                                type="button"
-                                                                className={styles.approveBtn}
-                                                                onClick={() => handleResendCode(item.appointment_id)}
-                                                            >
-                                                                ส่งรหัสอีกครั้ง
-                                                            </button>
-                                                        ) : item.status === 'cancelled' || item.status === 'rejected' ? (
-                                                            <button
-                                                                type="button"
-                                                                className={styles.editNoteBtn}
-                                                                onClick={() => handleEditCancellationReason(item)}
-                                                            >
-                                                                <Pencil size={15} strokeWidth={2.2} />
-                                                                แก้หมายเหตุ
-                                                            </button>
-                                                        ) : '-'}
-                                                    </td>
-                                                )}
+                                                        <td>{item.cancellation_reason || '-'}</td>
 
-                                                <td>
-                                                    <span className={styles.patientCodeBadge}>
-                                                        P{String(item.user_id).padStart(3, '0')}
-                                                    </span>
-                                                </td>
-
-                                                <td>
-                                                    <span className={styles.patientName}>
-                                                        {`${item.first_name || ''} ${item.last_name || ''}`.trim() || '-'}
-                                                    </span>
-                                                </td>
-
-                                                <td className={styles.dateCell}>
-                                                    {item.service_date
-                                                        ? dayjs(item.service_date).format('dd. D MMM. ') +
-                                                        (dayjs(item.service_date).year() + 543)
-                                                        : '-'}
-                                                </td>
-
-                                                <td className={styles.timeCell}>
-                                                    <Clock size={16} strokeWidth={2} />
-                                                    {item.hour_of_day ? `${String(item.hour_of_day).padStart(2, '0')}:00` : '-'} น.
-                                                </td>
-
-                                                <td>
-                                                    <span
-                                                        className={
-                                                            item.status === 'approved'
-                                                                ? styles.statusApproved
-                                                                : item.status === 'cancelled' || item.status === 'rejected'
-                                                                    ? styles.statusCancelled
-                                                                    : styles.statusPending
-                                                        }
-                                                    >
-                                                        {item.status === 'approved'
-                                                            ? 'อนุมัติแล้ว'
-                                                            : item.status === 'cancelled' || item.status === 'rejected'
-                                                                ? item.status === 'rejected' ? 'ไม่อนุมัติ' : 'ยกเลิก'
-                                                                : 'รอดำเนินการ'}
-                                                    </span>
-                                                </td>
-
-                                                <td>{item.cancellation_reason || '-'}</td>
-
-                                                <td className={styles.createdCell}>
-                                                    {item.created_at
-                                                        ? dayjs(item.created_at).format('dd. D MMM. ') +
-                                                        (dayjs(item.created_at).year() + 543)
-                                                        : '-'}
-                                                </td>
-                                            </tr>
+                                                        <td className={styles.createdCell}>
+                                                            {item.created_at
+                                                                ? dayjs(item.created_at).format('dd. D MMM. ') +
+                                                                (dayjs(item.created_at).year() + 543)
+                                                                : '-'}
+                                                        </td>
+                                                    </tr>
                                                 ))}
                                             </Fragment>
                                         ))

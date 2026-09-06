@@ -138,11 +138,12 @@ export default function LoginPage() {
             const result = await res.json();
             if (!res.ok) throw new Error(result?.message || result?.error || 'สมัครสมาชิกไม่สำเร็จ');
 
-            Swal.fire({ icon: 'success', title: 'สมัครสมาชิกสำเร็จ', text: 'โปรดเข้าสู่ระบบด้วยบัญชีของคุณ' });
-            setIsSignUp(false);
-            form.reset();
-            setProvince('');
-            setCaptchaToken(null);
+            await Swal.fire({
+                icon: result?.email_sent ? 'success' : 'warning',
+                title: 'สมัครสมาชิกสำเร็จ',
+                text: result?.email_sent ? 'กรุณากรอก OTP เพื่อยืนยันอีเมล' : 'ยังส่ง OTP ไม่สำเร็จ คุณสามารถกดส่งใหม่ในหน้าถัดไป',
+            });
+            router.push(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`);
         } catch (err: unknown) {
             Swal.fire({ icon: 'error', title: 'สมัครสมาชิกไม่สำเร็จ', text: getErrorMessage(err, 'เกิดข้อผิดพลาด') });
         } finally {
@@ -172,7 +173,12 @@ export default function LoginPage() {
                 body: JSON.stringify(body)
             });
             const result = await res.json();
-            if (!res.ok) throw new Error(result?.error || result?.message || 'เข้าสู่ระบบไม่สำเร็จ');
+            if (!res.ok) {
+                if (result?.code === 'EMAIL_VERIFICATION_REQUIRED' && result?.email) {
+                    router.push(`/verify-email?email=${encodeURIComponent(result.email)}`);
+                }
+                throw new Error(result?.error || result?.message || 'เข้าสู่ระบบไม่สำเร็จ');
+            }
 
             // { token, user:{ user_id, username, email, role } }
             const role = String(result.user?.role || '').toLowerCase();
@@ -180,6 +186,7 @@ export default function LoginPage() {
             Cookies.remove(isUser ? 'adminToken' : 'userToken');
             Cookies.set(isUser ? 'userToken' : 'adminToken', result.token, {
                 sameSite: 'lax',
+                secure: window.location.protocol === 'https:',
                 ...(rememberMe ? { expires: 7 } : {})
             });
 

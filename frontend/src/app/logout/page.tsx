@@ -1,86 +1,116 @@
 'use client';
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/navigation';
 import styles from './logout.module.css';
-import { API_BASE } from '@/lib/api';
+import { API_BASE, USER_API } from '@/lib/api';
+import { resolveBackendImage } from '@/lib/images';
+
+type Profile = {
+  first_name?: string | null;
+  last_name?: string | null;
+  username?: string | null;
+  email?: string | null;
+  role?: string | null;
+  profile_image?: string | null;
+};
+
+function getStoredProfile(): Profile | null {
+  try {
+    const value = localStorage.getItem('user');
+    return value ? JSON.parse(value) as Profile : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function LogoutPage() {
-    const router = useRouter();
-    const [profile, setProfile] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
-    // ดึงโปรไฟล์ผู้ใช้มาแสดง (ดึงก่อน logout)
-    useEffect(() => {
-        async function load() {
-            try {
-                const token = Cookies.get('adminToken');
-                if (!token) {
-                    setLoading(false);
-                    return;
-                }
+  useEffect(() => {
+    async function loadProfile() {
+      const storedProfile = getStoredProfile();
+      setProfile(storedProfile);
 
-                const res = await fetch(`${API_BASE}/me/profile`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
+      const token = Cookies.get('adminToken') || Cookies.get('userToken');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
-                if (res.ok) {
-                    setProfile(await res.json());
-                } else {
-                    setProfile(null);
-                }
-            } catch {
-                setProfile(null);
-            } finally {
-                setLoading(false);
-            }
-        }
-        load();
-    }, []);
+      try {
+        const response = await fetch(`${API_BASE}/me/profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        if (response.ok) setProfile(await response.json());
+      } catch (error) {
+        console.error('โหลดโปรไฟล์สำหรับหน้าออกจากระบบไม่สำเร็จ:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-    // ปุ่มยืนยันออกจากระบบ
-    const handleLogout = () => {
-        Cookies.remove('adminToken');       // ลบ token
-        Cookies.remove('userToken');        // เผื่อมี user token
-        localStorage.clear();               // เคลียร์ cache เพิ่มเติม
+    loadProfile();
+  }, []);
 
-        // ใช้ replace() ป้องกัน user กด Back แล้วกลับเข้าไป dashboard ได้
-        router.replace('userlogin');
-    };
+  const fullName = useMemo(() => {
+    const name = `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim();
+    return name || profile?.username || profile?.email?.split('@')[0] || 'ผู้ใช้งาน';
+  }, [profile]);
 
-    // ปุ่มยกเลิก → กลับหน้าก่อนหน้า
-    const handleCancel = () => {
-        router.back();
-    };
+  const resolvedAvatar = resolveBackendImage(profile?.profile_image);
+  const avatarSrc = !avatarFailed && resolvedAvatar
+    ? resolvedAvatar
+    : '/img/default-avatar.png';
 
-    if (loading) return <div className={styles.loading}>กำลังโหลด...</div>;
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await fetch(`${USER_API}/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (error) {
+      console.error('เรียก API logout ไม่สำเร็จ:', error);
+    } finally {
+      Cookies.remove('adminToken', { path: '/' });
+      Cookies.remove('userToken', { path: '/' });
+      localStorage.removeItem('user');
+      sessionStorage.removeItem('pwdResetToken');
+      window.location.replace('/userlogin');
+    }
+  };
 
-    return (
-        <div className={styles.container}>
-            <div className={styles.card}>
-                <img
-                    src={profile?.profile_image ? `${API_BASE}/${profile.profile_image}` : '/img/default-avatar.png'}
-                    alt="profile"
-                    className={styles.avatar}
-                />
-                <h2 className={styles.name}>
-                    {profile?.first_name} {profile?.last_name}
-                </h2>
-                <p className={styles.question}>ต้องการออกจากระบบใช่หรือไม่?</p>
+  if (loading) return <div className={styles.loading}>กำลังโหลดโปรไฟล์...</div>;
 
-                <div className={styles.buttonRow}>
-                    <button className={styles.cancelBtn} onClick={handleCancel}>
-                        ยกเลิก
-                    </button>
-                    <button className={styles.logoutBtn} onClick={handleLogout}>
-                        ออกจากระบบ
-                    </button>
-                </div>
-            </div>
+  return (
+    <main className={styles.container}>
+      <section className={styles.card}>
+        <img
+          src={avatarSrc}
+          alt={`รูปโปรไฟล์ของ ${fullName}`}
+          className={styles.avatar}
+          onError={() => setAvatarFailed(true)}
+        />
+        <h1 className={styles.name}>{fullName}</h1>
+        <p className={styles.question}>ต้องการออกจากระบบใช่หรือไม่?</p>
+
+        <div className={styles.buttonRow}>
+          <button type="button" className={styles.cancelBtn} onClick={() => router.back()} disabled={loggingOut}>
+            ยกเลิก
+          </button>
+          <button type="button" className={styles.logoutBtn} onClick={handleLogout} disabled={loggingOut}>
+            {loggingOut ? 'กำลังออกจากระบบ...' : 'ออกจากระบบ'}
+          </button>
         </div>
-    );
+      </section>
+    </main>
+  );
 }

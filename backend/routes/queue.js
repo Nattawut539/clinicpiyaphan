@@ -1,19 +1,46 @@
 const express = require("express");
-const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const router = express.Router();
 const pool = require("../tools/db");
 const { requireAuth, requireStaff, withContext } = require("../tools/_utils");
+const { JWT_SECRET } = require("../tools/config");
+
+const ACCESS_CODE_ENCRYPTION_KEY = crypto
+  .createHash("sha256")
+  .update(`clinic-appointment-access-code:${JWT_SECRET}`)
+  .digest();
+
+function decryptAccessCode(payload) {
+  if (!payload) return null;
+  try {
+    const [version, iv, authTag, encrypted] = String(payload).split(":");
+    if (version !== "v1" || !iv || !authTag || !encrypted) return null;
+    const decipher = crypto.createDecipheriv(
+      "aes-256-gcm",
+      ACCESS_CODE_ENCRYPTION_KEY,
+      Buffer.from(iv, "base64url"),
+    );
+    decipher.setAuthTag(Buffer.from(authTag, "base64url"));
+    const code = Buffer.concat([
+      decipher.update(Buffer.from(encrypted, "base64url")),
+      decipher.final(),
+    ]).toString("utf8");
+    return /^\d{6}$/.test(code) ? code : null;
+  } catch {
+    return null;
+  }
+}
 
 // -----------------------------------------------------
 // 📌 ฟังก์ชันหาลำดับคิวถัดไป (ต่อวัน, ช่วงเวลา, A/B prefix)
 // -----------------------------------------------------
-async function nextNo(client, _serviceDate, _avail, prefix) {
+async function nextNo(client, serviceDate, _avail, prefix) {
   const { rows } = await client.query(
     `SELECT COALESCE(MAX(numeric_no), 0) + 1 AS n
      FROM clinic.queue_tickets
-     WHERE prefix = $1`,
-    [prefix],
+     WHERE prefix = $1
+       AND service_date = $2::date`,
+    [prefix, serviceDate],
   );
   return rows[0].n;
 }
@@ -25,16 +52,14 @@ function formatQ(prefix, n) {
   return `${prefix}${String(n).padStart(3, "0")}`;
 }
 
-async function createWalkinAuthUser(client) {
+async function createWalkinPatientUser(client) {
   const random = crypto.randomBytes(5).toString("hex");
   const username = `walkin_${Date.now()}_${random}`;
-  const passwordHash = await bcrypt.hash(crypto.randomBytes(24).toString("hex"), 10);
-
   const insertedUser = await client.query(
-    `INSERT INTO clinic.users (username, password_hash, role)
-     VALUES ($1, $2, 'user')
+    `INSERT INTO clinic.users (username, role, account_status, registration_source)
+     VALUES ($1, 'user', 'unclaimed', 'walkin')
      RETURNING user_id`,
-    [username, passwordHash],
+    [username],
   );
 
   return insertedUser.rows[0].user_id;
@@ -105,10 +130,17 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
   const firstName = cleanText(patient?.first_name);
   const lastName = cleanText(patient?.last_name);
   const nationalId = cleanText(patient?.national_id);
+  const requestedQueueNumber = cleanText(receipt_queue).toUpperCase();
   const bp = splitBp(vitals?.bp);
 
   if ((patient || vitals) && (!firstName || !lastName)) {
     return res.status(400).json({ message: "กรุณากรอกชื่อและนามสกุลผู้ป่วย" });
+  }
+  if (nationalId && !/^\d{13}$/.test(nationalId)) {
+    return res.status(400).json({ message: "เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก" });
+  }
+  if (requestedQueueNumber && !/^B\d{3}$/.test(requestedQueueNumber)) {
+    return res.status(400).json({ message: "หมายเลขคิว Walk-in ต้องเป็นรูปแบบ B001" });
   }
 
   if (vitals?.bp && !bp) {
@@ -129,27 +161,37 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
           });
       const arrivedAt = `${day} ${visitTimeText}:00+07`;
 
+      const prefix = "B";
+      const n = requestedQueueNumber
+        ? Number.parseInt(requestedQueueNumber.slice(1), 10)
+        : await nextNo(client, day, avaliable_date, prefix);
+      const qnum = requestedQueueNumber || formatQ(prefix, n);
+
+      const duplicateQueue = await client.query(
+        `SELECT 1 FROM clinic.queue_tickets
+         WHERE service_date = $1::date
+           AND queue_number = $2
+           AND status <> 'cancelled'
+         LIMIT 1`,
+        [day, qnum],
+      );
+      if (duplicateQueue.rowCount) {
+        return res.status(409).json({ message: `หมายเลขคิว ${qnum} ถูกใช้แล้วในวันนี้` });
+      }
+
       let resolvedUserId = user_id;
 
       if (!resolvedUserId && patient) {
-        const found = await client.query(
+        const found = nationalId ? await client.query(
           `SELECT u.user_id
            FROM clinic.users u
            JOIN clinic.user_details d ON d.user_id = u.user_id
            WHERE u.role = 'user'
-             AND (
-               (NULLIF($1, '') IS NOT NULL AND d.national_id = $1)
-               OR (
-                 LOWER(BTRIM(d.first_name)) = LOWER($2)
-                 AND LOWER(BTRIM(d.last_name)) = LOWER($3)
-               )
-             )
-           ORDER BY
-             CASE WHEN NULLIF($1, '') IS NOT NULL AND d.national_id = $1 THEN 0 ELSE 1 END,
-             u.user_id
+             AND d.national_id = $1
+           ORDER BY u.user_id
            LIMIT 1`,
-          [nationalId, firstName, lastName],
-        );
+          [nationalId],
+        ) : { rowCount: 0, rows: [] };
 
         if (found.rowCount) {
           resolvedUserId = found.rows[0].user_id;
@@ -182,7 +224,7 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
             ],
           );
         } else {
-          resolvedUserId = await createWalkinAuthUser(client);
+          resolvedUserId = await createWalkinPatientUser(client);
 
           await client.query(
             `INSERT INTO clinic.user_details
@@ -206,10 +248,6 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
         }
       }
 
-      const prefix = "B";
-      const n = await nextNo(client, day, avaliable_date, prefix);
-      const qnum = formatQ(prefix, n);
-
       const ins = await client.query(
         `INSERT INTO clinic.queue_tickets
           (queue_number, prefix, numeric_no, service_date, avaliable_date, source, user_id, service_type, created_at)
@@ -223,7 +261,7 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
           avaliable_date,
           source,
           resolvedUserId,
-          service_type || cleanText(receipt_queue) || "Walk-in",
+          service_type || "Walk-in",
           arrivedAt,
         ],
       );
@@ -349,9 +387,13 @@ router.get("/today", requireStaff, async (req, res, next) => {
 
   try {
     await withContext(req, async (client) => {
-      const params = [new Date().toISOString().slice(0, 10)];
+      const params = [];
       let sql = `SELECT
                    q.*,
+                   s.hour_of_day,
+                   ac.code_ciphertext,
+                   ac.expires_at AS access_code_expires_at,
+                   ac.used_at AS access_code_used_at,
                    EXISTS (
                      SELECT 1
                      FROM clinic.measurements m
@@ -364,7 +406,10 @@ router.get("/today", requireStaff, async (req, res, next) => {
                        AND mr.visit_date::date = q.service_date
                    ) AS has_medical_record
                  FROM clinic.queue_tickets q
-                 WHERE q.service_date = $1`;
+                 LEFT JOIN clinic.appointments a ON a.appointment_id = q.appointment_id
+                 LEFT JOIN clinic.appointment_slots s ON s.slot_id = a.slot_id
+                 LEFT JOIN clinic.appointment_access_codes ac ON ac.queue_id = q.queue_id
+                 WHERE q.service_date = (now() AT TIME ZONE 'Asia/Bangkok')::date`;
 
       if (avaliable_date) {
         params.push(avaliable_date);
@@ -379,6 +424,13 @@ router.get("/today", requireStaff, async (req, res, next) => {
       sql += ` ORDER BY q.avaliable_date, q.prefix, q.numeric_no`;
 
       const { rows } = await client.query(sql, params);
+      for (const row of rows) {
+        row.access_code =
+          !row.access_code_used_at && row.access_code_expires_at && new Date(row.access_code_expires_at) > new Date()
+            ? decryptAccessCode(row.code_ciphertext)
+            : null;
+        delete row.code_ciphertext;
+      }
       res.json(rows);
     });
   } catch (e) {

@@ -14,6 +14,11 @@ const eslintConfig = [
     ignores: [".next/**", "node_modules/**", "out/**", "dist/**"],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
+  {
+    // Existing responsive/profile-image layouts rely on native img behavior.
+    // Keeping it avoids visual changes while remote upload URLs are proxied.
+    rules: { "@next/next/no-img-element": "off" },
+  },
 ];
 
 export default eslintConfig;

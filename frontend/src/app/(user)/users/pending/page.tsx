@@ -1,25 +1,18 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
 import styles from './pending.module.css';
 import CustomCalendar from '@/components/calendar/CustomCalendar';
-import {
-  AlertCircle,
-  CalendarCheck,
-  CheckCircle,
-  Clock,
-  List,
-  Sun,
-  Sunset,
-} from 'lucide-react';
+import { AlertCircle, CalendarCheck, CheckCircle, Clock, List, Sun, Sunset, } from 'lucide-react';
 import dayjs from 'dayjs';
-import 'dayjs/locale/th';
-import utc from 'dayjs/plugin/utc';
+import 'dayjs/locale/th'
+import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone';
 import Swal from 'sweetalert2';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import { API_BASE } from '@/lib/api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -27,13 +20,15 @@ dayjs.locale('th');
 
 const BANGKOK_TZ = 'Asia/Bangkok';
 
+const OTHER_TOPIC = 'อื่น ๆ (ระบุหมายเหตุ)';
+
 const TOPICS = [
   'ตรวจโรคทั่วไป',
-  'ตรวจสุขภาพประจำปี',
+  'ตรวจสุขภาพ',
   'ฉีดวัคซีน / ยา',
   'ปรึกษาแพทย์',
   'ทำแผล / ล้างแผล',
-  'อื่น ๆ',
+  OTHER_TOPIC,
 ];
 
 type Slot = {
@@ -44,16 +39,25 @@ type Slot = {
   status: 'open' | 'locked' | 'closed' | string;
 };
 
+type BookingRange = {
+  start: string;
+  end: string;
+  kind: 'current' | 'advance';
+};
+
+//แปลงวันที่ให้เป็นรูปแบบ พ.ศ.
 function formatThaiDate(dateStr: string) {
   const d = dayjs(dateStr);
   if (!d.isValid()) return '-';
   return `${d.format('D MMMM')} ${d.year() + 543}`;
 }
 
+//แปลงตัวเลขชั่วโมงให้เป็นรูปแบบเวลา (7 -> 07:00)
 function formatSlotTime(hour: number) {
   return `${String(hour).padStart(2, '0')}:00`;
 }
 
+//นำเวลานัดแปลงเป็นหมายเลขคิว
 function formatQueueForSlot(hour: number) {
   const queueByHour: Record<number, number> = {
     7: 1,
@@ -66,44 +70,54 @@ function formatQueueForSlot(hour: number) {
     19: 8,
   };
   const queueNo = queueByHour[Number(hour)];
-  return queueNo ? `A${String(queueNo).padStart(3, '0')}` : '-';
+  return queueNo ? `A${String(queueNo).padStart(3, '0')}` : '-'
 }
 
+//ตรวจสอบ slot ยังเปิดจองหรือไม่ (open = true , closed = false)
 function isSlotOpen(slot: Slot) {
   return String(slot.status || '').trim().toLowerCase() === 'open';
 }
 
+//ตรวจสอบ Slot ว่าหมดเวลาหรือยัง
 function isSlotExpiredToday(slot: Slot) {
   const now = dayjs().tz(BANGKOK_TZ);
   const slotDate = dayjs(slot.service_date).format('YYYY-MM-DD');
   if (slotDate !== now.format('YYYY-MM-DD')) return false;
 
-  const slotStart = dayjs.tz(`${slotDate} ${String(slot.hour_of_day).padStart(2, '0')}:00`, 'YYYY-MM-DD HH:mm', BANGKOK_TZ);
+  //สร้างวันและเวลาเริ่มต้นของ slot
+  const slotStart = dayjs.tz(
+    `${slotDate} ${String(slot.hour_of_day).padStart(2, '0')}:00`,
+    BANGKOK_TZ
+  );
   return !now.isBefore(slotStart);
 }
 
+//ตรวจสอบ Slot สามารถจองได้หรือไม่
 function isSlotBookable(slot: Slot) {
-  return isSlotOpen(slot) && !isSlotExpiredToday(slot);
+  return isSlotOpen(slot) && !isSlotExpiredToday(slot); // สถานะต้องเป็น open
 }
 
+//ตรวจสอบเลือกวันที่ย้อนหลังหรือไม่
 function isPastDate(dateStr: string) {
   return dayjs(dateStr).isBefore(dayjs().tz(BANGKOK_TZ).startOf('day'), 'day');
 }
 
+// ตรวจหาวันจันทร์และวันอาทิตย์ของสัปดาห์ปัจจุบัน
 function getCurrentWeekRange() {
-  const today = dayjs().tz(BANGKOK_TZ).startOf('day');
-  const daysFromMonday = (today.day() + 6) % 7;
-  const start = today.subtract(daysFromMonday, 'day');
+  const today = dayjs().tz(BANGKOK_TZ).startOf('day'); //วันที่ตามเวลาประเทศไทย
+  const daysFromMonday = (today.day() + 6) % 7;        //คำนวณจันทร์ถึงอาทิตย์
+  const start = today.subtract(daysFromMonday, 'day');  //หาวันจันทร์ของสัปดาห์นี้
   const end = start.add(6, 'day');
 
+  //start= วันจันทร์ ,end = วันอาทิตย์
   return {
-    start,
-    end,
+    start, end,
     startKey: start.format('YYYY-MM-DD'),
     endKey: end.format('YYYY-MM-DD'),
   };
 }
 
+// ตรวจสอบว่าวันที่อยู่ระหว่างวันจันทร์และวันอาทิตย์หรือไม่
 function isDateInRange(dateStr: string, startKey: string, endKey: string) {
   return Boolean(dateStr && dateStr >= startKey && dateStr <= endKey);
 }
@@ -112,9 +126,11 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : '';
 }
 
+//เปลี่ยน error จาก Backend เป็นข้อความให้ผู้ใช้
 function getBookingErrorMessage(message: string) {
-  const text = String(message || '').toLowerCase();
+  const text = String(message || '').toLowerCase(); //แปลงเป็นตัวพิมพ์เล็ก
 
+  //ตรวจ Error ที่เกี่ยวกับการจอง slot ซ้ำ
   if (
     text.includes('duplicate key value') ||
     text.includes('unique constraint') ||
@@ -123,23 +139,31 @@ function getBookingErrorMessage(message: string) {
     return 'ช่วงเวลานี้ถูกจองแล้ว กรุณาเลือกวันหรือช่วงเวลาอื่น';
   }
 
+  //ตรวจการจองนอกสัปดาห์
   if (text.includes('current week') || text.includes('slot date') || text.includes('สัปดาห์ปัจจุบัน')) {
     return 'สามารถจองคิวได้เฉพาะสัปดาห์ปัจจุบันเท่านั้น';
   }
 
+  //ตรวจเกี่ยวกับ Token
   if (text.includes('token missing') || text.includes('token invalid')) {
-    return 'กรุณาเข้าสู่ระบบใหม่ก่อนจองคิว';
+    return 'กรุณาเข้าสู่ระบบใหม่ก่อนจองคิว'
   }
 
-  if (text.includes('บัญชีผู้ใช้นี้ไม่มีอยู่ในระบบ') || text.includes('account_deleted')) {
+  //ตรวจกรณีบัญชีถูกลบ
+  if (
+    text.includes('บัญชีผู้ใช้นี้ไม่มีในระบบ') ||
+    text.includes('บัญชีผู้ใช้นี้ไม่มีอยู่ในระบบ') ||
+    text.includes('account_deleted')
+  ) {
     return 'บัญชีผู้ใช้นี้ไม่มีอยู่ในระบบ กรุณาลงทะเบียนเพื่อจองคิว';
   }
 
+  //ตรวจกรณีข้อมูลการจองไม่ครบ
   if (text.includes('slot_id') || text.includes('service_type')) {
-    return 'กรุณาเลือกวันที่ หัวข้อ และช่วงเวลาให้ครบ';
+    return 'กรุณาเลือกวันที่ หัวข้อ และช่วงเวลาให้ครบ'
   }
 
-  return message || 'จองคิวไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+  return message || 'จองคิวไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'
 }
 
 export default function PendingPage() {
@@ -155,15 +179,29 @@ export default function PendingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [slotError, setSlotError] = useState('');
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const refreshingSlotsRef = useRef(false);
   const currentWeek = useMemo(() => getCurrentWeekRange(), []);
-  const weekLabel = `${formatThaiDate(currentWeek.startKey)} - ${formatThaiDate(currentWeek.endKey)}`;
+  const [bookingRanges, setBookingRanges] = useState<BookingRange[]>([
+    { start: currentWeek.startKey, end: currentWeek.endKey, kind: 'current' },
+  ]);
+  const bookingEnd = useMemo(
+    () => bookingRanges.reduce((latest, range) => range.end > latest ? range.end : latest, currentWeek.endKey),
+    [bookingRanges, currentWeek.endKey],
+  );
+  const weekLabel = bookingRanges
+    .map((range) => `${formatThaiDate(range.start)} - ${formatThaiDate(range.end)}`)
+    .join(' และ ');
+  const isBookingDate = useCallback(
+    (date: string) => bookingRanges.some((range) => isDateInRange(date, range.start, range.end)),
+    [bookingRanges],
+  );
 
   const handleDateSelect = (date: string) => {
-    if (!isDateInRange(date, currentWeek.startKey, currentWeek.endKey)) {
+    if (!isBookingDate(date)) {
       setSelectedDate('');
       setSelectedSlotId('');
       setSlots([]);
-      setSlotError('เปิดจองเฉพาะสัปดาห์ปัจจุบันเท่านั้น');
+      setSlotError('วันที่นี้ยังไม่อยู่ในช่วงที่คลินิกเปิดให้จอง');
       setStep(1);
       return;
     }
@@ -171,13 +209,63 @@ export default function PendingPage() {
     setSelectedDate(date);
   };
 
+  const refreshBookingWindows = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/calendar/booking-windows`, { cache: 'no-store' });
+      const data = await response.json().catch(() => []);
+      if (!response.ok || !Array.isArray(data)) return;
+
+      const ranges = data
+        .map((item): BookingRange | null => {
+          const start = String(item?.range_start || '');
+          const end = String(item?.range_end || '');
+          if (!start || !end) return null;
+          return { start, end, kind: item?.kind === 'advance' ? 'advance' : 'current' };
+        })
+        .filter((item): item is BookingRange => Boolean(item));
+
+      const currentRange = ranges.find((range) => range.kind === 'current');
+      const uniqueRanges = ranges.filter((range, index, items) => {
+        const duplicateIndex = items.findIndex(
+          (item) => item.start === range.start && item.end === range.end,
+        );
+        const overlapsCurrent = Boolean(
+          range.kind === 'advance' && currentRange &&
+          range.start <= currentRange.end && range.end >= currentRange.start
+        );
+        return duplicateIndex === index && !overlapsCurrent;
+      });
+
+      if (uniqueRanges.length) setBookingRanges(uniqueRanges);
+    } catch (error) {
+      console.error('Load booking windows error:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const syncWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshBookingWindows();
+    };
+
+    void refreshBookingWindows();
+    const intervalId = window.setInterval(syncWhenVisible, 30_000);
+    window.addEventListener('focus', syncWhenVisible);
+    document.addEventListener('visibilitychange', syncWhenVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', syncWhenVisible);
+      document.removeEventListener('visibilitychange', syncWhenVisible);
+    };
+  }, [refreshBookingWindows]);
+
   useEffect(() => {
     const token = Cookies.get('userToken');
 
     if (!token) {
       Swal.fire({
         icon: 'info',
-        title: 'กรุณาลงทะเบียนหรือเข้าสู่ระบบเพื่อจองคิว',
+        title: 'กรุณาลงทะเบียนหรือเข้าสู่ระบบเพื่อดำเนินการจองคิว',
         confirmButtonColor: '#0f766e',
       }).then(() => {
         router.replace('/users/userHome');
@@ -190,7 +278,7 @@ export default function PendingPage() {
         const res = await fetch(`${API_BASE}/me/profile`, {
           headers: { Authorization: `Bearer ${token}` },
           credentials: 'include',
-          cache: 'no-store',
+          cache: 'no-store'
         });
 
         if (!res.ok) {
@@ -210,8 +298,7 @@ export default function PendingPage() {
       } catch {
         setCheckingAuth(false);
       }
-    };
-
+    }
     verifyAccount();
   }, [router]);
 
@@ -232,10 +319,10 @@ export default function PendingPage() {
       return;
     }
 
-    if (!isDateInRange(selectedDate, currentWeek.startKey, currentWeek.endKey)) {
+    if (!isBookingDate(selectedDate)) {
       setSlots([]);
       setSelectedSlotId('');
-      setSlotError('เปิดจองเฉพาะสัปดาห์ปัจจุบันเท่านั้น');
+      setSlotError('วันที่นี้ยังไม่อยู่ในช่วงที่คลินิกเปิดให้จอง');
       setStep(1);
       return;
     }
@@ -247,14 +334,16 @@ export default function PendingPage() {
         setSlotError('');
         setStep(2);
 
-        const res = await fetch(`${API_BASE}/slots/day?date=${selectedDate}`);
-        const data = await res.json().catch(() => []);
+        const res = await fetch(`${API_BASE}/slots/day?date=${selectedDate}`, {
+          cache: 'no-store',
+        });
+        const date = await res.json().catch(() => []);
 
         if (!res.ok) {
-          throw new Error(data?.error || data?.message || 'โหลดช่วงเวลานัดไม่สำเร็จ');
+          throw new Error(date?.error || date?.message || 'โหลดช่วงเวลานัดหมายไม่สำเร็จ')
         }
 
-        setSlots(Array.isArray(data) ? data : []);
+        setSlots(Array.isArray(date) ? date : []);
       } catch (err: unknown) {
         setSlots([]);
         setSlotError(getErrorMessage(err) || 'ยังไม่สามารถโหลดช่วงเวลาจาก backend ได้');
@@ -264,35 +353,61 @@ export default function PendingPage() {
     };
 
     loadSlotsByDate();
-  }, [currentWeek.endKey, currentWeek.startKey, selectedDate]);
+  }, [isBookingDate, selectedDate]);
 
-  const morningSlots = useMemo(
-    () => slots.filter((slot) => String(slot.avaliable_date).toLowerCase() === 'morning'),
-    [slots]
-  );
 
-  const afternoonSlots = useMemo(
-    () => slots.filter((slot) => String(slot.avaliable_date).toLowerCase() === 'afternoon'),
-    [slots]
-  );
+  const morningSlots = useMemo(() => slots.filter((slot) => String(slot.avaliable_date).toLowerCase() === 'morning'), [slots]);
+  const afternoonSlots = useMemo(() => slots.filter((slot) => String(slot.avaliable_date).toLowerCase() === 'afternoon'), [slots]);
 
   const selectedSlot = slots.find((slot) => String(slot.slot_id) === selectedSlotId);
-  const serviceTitle = title === 'อื่น ๆ' ? customTitle.trim() : title.trim();
+  const serviceTitle = title === OTHER_TOPIC ? customTitle.trim() : title.trim();
 
-  const refreshSlots = async () => {
-    if (!selectedDate || isPastDate(selectedDate) || !isDateInRange(selectedDate, currentWeek.startKey, currentWeek.endKey)) return;
+  const refreshSlots = useCallback(async () => {
+    if (!selectedDate || isPastDate(selectedDate) || !isBookingDate(selectedDate)) return;
+    if (refreshingSlotsRef.current) return;
 
     try {
-      const res = await fetch(`${API_BASE}/slots/day?date=${selectedDate}`);
+      refreshingSlotsRef.current = true;
+      const res = await fetch(`${API_BASE}/slots/day?date=${selectedDate}`, {
+        cache: 'no-store',
+      });
       const data = await res.json().catch(() => []);
 
       if (res.ok) {
-        setSlots(Array.isArray(data) ? data : []);
+        const nextSlots = Array.isArray(data) ? data : [];
+        setSlots(nextSlots);
+        setSelectedSlotId((currentSlotId) => {
+          if (!currentSlotId) return currentSlotId;
+          const currentSlot = nextSlots.find(
+            (slot: Slot) => String(slot.slot_id) === currentSlotId,
+          );
+          return currentSlot && isSlotBookable(currentSlot) ? currentSlotId : '';
+        });
       }
     } catch (err) {
       console.error('Refresh slots error:', err);
+    } finally {
+      refreshingSlotsRef.current = false;
     }
-  };
+  }, [isBookingDate, selectedDate]);
+
+  useEffect(() => {
+    if (!selectedDate || isPastDate(selectedDate) || !isBookingDate(selectedDate)) return;
+
+    const syncVisibleSlots = () => {
+      if (document.visibilityState === 'visible') void refreshSlots();
+    };
+    const intervalId = window.setInterval(syncVisibleSlots, 3000);
+
+    window.addEventListener('focus', syncVisibleSlots);
+    document.addEventListener('visibilitychange', syncVisibleSlots);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', syncVisibleSlots);
+      document.removeEventListener('visibilitychange', syncVisibleSlots);
+    };
+  }, [isBookingDate, refreshSlots, selectedDate]);
 
   const handleSubmit = async () => {
     if (isPastDate(selectedDate)) {
@@ -305,11 +420,11 @@ export default function PendingPage() {
       return;
     }
 
-    if (!isDateInRange(selectedDate, currentWeek.startKey, currentWeek.endKey)) {
+    if (!isBookingDate(selectedDate)) {
       Swal.fire({
         icon: 'warning',
-        title: 'เปิดจองเฉพาะสัปดาห์ปัจจุบัน',
-        text: `สัปดาห์นี้เปิดให้จองวันที่ ${weekLabel}`,
+        title: 'วันที่นี้ยังไม่เปิดให้จอง',
+        text: `ช่วงที่เปิดให้จองคือ ${weekLabel}`,
         confirmButtonColor: '#0f766e',
       });
       return;
@@ -320,6 +435,18 @@ export default function PendingPage() {
         icon: 'warning',
         title: 'กรุณากรอกข้อมูลให้ครบถ้วน',
         text: 'ต้องเลือกวันที่ หัวข้อ และช่วงเวลา',
+        confirmButtonColor: '#0f766e',
+      });
+      return;
+    }
+
+    if (!selectedSlot || !isSlotBookable(selectedSlot)) {
+      setSelectedSlotId('');
+      await refreshSlots();
+      await Swal.fire({
+        icon: 'warning',
+        title: 'ช่วงเวลานี้ไม่สามารถจองได้',
+        text: 'กรุณาเลือกช่วงเวลาอื่น',
         confirmButtonColor: '#0f766e',
       });
       return;
@@ -341,16 +468,43 @@ export default function PendingPage() {
     try {
       setSubmitting(true);
 
+      // ตรวจสถานะล่าสุดอีกครั้งก่อนส่งคำขอจอง เพื่อลดความสับสนเมื่อมีหลายคนเลือกเวลาเดียวกัน
+      const availabilityRes = await fetch(`${API_BASE}/slots/day?date=${selectedDate}`, {
+        cache: 'no-store',
+      });
+      const latestSlotsData = await availabilityRes.json().catch(() => []);
+
+      if (!availabilityRes.ok || !Array.isArray(latestSlotsData)) {
+        setSelectedSlotId('');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'สถานะการจองมีการเปลี่ยนแปลง',
+          text: latestSlotsData?.error || 'กรุณาเลือกวันและช่วงเวลาใหม่อีกครั้ง',
+          confirmButtonColor: '#0f766e',
+        });
+        return;
+      }
+
+      const latestSlots = latestSlotsData as Slot[];
+      setSlots(latestSlots);
+      const latestSelectedSlot = latestSlots.find(
+        (slot) => String(slot.slot_id) === selectedSlotId,
+      );
+      if (!latestSelectedSlot || !isSlotBookable(latestSelectedSlot)) {
+        setSelectedSlotId('');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'ช่วงเวลานี้เพิ่งถูกจองไป',
+          text: 'มีผู้ใช้อื่นจองช่วงเวลานี้ก่อนหน้า กรุณาเลือกช่วงเวลาอื่น',
+          confirmButtonColor: '#0f766e',
+        });
+        return;
+      }
+
       const res = await fetch(`${API_BASE}/appointments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          slot_id: Number(selectedSlotId),
-          service_type: serviceTitle,
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, },
+        body: JSON.stringify({ slot_id: Number(selectedSlotId), service_type: serviceTitle, }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -372,13 +526,32 @@ export default function PendingPage() {
           return;
         }
 
+        if (
+          data?.code === 'USER_ALREADY_BOOKED_DATE' ||
+          String(data?.error || '').includes('มีนัดหมายในวันนี้แล้ว')
+        ) {
+          const result = await Swal.fire({
+            icon: 'info',
+            title: 'คุณมีนัดหมายในวันนี้แล้ว',
+            text: 'หนึ่งบัญชีสามารถจองได้หนึ่งช่วงเวลาต่อวัน กรุณาเลือกวันอื่นหรือดูรายการนัดหมายเดิม',
+            showCancelButton: true,
+            confirmButtonText: 'ดูรายการนัดหมาย',
+            cancelButtonText: 'เลือกวันอื่น',
+            confirmButtonColor: '#0f766e',
+          });
+
+          if (result.isConfirmed) {
+            router.push('/users/appointment');
+          }
+          return;
+        }
+
         Swal.fire({
           icon: 'warning',
           title: 'จองคิวไม่สำเร็จ',
           text: getBookingErrorMessage(data?.error || data?.message || ''),
           confirmButtonColor: '#0f766e',
         });
-
         return;
       }
 
@@ -416,8 +589,7 @@ export default function PendingPage() {
     const selected = String(slot.slot_id) === selectedSlotId;
 
     return (
-      <button
-        type="button"
+      <button type='button'
         className={`${styles.slotButton} ${styles[session]} ${selected ? styles.selectedSlot : ''} ${!open ? styles.unavailableSlot : ''}`}
         disabled={!open || submitting}
         onClick={() => setSelectedSlotId(String(slot.slot_id))}
@@ -442,15 +614,12 @@ export default function PendingPage() {
         </div>
 
         <div className={styles.toggleButtons}>
-          <button
-            className={styles.inactiveButton}
-            type="button"
+          <button type='button' className={styles.inactiveButton}
             onClick={() => router.push('/users/appointment')}
           >
-            <List size={16} />
-            ทั้งหมด
+            <List size={16} /> ทั้งหมด
           </button>
-          <button className={styles.activeButton} type="button">
+          <button type='button' className={styles.activeButton}>
             <CalendarCheck size={16} />
             จองคิว
           </button>
@@ -458,9 +627,20 @@ export default function PendingPage() {
       </div>
 
       <section className={styles.weekWindowCard}>
-        <div>
-          <span>Booking window</span>
-          <strong>{weekLabel}</strong>
+        <div className={styles.weekWindowHeading}>
+          <span>ช่วงวันที่เปิดให้จอง</span>
+          <small>อัปเดตอัตโนมัติ</small>
+        </div>
+        <div className={styles.weekWindowList}>
+          {bookingRanges.map((range) => (
+            <div
+              className={`${styles.weekWindowItem} ${range.kind === 'advance' ? styles.advanceWindowItem : ''}`}
+              key={`${range.kind}-${range.start}-${range.end}`}
+            >
+              <span>{range.kind === 'current' ? 'สัปดาห์ปัจจุบัน' : 'เปิดจองล่วงหน้า'}</span>
+              <strong>{formatThaiDate(range.start)} - {formatThaiDate(range.end)}</strong>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -469,8 +649,9 @@ export default function PendingPage() {
           <CustomCalendar
             onDateSelect={handleDateSelect}
             minDate={currentWeek.startKey}
-            maxDate={currentWeek.endKey}
-            helperText={`เปิดจองเฉพาะสัปดาห์ปัจจุบัน: ${weekLabel}`}
+            maxDate={bookingEnd}
+            allowedRanges={bookingRanges}
+            helperText={`ช่วงวันที่เปิดให้จอง: ${weekLabel}`}
           />
         </section>
 
@@ -492,8 +673,7 @@ export default function PendingPage() {
                   <span>วันที่เลือก</span>
                   <strong>{formatThaiDate(selectedDate)}</strong>
                 </div>
-                <button
-                  type="button"
+                <button type='button'
                   onClick={() => {
                     setSelectedDate('');
                     setSelectedSlotId('');
@@ -509,9 +689,8 @@ export default function PendingPage() {
                   <h3>หัวข้อการรักษา</h3>
                   <div className={styles.topicGrid}>
                     {TOPICS.map((topic) => (
-                      <button
+                      <button type='button'
                         key={topic}
-                        type="button"
                         className={title === topic ? styles.topicActive : styles.topicButton}
                         onClick={() => setTitle(topic)}
                       >
@@ -520,97 +699,93 @@ export default function PendingPage() {
                     ))}
                   </div>
 
-                  {title === 'อื่น ๆ' && (
-                    <input
-                      className={styles.customInput}
-                      value={customTitle}
-                      onChange={(e) => setCustomTitle(e.target.value)}
-                      placeholder="ระบุหัวข้อที่ต้องการนัด"
+                  {title === OTHER_TOPIC && (
+                    <input className={styles.customInput}
+                    value={customTitle}
+                    onChange={(e) => setCustomTitle(e.target.value)}
+                    placeholder='ระบุหัวข้อที่ต้องการนัดหมาย'
                     />
                   )}
                 </div>
 
-                <div className={`${styles.sessionBlock} ${styles.morningBlock}`}>
-                  <div className={styles.slotTitle}>
-                    <Sun size={17} />
-                    <h3>ช่วงเช้า</h3>
-                  </div>
-                  <div className={styles.slotGrid}>
-                    {loadingSlots && <p className={styles.note}>กำลังโหลดช่วงเวลา...</p>}
-                    {!loadingSlots && morningSlots.map((slot) => (
-                      <SlotButton key={slot.slot_id} slot={slot} session="morning" />
-                    ))}
-                    {!loadingSlots && !slotError && morningSlots.length === 0 && (
-                      <p className={styles.note}>ยังไม่มีช่วงเช้าสำหรับวันนี้</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className={`${styles.sessionBlock} ${styles.afternoonBlock}`}>
-                  <div className={styles.slotTitle}>
-                    <Sunset size={17} />
-                    <h3>ช่วงบ่าย</h3>
-                  </div>
-                  <div className={styles.slotGrid}>
-                    {!loadingSlots && afternoonSlots.map((slot) => (
-                      <SlotButton key={slot.slot_id} slot={slot} session="afternoon" />
-                    ))}
-                    {!loadingSlots && !slotError && afternoonSlots.length === 0 && (
-                      <p className={styles.note}>ยังไม่มีช่วงบ่ายสำหรับวันนี้</p>
-                    )}
-                  </div>
-                </div>
-
-                {slotError && (
-                  <p className={styles.errorNote}>
-                    <AlertCircle size={16} />
-                    {slotError}
-                  </p>
-                )}
-
-                {!loadingSlots && !slotError && slots.length > 0 && slots.every((slot) => !isSlotBookable(slot)) && (
-                  <p className={styles.errorNote}>
-                    <AlertCircle size={16} />
-                    วันนี้ไม่มีช่วงเวลาที่สามารถจองได้
-                  </p>
-                )}
-
-                {selectedSlot && serviceTitle && (
-                  <div className={styles.summaryCard}>
-                    <h3>สรุปการจอง</h3>
-                    <div>
-                      <span>วัน</span>
-                      <strong>{formatThaiDate(selectedDate)}</strong>
+                  <div className={`${styles.sessionBlock} ${styles.morningBlock}`}>
+                    <div className={styles.slotTitle}>
+                      <Sun size={17}/>
+                      <h3>ช่วงเช้า</h3>
                     </div>
-                    <div>
-                      <span>คิว</span>
-                      <strong>{formatQueueForSlot(selectedSlot.hour_of_day)}</strong>
-                    </div>
-                    <div>
-                      <span>เวลา</span>
-                      <strong>
-                        <Clock size={15} />
-                        {formatSlotTime(selectedSlot.hour_of_day)} น.
-                      </strong>
-                    </div>
-                    <div>
-                      <span>เรื่อง</span>
-                      <strong>{serviceTitle}</strong>
+                    <div className={styles.slotGrid}>
+                      {loadingSlots && <p className={styles.note}>กำลังโหลดช่วงเวลา...</p>}
+                      {!loadingSlots && morningSlots.map((slot) =>(
+                        <SlotButton key={slot.slot_id} slot={slot} session='morning'/>
+                      ))}
+                      {!loadingSlots && !slotError && morningSlots.length === 0 && (
+                        <p className={styles.note}>ยังไม่มีช่วงเวลาในช่วงเช้าสำหรับวันนี้</p>
+                      )}
                     </div>
                   </div>
-                )}
 
-                <button
-                  className={styles.completedButton}
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  type="button"
-                >
-                  <CheckCircle size={18} />
-                  {submitting ? 'กำลังจอง...' : 'ยืนยันการจองคิว'}
-                </button>
+                  <div className={`${styles.sessionBlock} ${styles.afternoonBlock}`}>
+                    <div className={styles.slotTitle}>
+                      <Sunset size={17}/>
+                      <h3>ช่วงบ่าย</h3>
+                    </div>
+                    <div className={styles.slotGrid}>
+                      {!loadingSlots && afternoonSlots.map((slot) =>(
+                        <SlotButton key={slot.slot_id} slot={slot} session='afternoon'/>
+                      ))}
+                      {!loadingSlots && !slotError && afternoonSlots.length === 0 && (
+                        <p className={styles.note}>ยังไม่มีช่วงเวลาในช่วงบ่ายสำหรับวันนี้</p>
+                      )}
+                    </div>
+                  </div>
 
-                <p className={styles.note}>หมายเหตุ: กรณีนัดหมายล่วงหน้า กรุณาทักหา Admin</p>
+                  {slotError && (
+                    <p className={styles.errorNote}>
+                      <AlertCircle size={16} />
+                      {slotError}
+                    </p>
+                  )}
+
+                  {!loadingSlots && !slotError && slots.length > 0 && slots.every((slot) => !isSlotBookable(slot)) &&(
+                    <p className={styles.errorNote}>
+                      <AlertCircle size={16} />
+                      วันนี้ไม่มีช่วงเวลาที่สามารถจองได้
+                    </p>
+                  )}
+
+                  {selectedSlot && serviceTitle && (
+                    <div className={styles.summaryCard}>
+                      <h3>สรุปการจอง</h3>
+                      <div>
+                        <span>วัน</span>
+                        <strong>{formatThaiDate(selectedDate)}</strong>
+                      </div>
+                      <div>
+                        <span>คิว</span>
+                        <strong>{formatQueueForSlot(selectedSlot.hour_of_day)}</strong>
+                      </div>
+                      <div>
+                        <span>เวลา</span>
+                        <strong>
+                          <Clock size={15} />
+                          {formatSlotTime(selectedSlot.hour_of_day)} น.
+                        </strong>
+                      </div>
+                      <div>
+                        <span>เรื่อง</span>
+                        <strong>{serviceTitle}</strong>
+                      </div>
+                    </div>
+                  )}
+
+                  <button type='button'
+                    className={styles.completedButton}
+                    disabled={submitting}
+                    onClick={handleSubmit}
+                    >
+                      <CheckCircle size={18} />
+                      {submitting ? 'กำลังดำเนินการจองคิวของท่าน' :'ยืนยันการจองคิวของท่าน'}
+                    </button>
               </div>
             </div>
           )}

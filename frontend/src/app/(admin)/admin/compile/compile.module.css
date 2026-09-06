@@ -5,49 +5,6 @@
   min-height: 100vh;
 }
 
-.popupOverlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 51, 102, 0.3);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 9999;
-}
-
-.popupBox {
-  background: white;
-  padding: 24px 36px;
-  border-radius: 12px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-  font-size: 20px;
-  font-weight: bold;
-  color: #d62828;
-  text-align: center;
-  animation: fadePopup 0.3s ease;
-}
-
-.popupIcon {
-  font-size: 36px;
-  display: block;
-  margin-bottom: 8px;
-}
-
-
-@keyframes fadePopup {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 
 /* .header {
   display: flex;
@@ -66,91 +23,8 @@
   gap: 10px;
 } */
 
-.logoIcon {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  object-fit: cover;
-  /* filter: drop-shadow(4px 3px 10px #D3D3D3); */
-  transition: transform 0.2s ease;
-}
-
-.logoIcon:hover{
-  transform: scale(1.1);
-}
-
-.brand {
-  color: white;
-  font-weight: 700;
-  font-size: 24px;
-  font-family: 'Prompt', sans-serif;
-  /*margin-left: 1px; */
-  letter-spacing: 1px;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-} 
-
-.nav {
-  display: flex;
-  justify-content: center;
-  padding: 40px 0;
-}
-
-.nav ul {
-  list-style: none;
-  display: flex;
-  gap: 50px;
-  padding: 0;
-  margin: 0;
-}
-
-.nav li {
-  position: relative;
-}
-
-.nav a {
-  color: white;
-  text-decoration: none;
-  font-size: 1rem;
-  padding: 4px 8px;
-  position: relative;
-}
-
-.nav a::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: -4px;
-  width: 0%;
-  height: 2px;
-  background-color: #f7eded;
-  transition: width 0.3s ease-in-out;
-}
-
-.nav a:hover::after {
-  width: 100%;
-}
-
-
-.rightHeader {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  padding: 10px 5px;
-}
-
 
 /* แก้ไขให้เหมาะกับ Layout Clinic Dashboard */
-
-
-
-
-.Wrapper {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  overflow: hidden;
-}
 
 /* :root{
   --width-open: 230px;
@@ -266,83 +140,6 @@
 
 
 /* อิโมจิ (หากใช้ในโค้ด JSX) */
-.allPatientsSection h2::before {
-  content: '📋';
-  font-size: 20px;
-}
-
-.title{
-  font-size: 1.5rem;
-  color: #2f86a5;
-  font-weight: bold;
-  margin-bottom: 1rem;
-}
-
-.grid{
-  display: grid;
-  grid-template-columns: repeat(auto-fill,minmax(370px,1fr));
-  gap: 2rem;
-}
-
-.card {
-  background-color: #0066cc;
-  border-radius: 16px;
-  padding: 16px 20px;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: white;
-  font-size: 15px;
-  font-family: 'Prompt', sans-serif;
-}
-
-.name {
-  font-weight: bold;
-  flex: 1;
-}
-
-.stars {
-  display: flex;
-  gap: 2px;
-  margin: 0 16px;
-  font-size: 22px;
-}
-
-.filled {
-  color: red;
-}
-
-.half {
-  color: red;
-  position: relative;
-}
-.half::after {
-  content: '★';
-  color: #ccc;
-  position: absolute;
-  left: 50%;
-  overflow: hidden;
-  width: 50%;
-}
-
-.empty {
-  color: #ccc;
-}
-
-.detailButton {
-  background-color: #00cc00;
-  color: white;
-  font-weight: bold;
-  border: none;
-  border-radius: 8px;
-  padding: 6px 16px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-.detailButton:hover {
-  background-color: #009900;
-}
 
 /* 🔵 Popup Style */
 /* ✅ พื้นหลังเบลอ */
@@ -391,54 +188,6 @@
   font-size: 20px;
   color: red;
   cursor: pointer;
-}
-
-
-
-.chartTitle {
-  flex: 1;
-  font-size: 16px;
-  font-weight: bold;
-  white-space: nowrap; /* ไม่ให้ขึ้นบรรทัดใหม่ */
-  padding-right: 16px;
-}
-.monthNav,
-.navMonth {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 1rem;
-}
-
-.monthNav button,
-.navMonth button{
-
-  border: none;
-  color: black;
-  padding: 6px 12px;
-  font-size: 20px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.ageRow {
-  display: flex;
-  align-items: center;
-  background: white;
-  padding: 0.75rem 1rem;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 500;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.colorBox {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  margin-right: 12px;
-  flex-shrink: 0;
 } 
 
 .dashboard {
@@ -454,161 +203,21 @@
 }
 
 /* สี่ช่อง Earning, Share, Likes, Rating */
-.topStats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-}
-
-.statCard {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 1.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-  text-align: center;
-  transition: transform 0.2s ease;
-}
-.statCard:hover {
-  transform: translateY(-4px);
-}
-.statTitle {
-  font-size: 1rem;
-  color: #666;
-}
-.statValue {
-  font-size: 1.8rem;
-  color: #2f86a5;
-  font-weight: bold;
-  margin-top: 0.5rem;
-}
 
 /* ส่วนกราฟหลัก (ซ้าย + ขวา) */
-.mainGrid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 2rem;
-}
 
 /* ซ้าย: Bar, Line, Age */
-.graphsLeft {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 2rem;
-}
 
 /* ขวา: Doughnut */
-.graphRight {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
 
 /* Box ของกราฟแต่ละอัน */
-.chartCard {
-  background: #ffffff;
-  padding: 2rem;
-  border-radius: 16px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.05);
-  transition: box-shadow 0.3s ease;
-}
-
-.chartCard:hover {
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
-}
 
 
 /* Header ของกราฟ เช่นชื่อ + ปุ่มเปลี่ยนเดือน */
-.chartHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-.chartCard canvas {
-  max-width: 100% !important;
-}
-.chartHeader h4 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #333;
-}
-.navMonth {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.navMonth button {
-  background: #e6eef5;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 1rem;
-  cursor: pointer;
-  color: #2f86a5;
-  font-weight: bold;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-}
-.navMonth span {
-  font-weight: bold;
-  color: #444;
-}
 
 /* Doughnut Chart กลางขวา */
-.doughnutWrapper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.5rem;
-}
-.doughnutChart {
-  position: relative;
-  width: 180px;
-  height: 180px;
-}
-.doughnutLabels {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-  justify-content: center;
-  flex: 1;
-}
-.doughnutLabelRow {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1rem;
-}
-.legendBox {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-}
 
 /* อายุลูกค้า */
-.ageList {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.ageRow {
-  display: flex;
-  align-items: center;
-  background: #f5f5f5;
-  padding: 0.8rem 1rem;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 500;
-  justify-content: space-between;
-  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.03);
-}
-.colorBox {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  margin-right: 10px;
-  flex-shrink: 0;
-}
 
 /* =========================================================
    Modern Admin Layout Override
@@ -650,51 +259,9 @@
   min-width: 0;
 }
 
-.rightHeader {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 14px;
-  min-width: 0;
-}
-
 /* ถ้าหน้าไหนยังใช้ logo + brand เดิม */
-.logoIcon {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  object-fit: contain;
-  background: #f4f7fb;
-  padding: 4px;
-  flex-shrink: 0;
-}
-
-.brand {
-  color: #172033;
-  font-size: 22px;
-  font-weight: 700;
-  font-family: "Prompt", sans-serif;
-  letter-spacing: 0;
-  line-height: 1.1;
-  text-shadow: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 /* ถ้าหน้าไหนใช้โครง Header ใหม่แบบ Dashboard */
-.pageIcon {
-  color: #1559f6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.pageIcon span {
-  font-size: 32px;
-  line-height: 1;
-  font-weight: 600;
-}
 
 .pageTitleBox {
   display: flex;
@@ -717,80 +284,8 @@
   color: #8a97aa;
 }
 
-.notificationBtn {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  border: none;
-  border-radius: 18px;
-  background: #f4f7fb;
-  color: #24344d;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.notificationBtn:hover {
-  background: #edf3fb;
-}
-
-.redDot {
-  position: absolute;
-  top: 11px;
-  right: 12px;
-  width: 10px;
-  height: 10px;
-  background: #ff3b45;
-  border: 2px solid #ffffff;
-  border-radius: 50%;
-}
-
-.adminBox {
-  height: 54px;
-  padding: 0 16px 0 12px;
-  border-radius: 18px;
-  background: #f7f9fc;
-  border: 1px solid #edf0f5;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.adminAvatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: #1559f6;
-  color: #ffffff;
-  font-size: 18px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.adminText {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
-}
-
-.adminText span {
-  font-size: 15px;
-  font-weight: 700;
-  color: #172033;
-}
-
-.adminText small {
-  margin-top: 3px;
-  font-size: 12px;
-  color: #8a97aa;
-}
-
 /* ===== Layout หลัก ให้ไม่โดน Sidebar/Header ทับ ===== */
 
-.Wrapper,
 .wrapper {
   margin-left: var(--sidebar-current-width, 72px);
   padding-top: 78px;
@@ -803,29 +298,6 @@
 }
 
 /* หน้า admin / appointment / help / medicalrecords ส่วนมากใช้ contentArea */
-.contentArea {
-  flex: 1;
-  min-width: 0;
-  height: calc(100dvh - 78px);
-  overflow: auto;
-  padding: 24px clamp(24px, 2.2vw, 42px);
-  border-radius: 0;
-  text-align: initial;
-  font-size: initial;
-  background:
-    radial-gradient(
-      circle at top left,
-      rgba(219, 234, 254, 0.8),
-      transparent 34%
-    ),
-    radial-gradient(
-      circle at top right,
-      rgba(254, 243, 199, 0.5),
-      transparent 28%
-    ),
-    #f8fafc;
-  font-family: "Prompt", sans-serif;
-}
 
 /* หน้า compile ใช้ dashboard เป็น content หลัก */
 .dashboard {
@@ -853,79 +325,18 @@
 }
 
 /* ถ้าหน้าไหนใช้ main เป็น content หลัก */
-.main {
-  flex: 1;
-  min-width: 0;
-  height: calc(100dvh - 78px);
-  overflow: auto;
-  padding: 24px clamp(24px, 2.2vw, 42px);
-  background:
-    radial-gradient(
-      circle at top left,
-      rgba(219, 234, 254, 0.8),
-      transparent 34%
-    ),
-    radial-gradient(
-      circle at top right,
-      rgba(254, 243, 199, 0.5),
-      transparent 28%
-    ),
-    #f8fafc;
-}
 
 /* scrollbar ให้เหมือน dashboard */
-.contentArea::-webkit-scrollbar,
-.dashboard::-webkit-scrollbar,
-.main::-webkit-scrollbar {
+.dashboard::-webkit-scrollbar {
   width: 7px;
 }
 
-.contentArea::-webkit-scrollbar-thumb,
-.dashboard::-webkit-scrollbar-thumb,
-.main::-webkit-scrollbar-thumb {
+.dashboard::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 999px;
 }
 
 /* ===== Search ในหน้า admin ให้เข้ากับ header ใหม่ ===== */
-
-.searchInput {
-  height: 42px;
-  padding: 0 14px;
-  font-size: 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  outline: none;
-  width: min(300px, 32vw);
-  background-color: #f8fafc;
-  color: #172033;
-  box-shadow: none;
-  transition: all 0.2s ease;
-}
-
-.searchInput:focus {
-  background-color: #ffffff;
-  border-color: #1559f6;
-  box-shadow: 0 0 0 3px rgba(21, 89, 246, 0.12);
-}
-
-.searchButton {
-  height: 42px;
-  border: none;
-  color: #ffffff;
-  padding: 0 16px;
-  font-size: 14px;
-  font-weight: 700;
-  border-radius: 14px;
-  background: #1559f6;
-  transition: 0.2s ease;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.searchButton:hover {
-  background: #0f46c8;
-}
 
 /* ===== Responsive ===== */
 
@@ -936,20 +347,16 @@
     padding: 0 14px;
   }
 
-  .Wrapper,
   .wrapper {
     margin-left: 64px;
     padding-top: 70px;
   }
 
-  .contentArea,
-  .dashboard,
-  .main {
+  .dashboard {
     height: calc(100dvh - 70px);
     padding: 16px 14px;
   }
 
-  .brand,
   .pageTitle {
     font-size: 18px;
   }
@@ -957,43 +364,10 @@
   .pageDate {
     font-size: 11px;
   }
-
-  .notificationBtn {
-    width: 42px;
-    height: 42px;
-    border-radius: 15px;
-  }
-
-  .adminBox {
-    height: 46px;
-    padding: 0 8px;
-  }
-
-  .adminText {
-    display: none;
-  }
-
-  .adminAvatar {
-    width: 34px;
-    height: 34px;
-    border-radius: 12px;
-  }
-
-  .searchInput {
-    width: 100%;
-    max-width: 180px;
-  }
 }
 /* =========================================================
    Service Score UI from Figma
 ========================================================= */
-
-.pageIcon {
-  color: #1559f6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
 .errorBanner {
   margin-bottom: 16px;
@@ -1152,13 +526,6 @@
   color: #5d7190;
   font-size: 14px;
   white-space: nowrap;
-}
-
-.donutLayout {
-  display: grid;
-  grid-template-columns: 45% 1fr;
-  gap: 24px;
-  align-items: center;
 }
 
 .donutBox {
@@ -1563,10 +930,6 @@
 
   .monthlyScoreTools {
     justify-content: flex-start;
-  }
-
-  .donutLayout {
-    grid-template-columns: 1fr;
   }
 
   .satisfactionDonutPanel {

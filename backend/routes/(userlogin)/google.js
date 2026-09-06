@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const pool = require("../../tools/db");
 const { FRONTEND_URL, JWT_SECRET } = require("../../tools/config");
+const { cookieOptions, clearCookieOptions } = require("../../tools/cookies");
 
 const router = express.Router();
 
@@ -27,13 +28,7 @@ const {
 const randomValue = () => crypto.randomBytes(24).toString("hex");
 
 function oauthCookieOptions() {
-  return {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 10 * 60 * 1000,
-  };
+  return cookieOptions({ httpOnly: true, maxAge: 10 * 60 * 1000 });
 }
 
 router.get("/google/login", (_req, res) => {
@@ -66,8 +61,8 @@ router.get("/google/callback", async (req, res) => {
   const nonceCookie = req.cookies?.gg_nonce || "";
 
   const clearOauthCookies = () => {
-    res.clearCookie("gg_state", { path: "/" });
-    res.clearCookie("gg_nonce", { path: "/" });
+    res.clearCookie("gg_state", clearCookieOptions({ httpOnly: true }));
+    res.clearCookie("gg_nonce", clearCookieOptions({ httpOnly: true }));
   };
 
   try {
@@ -101,7 +96,7 @@ router.get("/google/callback", async (req, res) => {
     if (googleProfile.aud !== GOOGLE_CLIENT_ID) {
       throw new Error("Google ID token audience is invalid");
     }
-    if (nonceCookie && googleProfile.nonce && googleProfile.nonce !== nonceCookie) {
+    if (nonceCookie && googleProfile.nonce !== nonceCookie) {
       throw new Error("Google ID token nonce is invalid");
     }
 
@@ -112,15 +107,20 @@ router.get("/google/callback", async (req, res) => {
     if (!googleUserId || !email) {
       throw new Error("Google account does not provide a usable email");
     }
+    if (String(googleProfile.email_verified).toLowerCase() !== "true") {
+      throw new Error("Google email is not verified");
+    }
 
     const client = await pool.connect();
     let userId;
     let role;
+    let sessionVersion = 1;
+    let profileCompleted = false;
     try {
       await client.query("BEGIN");
 
       const existing = await client.query(
-        `SELECT user_id, role
+        `SELECT user_id, role, account_status, session_version
          FROM clinic.users
          WHERE google_id = $1 OR lower(email) = $2
          ORDER BY CASE WHEN google_id = $1 THEN 0 ELSE 1 END
@@ -131,10 +131,20 @@ router.get("/google/callback", async (req, res) => {
 
       if (existing.rowCount) {
         ({ user_id: userId, role } = existing.rows[0]);
+        sessionVersion = Number(existing.rows[0].session_version || 1);
+        const existingStatus = String(existing.rows[0].account_status || "active");
+        if (!["active", "pending_verification"].includes(existingStatus)) {
+          const error = new Error("Account is not active");
+          error.status = 403;
+          throw error;
+        }
         await client.query(
           `UPDATE clinic.users
            SET google_id = COALESCE(google_id, $1),
                email = COALESCE(email, $2),
+               email_verified_at = COALESCE(email_verified_at, now()),
+               account_status = CASE WHEN account_status = 'pending_verification' THEN 'active' ELSE account_status END,
+               registration_source = 'google',
                last_login_at = NOW()
            WHERE user_id = $3`,
           [googleUserId, email, userId],
@@ -145,7 +155,8 @@ router.get("/google/callback", async (req, res) => {
            SET email = COALESCE(email, $1),
                first_name = COALESCE(NULLIF(first_name, ''), $2),
                profile_image = COALESCE(NULLIF(profile_image, ''), $3)
-           WHERE user_id = $4`,
+           WHERE user_id = $4
+           RETURNING national_id, first_name, last_name, birth_date, phone`,
           [email, name, picture, userId],
         );
         if (!detailUpdate.rowCount) {
@@ -154,15 +165,26 @@ router.get("/google/callback", async (req, res) => {
              VALUES ($1, $2, $3, $4)`,
             [userId, name, picture, email],
           );
+        } else {
+          const detail = detailUpdate.rows[0];
+          profileCompleted = Boolean(detail.national_id && detail.first_name && detail.last_name && detail.birth_date && detail.phone);
+          if (profileCompleted) {
+            await client.query(
+              `UPDATE clinic.users SET profile_completed_at = COALESCE(profile_completed_at, now()) WHERE user_id = $1`,
+              [userId],
+            );
+          }
         }
       } else {
         const inserted = await client.query(
-          `INSERT INTO clinic.users (google_id, email, role)
-           VALUES ($1, $2, 'user')
-           RETURNING user_id, role`,
+          `INSERT INTO clinic.users
+           (google_id, email, role, account_status, email_verified_at, registration_source)
+           VALUES ($1, $2, 'user', 'active', now(), 'google')
+           RETURNING user_id, role, session_version`,
           [googleUserId, email],
         );
         ({ user_id: userId, role } = inserted.rows[0]);
+        sessionVersion = Number(inserted.rows[0].session_version || 1);
         await client.query(
           `INSERT INTO clinic.user_details (user_id, first_name, profile_image, email)
            VALUES ($1, $2, $3, $4)`,
@@ -180,27 +202,23 @@ router.get("/google/callback", async (req, res) => {
 
     const normalizedRole = String(role || "user").toLowerCase();
     const token = jwt.sign(
-      { sub: userId, role: normalizedRole },
+      { sub: userId, role: normalizedRole, sv: sessionVersion },
       JWT_SECRET,
       { expiresIn: "7d" },
     );
-    const authCookieOptions = {
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    };
-
-    res.cookie("authToken", token, { ...authCookieOptions, httpOnly: true });
+    const authCookieMaxAge = 7 * 24 * 60 * 60 * 1000;
+    res.cookie("authToken", token, cookieOptions({ httpOnly: true, maxAge: authCookieMaxAge }));
     const isUser = normalizedRole === "user" || normalizedRole === "users";
-    res.clearCookie(isUser ? "adminToken" : "userToken", { path: "/" });
+    res.clearCookie(isUser ? "adminToken" : "userToken", clearCookieOptions({ httpOnly: false }));
     res.cookie(isUser ? "userToken" : "adminToken", token, {
-      ...authCookieOptions,
-      httpOnly: false,
+      ...cookieOptions({ httpOnly: false, maxAge: authCookieMaxAge }),
     });
 
     return res.redirect(
-      new URL(ROLE_HOME[normalizedRole] || "/", FRONTEND_URL).toString(),
+      new URL(
+        isUser && !profileCompleted ? "/google/complete-profile" : ROLE_HOME[normalizedRole] || "/",
+        FRONTEND_URL,
+      ).toString(),
     );
   } catch (error) {
     clearOauthCookies();

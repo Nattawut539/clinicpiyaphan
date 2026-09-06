@@ -8,6 +8,19 @@ const OPEN_DAYS_TABLE_SQL = `
   )
 `;
 
+const ADVANCE_BOOKING_WEEKS_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS clinic.advance_booking_weeks (
+    week_start date PRIMARY KEY,
+    week_end date NOT NULL,
+    created_by integer,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT advance_booking_weeks_valid_range CHECK (week_end >= week_start),
+    CONSTRAINT advance_booking_weeks_same_month CHECK (
+      date_trunc('month', week_start::timestamp) = date_trunc('month', week_end::timestamp)
+    )
+  )
+`;
+
 const DEFAULT_SUNDAY_REASON = "วันหยุดประจำสัปดาห์ของคลินิก";
 
 function validDate(value) {
@@ -16,6 +29,20 @@ function validDate(value) {
 
 async function ensureCalendarRulesSchema(db) {
   await db.query(OPEN_DAYS_TABLE_SQL);
+  await db.query(ADVANCE_BOOKING_WEEKS_TABLE_SQL);
+}
+
+async function isAdvanceBookingDate(db, date) {
+  const { rows } = await db.query(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM clinic.advance_booking_weeks
+       WHERE $1::date BETWEEN week_start AND week_end
+     ) AS is_open`,
+    [date]
+  );
+
+  return Boolean(rows[0]?.is_open);
 }
 
 async function isClinicHoliday(db, date) {
@@ -114,6 +141,7 @@ function monthHolidayQuery(where, includeDefaultSundays) {
 module.exports = {
   DEFAULT_SUNDAY_REASON,
   ensureCalendarRulesSchema,
+  isAdvanceBookingDate,
   isClinicHoliday,
   monthHolidayQuery,
   validDate,

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import styles from './appointment.module.css';
 import CustomCalendar from '@/components/calendar/CustomCalendar';
-import { CalendarCheck, CalendarDays, Clock, List, Plus, Sun, Sunset } from 'lucide-react';
+import { CalendarCheck, CalendarDays, Clock, Eye, EyeOff, KeyRound, List, Plus, Sun, Sunset } from 'lucide-react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/th';
 import { useRouter } from 'next/navigation';
@@ -27,7 +27,13 @@ type Appointment = {
   service_date: string;
   avaliable_date: 'morning' | 'afternoon' | string;
   hour_of_day: number;
+  queue_number?: string | null;
+  access_code_status?: 'available' | 'used' | 'expired' | 'not_issued' | string;
+  access_code_expires_at?: string | null;
+  access_code?: string | null;
 };
+
+type VisibleAccessCode = { code: string; expiresAt: string; visible: boolean };
 
 const THAI_MONTHS = [
   'มกราคม',
@@ -94,6 +100,8 @@ export default function AppointmentPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [accessCodes, setAccessCodes] = useState<Record<number, VisibleAccessCode>>({});
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const router = useRouter();
 
   useEffect(() => {
@@ -115,14 +123,27 @@ export default function AppointmentPage() {
         setLoading(true);
         setError('');
 
-        const res = await fetch(`${API_BASE}/appointments/user/${userId}`);
+        const res = await fetch(`${API_BASE}/appointments/user/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
         const data = await res.json().catch(() => []);
 
         if (!res.ok) {
           throw new Error(data?.error || 'โหลดรายการนัดหมายไม่สำเร็จ');
         }
 
-        setAppointments(Array.isArray(data) ? data : []);
+        const loadedAppointments: Appointment[] = Array.isArray(data) ? data : [];
+        setAppointments(loadedAppointments);
+        setAccessCodes(Object.fromEntries(
+          loadedAppointments
+            .filter((item) => item.access_code && item.access_code_expires_at)
+            .map((item) => [item.appointment_id, {
+              code: item.access_code as string,
+              expiresAt: item.access_code_expires_at as string,
+              visible: false,
+            }]),
+        ));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'โหลดรายการนัดหมายไม่สำเร็จ');
       } finally {
@@ -133,6 +154,17 @@ export default function AppointmentPage() {
 
     loadAppointments();
   }, [router]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const toggleAccessCode = (appointmentId: number) => {
+    setAccessCodes((current) => current[appointmentId]
+      ? { ...current, [appointmentId]: { ...current[appointmentId], visible: !current[appointmentId].visible } }
+      : current);
+  };
 
   const visibleAppointments = useMemo(() => {
     const todayStart = dayjs().startOf('day').valueOf();
@@ -328,6 +360,12 @@ export default function AppointmentPage() {
               <div className={styles.appointmentList}>
                 {visibleAppointments.map((item) => {
                   const isMorning = item.avaliable_date === 'morning';
+                  const codeInfo = accessCodes[item.appointment_id];
+                  const codeUsed = item.access_code_status === 'used';
+                  const codeExpired = !codeUsed && (
+                    item.access_code_status === 'expired'
+                    || Boolean(codeInfo && dayjs(codeInfo.expiresAt).valueOf() <= nowMs)
+                  );
 
                   return (
                     <article key={item.appointment_id} className={styles.appointmentCard}>
@@ -350,9 +388,38 @@ export default function AppointmentPage() {
                           </span>
                           <span>
                             <Clock size={15} />
-                            คิว {queueNumber(item.hour_of_day)} - {formatTime(item.hour_of_day)}
+                            คิว {item.queue_number || queueNumber(item.hour_of_day)} - {formatTime(item.hour_of_day)}
                           </span>
                         </div>
+
+                        {item.status === 'approved' && (
+                          <div className={`${styles.metaRow} ${styles.accessCodeRow} ${codeExpired ? styles.accessCodeExpired : ''}`}>
+                            <KeyRound size={16} />
+                            {codeInfo ? (
+                              <>
+                                <strong>{codeInfo.visible ? codeInfo.code : '••••••'}</strong>
+                                <button type="button" onClick={() => toggleAccessCode(item.appointment_id)} title="แสดงหรือซ่อนรหัส">
+                                  {codeInfo.visible ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                                {codeUsed ? (
+                                  <small className={styles.accessCodeNotice}>ใช้รหัสแล้ว</small>
+                                ) : codeExpired ? (
+                                  <small className={styles.accessCodeNotice}>รหัสหมดอายุ กรุณาติดต่อ Admin เพื่อขอรหัสใหม่</small>
+                                ) : (
+                                  <small>ใช้ได้ถึง {dayjs(codeInfo.expiresAt).format('HH:mm น.')}</small>
+                                )}
+                              </>
+                            ) : (
+                              <span className={styles.accessCodeNotice}>
+                                {codeUsed
+                                  ? 'ชั่งน้ำหนักแล้ว'
+                                  : codeExpired
+                                    ? 'รหัสหมดอายุ กรุณาติดต่อ Admin เพื่อขอรหัสใหม่'
+                                    : 'ไม่สามารถแสดงรหัสเดิมได้ กรุณาติดต่อ Admin'}
+                              </span>
+                            )}
+                          </div>
+                        )}
 
                         {item.cancellation_reason && (
                           <p className={styles.reason}>เหตุผล: {item.cancellation_reason}</p>

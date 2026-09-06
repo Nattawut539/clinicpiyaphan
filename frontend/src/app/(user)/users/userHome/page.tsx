@@ -4,10 +4,10 @@ import {
     Phone,
     MapPin,
     Clock,
-    MessageCircle,
     ChevronRight,
     CalendarCheck,
     Stethoscope,
+    Mail,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import styles from './userHome.module.css';
@@ -18,7 +18,7 @@ const clinicName = 'คลินิกหมอปิยะพันธ์';
 const clinicAddress =
     'คลินิกหมอปิยะพันธ์ ตำบลนาเชือก อำเภอนาเชือก จังหวัดมหาสารคาม 44170';
 const phoneNumber = '086-856-8646';
-const lineId = '@847ddyov';
+const email = 'clinic.piyaphan@gmail.com';
 const clinicLatitude = '15.79998408639681';
 const clinicLongitude = '103.0360518657376';
 const clinicCoordinates = `${clinicLatitude},${clinicLongitude}`;
@@ -45,7 +45,6 @@ export default function UserHomePage() {
 
     const services = [
         'ตรวจโรคทั่วไป',
-        'ให้คำปรึกษาสุขภาพ',
         'ดูแลอย่างต่อเนื่อง',
         'ตรวจอาการเจ็บป่วยเบื้องต้น พร้อมคำแนะนำที่เหมาะสม',
         'ติดตามอาการและดูแลสุขภาพของคนทุกวัย',
@@ -60,10 +59,10 @@ export default function UserHomePage() {
             className: styles.contactGreen,
         },
         {
-            icon: MessageCircle,
-            label: 'LINE ID',
-            value: lineId,
-            sub: 'ติดต่อผ่าน LINE',
+            icon: Mail,
+            label: 'อีเมล',
+            value: email,
+            sub: 'ส่งข้อความถึงคลินิก',
             className: styles.contactLime,
         },
         {
@@ -100,9 +99,8 @@ export default function UserHomePage() {
                             </h1>
 
                             <p className={styles.heroDescription}>
-                                บริการตรวจรักษาโรคทั่วไปและให้คำปรึกษาด้านสุขภาพ
-                                โดยทีมแพทย์และพยาบาลที่พร้อมดูแลคุณอย่างใกล้ชิด
-                                ในบรรยากาศที่อบอุ่นและเป็นมิตร
+                                บริการตรวจรักษาโรคทั่วไปด้านสุขภาพ
+                                โดยแพทย์ที่เชียวชาญที่พร้อมดูแลคุณอย่างใกล้ชิด
                             </p>
 
                             <div className={styles.heroActions}>
@@ -205,6 +203,21 @@ export default function UserHomePage() {
                     </div>
                 </div>
             </section>
+            <section className={styles.ctaCard}>
+                <div>
+                    <h3>พร้อมดูแลสุขภาพของคุณและครอบครัว</h3>
+                    <p>จองคิวออนไลน์ล่วงหน้า เพื่อประหยัดเวลารอรับบริการ</p>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={() => onNavigate('appointment')}
+                    className={styles.ctaButton}
+                >
+                    <CalendarCheck size={16} />
+                    จองเลย
+                </button>
+            </section>
 
             <section className={styles.mapCard}>
                 <div className={styles.mapBox}>
@@ -281,22 +294,6 @@ export default function UserHomePage() {
                         ))}
                     </div>
                 </div>
-            </section>
-
-            <section className={styles.ctaCard}>
-                <div>
-                    <h3>พร้อมดูแลสุขภาพของคุณและครอบครัว</h3>
-                    <p>จองคิวออนไลน์ล่วงหน้า เพื่อประหยัดเวลารอรับบริการ</p>
-                </div>
-
-                <button
-                    type="button"
-                    onClick={() => onNavigate('appointment')}
-                    className={styles.ctaButton}
-                >
-                    <CalendarCheck size={16} />
-                    จองเลย
-                </button>
             </section>
         </div>
     );

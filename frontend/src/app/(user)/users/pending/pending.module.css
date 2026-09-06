@@ -1,11 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700;800&display=swap');
-
 .wrapper {
   min-height: calc(100vh - 135px);
   padding: 24px clamp(16px, 4vw, 56px) 72px;
   background: #f8fafc;
   color: #0f172a;
-  font-family: 'Prompt', sans-serif;
+  font-family: "Prompt", sans-serif;
   box-sizing: border-box;
 }
 
@@ -54,7 +52,10 @@
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .activeButton {
@@ -207,7 +208,10 @@
   font-weight: 700;
   text-align: left;
   cursor: pointer;
-  transition: border 0.2s ease, background 0.2s ease, color 0.2s ease;
+  transition:
+    border 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 .topicButton:hover {
@@ -275,7 +279,11 @@
   border-radius: 14px;
   font-family: inherit;
   cursor: pointer;
-  transition: border 0.2s ease, background 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+  transition:
+    border 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .slotButton span {
@@ -387,7 +395,9 @@
   font-weight: 800;
   cursor: pointer;
   box-shadow: 0 10px 20px rgba(15, 118, 110, 0.18);
-  transition: background 0.2s ease, opacity 0.2s ease;
+  transition:
+    background 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .completedButton:hover {
@@ -461,12 +471,109 @@
   }
 }
 
+/* Booking windows: separate current and advance ranges to avoid ambiguous text. */
+.weekWindowCard {
+  align-items: stretch;
+}
+
+.weekWindowHeading {
+  flex: 0 0 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.weekWindowHeading > span {
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.weekWindowHeading > small {
+  margin-top: 5px;
+  color: #8a9aa5;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.weekWindowList {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+  gap: 9px;
+}
+
+.weekWindowItem {
+  min-width: 0;
+  padding: 10px 13px;
+  border: 1px solid #d9ebe8;
+  border-radius: 12px;
+  background: #f5fbfa;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  column-gap: 14px;
+}
+
+.weekWindowItem > span {
+  padding-right: 14px;
+  border-right: 1px solid #cce2de;
+  color: #46847e;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.4;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.weekWindowItem > strong {
+  min-width: 0;
+  margin: 0;
+  color: #173d3a;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.4;
+}
+
+.advanceWindowItem {
+  border-color: #d8def5;
+  background: #f7f8fe;
+}
+
+.advanceWindowItem > span {
+  border-right-color: #d8def5;
+  color: #6274b7;
+}
+
+.advanceWindowItem > strong {
+  color: #344474;
+}
+
+@media (max-width: 720px) {
+  .weekWindowCard {
+    flex-direction: column;
+  }
+
+  .weekWindowHeading {
+    flex-basis: auto;
+  }
+
+  .weekWindowList {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Modern booking refresh */
 .wrapper {
   min-height: calc(100dvh - 135px);
   background:
     radial-gradient(circle at 8% 4%, rgba(45, 212, 191, 0.2), transparent 30%),
-    radial-gradient(circle at 92% 12%, rgba(251, 113, 133, 0.16), transparent 26%),
+    radial-gradient(
+      circle at 92% 12%,
+      rgba(251, 113, 133, 0.16),
+      transparent 26%
+    ),
     linear-gradient(135deg, #f8fafc 0%, #eefbf8 48%, #fff7ed 100%);
 }
 
@@ -513,7 +620,11 @@
   border: 1px solid rgba(45, 212, 191, 0.34);
   border-radius: 18px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(240, 253, 250, 0.88)),
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.86),
+      rgba(240, 253, 250, 0.88)
+    ),
     #ffffff;
   display: flex;
   align-items: center;
@@ -588,8 +699,7 @@
 }
 
 .selectedDateBar {
-  background:
-    linear-gradient(135deg, #111827, #0f766e 58%, #f97316);
+  background: linear-gradient(135deg, #111827, #0f766e 58%, #f97316);
 }
 
 .selectedDateBar button {
@@ -729,8 +839,7 @@
 .wrapper {
   min-height: calc(100dvh - 135px);
   padding: 28px clamp(14px, 3vw, 40px) 72px;
-  background:
-    linear-gradient(180deg, #f7fafc 0%, #eef5f4 100%);
+  background: linear-gradient(180deg, #f7fafc 0%, #eef5f4 100%);
   color: #101828;
 }
 

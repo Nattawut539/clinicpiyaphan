@@ -247,7 +247,9 @@ export default function PatientDashboard() {
         likesViewMonth,
         scoreViewMonth,
         scoreViewYear,
-        currentYear
+        currentYear,
+        headers,
+        token
     ]);
 
 

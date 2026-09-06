@@ -1,11 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../tools/db");
-const jwt = require("jsonwebtoken");
-const { JWT_SECRET } = require("../tools/config");
+const { authRequired, requireStaff } = require("../tools/_utils");
 const {
   DEFAULT_SUNDAY_REASON,
   ensureCalendarRulesSchema,
+  isAdvanceBookingDate,
   isClinicHoliday,
   monthHolidayQuery,
 } = require("../tools/calendarRules");
@@ -15,30 +15,6 @@ const {
   reopenBookableSlotsForDate,
   reopenBookableSlotsForRange,
 } = require("../tools/slotSeeder");
-
-// อ่าน JWT ของ users และคืนข้อมูล user จาก token
-function getUserFromToken(req) {
-  /*
-    return res.status(400).json({
-      error: "เปิดจองเฉพาะสัปดาห์ปัจจุบันเท่านั้น",
-      current_week: getCurrentWeekRangeBangkok(),
-    });
-  */
-
-  try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return null;
-
-    const payload = jwt.verify(token, JWT_SECRET);
-
-    return {
-      ...payload,
-      user_id: payload.user_id || payload.sub,
-    };
-  } catch (err) {
-    return null;
-  }
-}
 
 // วันที่วันนี้ตามเวลาไทย
 function getTodayBangkokDate() {
@@ -105,15 +81,14 @@ router.get("/day", async (req, res) => {
     });
   }
 
-  if (!isDateInCurrentWeek(date)) {
-    return res.status(400).json({
-      error: "เปิดจองเฉพาะสัปดาห์ปัจจุบันเท่านั้น",
-      current_week: getCurrentWeekRangeBangkok(),
-    });
-  }
-
   try {
     await ensureCalendarRulesSchema(pool);
+    if (!isDateInCurrentWeek(date) && !(await isAdvanceBookingDate(pool, date))) {
+      return res.status(400).json({
+        error: "วันที่นี้ยังไม่เปิดให้จอง กรุณาเลือกสัปดาห์ปัจจุบันหรือสัปดาห์ที่คลินิกเปิดล่วงหน้า",
+        current_week: getCurrentWeekRangeBangkok(),
+      });
+    }
     const holiday = await isClinicHoliday(pool, date);
     if (holiday) {
       return res.status(409).json({
@@ -351,7 +326,7 @@ router.get("/month-status", async (req, res) => {
 });
 
 // user เห็นปฏิทิน slot ทั้งหมด และนัดหมายของตนเองเท่านั้น
-router.get("/user-calendar", async (req, res) => {
+router.get("/user-calendar", authRequired, async (req, res) => {
   const { date } = req.query;
 
   if (!date) {
@@ -364,10 +339,7 @@ router.get("/user-calendar", async (req, res) => {
     });
   }
 
-  const user = getUserFromToken(req);
-  if (!user) {
-    return res.status(403).json({ error: "Missing or invalid token" });
-  }
+  const user = req.user;
 
   try {
     await ensureCalendarRulesSchema(pool);
@@ -487,16 +459,7 @@ router.get("/month", async (req, res) => {
 });
 
 // STAFF เท่านั้น: generate slot ล่วงหน้า
-router.post("/seed", async (req, res) => {
-  const user = getUserFromToken(req);
-
-  if (
-    !user ||
-    !["admin", "super_admin", "doctor", "assistant"].includes(user.role)
-  ) {
-    return res.status(403).json({ error: "ต้องเป็น staff เท่านั้น" });
-  }
-
+router.post("/seed", requireStaff, async (req, res) => {
   const { start, end } = req.body;
 
   if (!start || !end) {

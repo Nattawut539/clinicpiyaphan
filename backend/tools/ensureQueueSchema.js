@@ -109,6 +109,20 @@ async function ensureQueueSchema() {
     `);
 
     await client.query(`
+      ALTER TABLE clinic.measurements
+      ADD COLUMN IF NOT EXISTS source varchar(20) NOT NULL DEFAULT 'manual',
+      ADD COLUMN IF NOT EXISTS device_id varchar(80),
+      ADD COLUMN IF NOT EXISTS hardware_message_id varchar(100),
+      ADD COLUMN IF NOT EXISTS measured_at timestamptz
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS measurements_hardware_message_id_key
+      ON clinic.measurements (hardware_message_id)
+      WHERE hardware_message_id IS NOT NULL
+    `);
+
+    await client.query(`
       ALTER TABLE clinic.appointments
       ADD COLUMN IF NOT EXISTS cancellation_reason text
     `);
@@ -121,6 +135,7 @@ async function ensureQueueSchema() {
         queue_id integer NOT NULL UNIQUE
           REFERENCES clinic.queue_tickets(queue_id) ON DELETE CASCADE,
         code_hash varchar(64) NOT NULL UNIQUE,
+        code_ciphertext text,
         used_at timestamptz,
         expires_at timestamptz NOT NULL DEFAULT (now() + interval '15 minutes'),
         created_at timestamptz NOT NULL DEFAULT now()
@@ -129,7 +144,8 @@ async function ensureQueueSchema() {
 
     await client.query(`
       ALTER TABLE clinic.appointment_access_codes
-      ADD COLUMN IF NOT EXISTS expires_at timestamptz NOT NULL DEFAULT (now() + interval '15 minutes')
+      ADD COLUMN IF NOT EXISTS expires_at timestamptz NOT NULL DEFAULT (now() + interval '15 minutes'),
+      ADD COLUMN IF NOT EXISTS code_ciphertext text
     `);
 
     await client.query(`
@@ -145,6 +161,7 @@ async function ensureQueueSchema() {
       JOIN clinic.appointment_slots s ON s.slot_id = a.slot_id
       WHERE ac.appointment_id = a.appointment_id
         AND ac.used_at IS NULL
+        AND ac.expires_at IS NULL
     `);
 
     await client.query(`
@@ -157,6 +174,58 @@ async function ensureQueueSchema() {
       CREATE INDEX IF NOT EXISTS appointment_access_codes_expires_at_idx
       ON clinic.appointment_access_codes (expires_at)
       WHERE used_at IS NULL
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS clinic.hardware_otp_sessions (
+        session_id uuid PRIMARY KEY,
+        device_id varchar(80) NOT NULL,
+        access_code_id bigint NOT NULL
+          REFERENCES clinic.appointment_access_codes(access_code_id) ON DELETE CASCADE,
+        queue_id integer NOT NULL
+          REFERENCES clinic.queue_tickets(queue_id) ON DELETE CASCADE,
+        expires_at timestamptz NOT NULL,
+        used_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS hardware_otp_sessions_active_idx
+      ON clinic.hardware_otp_sessions (device_id, expires_at)
+      WHERE used_at IS NULL
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS clinic.hardware_measurement_events (
+        message_id varchar(100) PRIMARY KEY,
+        device_id varchar(80) NOT NULL,
+        mode varchar(20) NOT NULL CHECK (mode IN ('online', 'walk_in')),
+        queue_id integer NOT NULL
+          REFERENCES clinic.queue_tickets(queue_id) ON DELETE CASCADE,
+        measurement_id integer NOT NULL UNIQUE
+          REFERENCES clinic.measurements(measurement_id) ON DELETE CASCADE,
+        print_job_id varchar(100) UNIQUE,
+        print_status varchar(20) NOT NULL DEFAULT 'pending'
+          CHECK (print_status IN ('pending', 'requested', 'printed', 'failed')),
+        print_attempts integer NOT NULL DEFAULT 0,
+        print_error_code varchar(80),
+        print_requested_at timestamptz,
+        printed_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    await client.query(`
+      ALTER TABLE clinic.hardware_measurement_events
+      ADD COLUMN IF NOT EXISTS print_attempts integer NOT NULL DEFAULT 0
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS hardware_measurement_events_pending_print_idx
+      ON clinic.hardware_measurement_events (created_at)
+      WHERE print_status IN ('pending', 'failed')
     `);
 
     await client.query(`
@@ -222,6 +291,19 @@ async function ensureQueueSchema() {
         created_by integer,
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS clinic.advance_booking_weeks (
+        week_start date PRIMARY KEY,
+        week_end date NOT NULL,
+        created_by integer,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT advance_booking_weeks_valid_range CHECK (week_end >= week_start),
+        CONSTRAINT advance_booking_weeks_same_month CHECK (
+          date_trunc('month', week_start::timestamp) = date_trunc('month', week_end::timestamp)
+        )
       )
     `);
 
@@ -292,7 +374,13 @@ async function ensureQueueSchema() {
           INTO ws, we
         FROM clinic.current_week_bounds('Asia/Bangkok');
 
-        IF NOT clinic.is_staff() AND (s_date < ws OR s_date > we) THEN
+        IF NOT clinic.is_staff()
+          AND (s_date < ws OR s_date > we)
+          AND NOT EXISTS (
+            SELECT 1
+            FROM clinic.advance_booking_weeks b
+            WHERE s_date BETWEEN b.week_start AND b.week_end
+          ) THEN
           RAISE EXCEPTION 'You can only book in current week (% to %). Slot date: %', ws, we, s_date;
         END IF;
 
@@ -321,42 +409,57 @@ async function ensureQueueSchema() {
     `);
 
     await client.query(`
-      DROP FUNCTION IF EXISTS clinic.seed_slots(date, date) CASCADE
-    `);
-
-    await client.query(`
-      CREATE FUNCTION clinic.seed_slots(
+      CREATE OR REPLACE FUNCTION clinic.seed_slots(
         start_date date,
         end_date date
       ) RETURNS void AS $$
       BEGIN
-        -- This function seeds appointment slots for the given date range
-        -- For now, this is a placeholder - actual slot seeding logic would go here
-        RETURN;
+        IF start_date IS NULL OR end_date IS NULL OR end_date < start_date THEN
+          RAISE EXCEPTION 'Invalid slot date range';
+        END IF;
+
+        INSERT INTO clinic.appointment_slots
+          (service_date, avaliable_date, hour_of_day, status)
+        SELECT
+          d.service_date::date,
+          h.avaliable_date,
+          h.hour_of_day,
+          'open'::clinic.slot_status
+        FROM generate_series(start_date, end_date, interval '1 day') d(service_date)
+        CROSS JOIN (
+          VALUES
+            ('morning'::varchar, 7::smallint),
+            ('morning'::varchar, 8::smallint),
+            ('morning'::varchar, 9::smallint),
+            ('morning'::varchar, 10::smallint),
+            ('afternoon'::varchar, 16::smallint),
+            ('afternoon'::varchar, 17::smallint),
+            ('afternoon'::varchar, 18::smallint),
+            ('afternoon'::varchar, 19::smallint)
+        ) h(avaliable_date, hour_of_day)
+        ON CONFLICT (service_date, avaliable_date, hour_of_day) DO NOTHING;
       END;
       $$ LANGUAGE plpgsql;
     `);
 
     await client.query(`
-      DROP FUNCTION IF EXISTS clinic.lock_timed_out_slots() CASCADE
-    `);
-
-    await client.query(`
-      CREATE FUNCTION clinic.lock_timed_out_slots() RETURNS void AS $$
+      CREATE OR REPLACE FUNCTION clinic.lock_timed_out_slots() RETURNS void AS $$
       BEGIN
-        -- This function locks slots that have timed out
-        -- For now, this is a placeholder - actual timeout logic would go here
-        RETURN;
+        UPDATE clinic.appointment_slots s
+        SET status = 'locked'
+        WHERE s.status = 'open'
+          AND s.bookable_until < (now() AT TIME ZONE 'Asia/Bangkok')
+          AND NOT EXISTS (
+            SELECT 1 FROM clinic.appointments a
+            WHERE a.slot_id = s.slot_id
+              AND a.status NOT IN ('cancelled', 'rejected')
+          );
       END;
       $$ LANGUAGE plpgsql;
     `);
 
     await client.query(`
-      DROP FUNCTION IF EXISTS clinic.get_calendar_month(integer, integer, text) CASCADE
-    `);
-
-    await client.query(`
-      CREATE FUNCTION clinic.get_calendar_month(
+      CREATE OR REPLACE FUNCTION clinic.get_calendar_month(
         p_year integer,
         p_month integer,
         p_timezone text
@@ -367,27 +470,74 @@ async function ensureQueueSchema() {
         available_slots integer,
         status text
       ) AS $$
-      BEGIN
-        -- This function returns calendar data for the given month
-        -- For now, this is a placeholder - actual logic would go here
-        RETURN;
-      END;
-      $$ LANGUAGE plpgsql;
+        SELECT
+          s.service_date AS date,
+          COUNT(*)::integer AS total_slots,
+          COUNT(a.appointment_id)::integer AS booked_slots,
+          COUNT(*) FILTER (
+            WHERE s.status = 'open'
+              AND a.appointment_id IS NULL
+              AND NOT clinic.is_slot_closed(s.service_date, s.avaliable_date)
+              AND s.bookable_until >= (now() AT TIME ZONE p_timezone)
+          )::integer AS available_slots,
+          CASE
+            WHEN bool_and(clinic.is_slot_closed(s.service_date, s.avaliable_date)) THEN 'holiday'
+            WHEN COUNT(*) FILTER (
+              WHERE s.status = 'open'
+                AND a.appointment_id IS NULL
+                AND NOT clinic.is_slot_closed(s.service_date, s.avaliable_date)
+                AND s.bookable_until >= (now() AT TIME ZONE p_timezone)
+            ) = 0 THEN 'full'
+            WHEN COUNT(*) FILTER (
+              WHERE s.status = 'open'
+                AND a.appointment_id IS NULL
+                AND NOT clinic.is_slot_closed(s.service_date, s.avaliable_date)
+                AND s.bookable_until >= (now() AT TIME ZONE p_timezone)
+            ) <= 2 THEN 'almost_full'
+            ELSE 'available'
+          END AS status
+        FROM clinic.appointment_slots s
+        LEFT JOIN clinic.appointments a
+          ON a.slot_id = s.slot_id
+         AND a.status NOT IN ('cancelled', 'rejected')
+        WHERE EXTRACT(YEAR FROM s.service_date) = p_year
+          AND EXTRACT(MONTH FROM s.service_date) = p_month
+        GROUP BY s.service_date
+        ORDER BY s.service_date
+      $$ LANGUAGE sql STABLE;
     `);
 
     await client.query(`
-      DROP VIEW IF EXISTS clinic.calendar_this_week CASCADE
-    `);
-
-    await client.query(`
-      CREATE VIEW clinic.calendar_this_week AS
+      CREATE OR REPLACE VIEW clinic.calendar_this_week AS
       SELECT
-        NOW()::date as date,
-        0::int as total_slots,
-        0::int as booked_slots,
-        0::int as available_slots,
-        'placeholder'::text as status
-      LIMIT 0
+        s.service_date AS date,
+        COUNT(*)::integer AS total_slots,
+        COUNT(a.appointment_id)::integer AS booked_slots,
+        COUNT(*) FILTER (
+          WHERE s.status = 'open'
+            AND a.appointment_id IS NULL
+            AND NOT clinic.is_slot_closed(s.service_date, s.avaliable_date)
+            AND s.bookable_until >= (now() AT TIME ZONE 'Asia/Bangkok')
+        )::integer AS available_slots,
+        CASE
+          WHEN bool_and(clinic.is_slot_closed(s.service_date, s.avaliable_date)) THEN 'holiday'
+          WHEN COUNT(*) FILTER (
+            WHERE s.status = 'open'
+              AND a.appointment_id IS NULL
+              AND NOT clinic.is_slot_closed(s.service_date, s.avaliable_date)
+              AND s.bookable_until >= (now() AT TIME ZONE 'Asia/Bangkok')
+          ) = 0 THEN 'full'
+          ELSE 'available'
+        END AS status
+      FROM clinic.appointment_slots s
+      LEFT JOIN clinic.appointments a
+        ON a.slot_id = s.slot_id
+       AND a.status NOT IN ('cancelled', 'rejected')
+      WHERE s.service_date BETWEEN
+        date_trunc('week', now() AT TIME ZONE 'Asia/Bangkok')::date
+        AND (date_trunc('week', now() AT TIME ZONE 'Asia/Bangkok')::date + 6)
+      GROUP BY s.service_date
+      ORDER BY s.service_date
     `);
 
     await client.query("COMMIT");

@@ -79,19 +79,6 @@
   gap: 18px;
 }
 
-.pageIcon {
-  color: #1559f6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.pageIcon span {
-  font-size: 32px;
-  line-height: 1;
-  font-weight: 600;
-}
-
 .pageTitleBox {
   display: flex;
   flex-direction: column;
@@ -113,88 +100,6 @@
   color: #8a97aa;
 }
 
-.rightHeader {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.notificationBtn {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  border: none;
-  border-radius: 18px;
-  background: #f4f7fb;
-  color: #24344d;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.notificationBtn:hover {
-  background: #edf3fb;
-}
-
-.bellIcon {
-  font-size: 24px;
-  line-height: 1;
-}
-
-.redDot {
-  position: absolute;
-  top: 11px;
-  right: 12px;
-  width: 10px;
-  height: 10px;
-  background: #ff3b45;
-  border: 2px solid #ffffff;
-  border-radius: 50%;
-}
-
-.adminBox {
-  height: 54px;
-  padding: 0 16px 0 12px;
-  border-radius: 18px;
-  background: #f7f9fc;
-  border: 1px solid #edf0f5;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.adminAvatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: #1559f6;
-  color: #ffffff;
-  font-size: 18px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.adminText {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
-}
-
-.adminText span {
-  font-size: 15px;
-  font-weight: 700;
-  color: #172033;
-}
-
-.adminText small {
-  margin-top: 3px;
-  font-size: 12px;
-  color: #8a97aa;
-}
-
 @media (max-width: 768px) {
   .header {
     left: 64px;
@@ -209,46 +114,6 @@
   .pageDate {
     font-size: 11px;
   }
-
-  .notificationBtn {
-    width: 42px;
-    height: 42px;
-    border-radius: 15px;
-  }
-
-  .adminBox {
-    height: 46px;
-    padding: 0 8px;
-  }
-
-  .adminText {
-    display: none;
-  }
-
-  .adminAvatar {
-    width: 34px;
-    height: 34px;
-    border-radius: 12px;
-  }
-}
-.mainContent {
-    margin-left: 72px;
-    padding-top: 78px;
-}
-
-.logoIcon {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.brand {
-  color: #ffffff;
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: 0.6px;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 .wrapper {
@@ -330,20 +195,6 @@
   background: linear-gradient(135deg, #8b5cf6, #7c3aed);
 }
 
-.summaryIconBox {
-  width: 42px;
-  height: 42px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.18);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 23px;
-  margin-bottom: 14px;
-  position: relative;
-  z-index: 1;
-}
-
 .summaryCard p {
   margin: 0;
   opacity: 0.86;
@@ -411,6 +262,7 @@
   padding: 14px;
   border: 1px solid #e2e8f0;
   border-radius: 26px;
+  min-height: 750px;
   background: #ffffff;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
 }
@@ -480,6 +332,88 @@
   background: #0f766e !important;
   color: #ffffff !important;
   border-color: #0f766e !important;
+}
+
+.checkinBtn {
+  background: #1d4ed8 !important;
+  color: #fff !important;
+  border-color: #1d4ed8 !important;
+}
+
+.checkinModal {
+  width: min(860px, 96vw);
+  max-height: 88vh;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .28);
+}
+
+.checkinBody {
+  max-height: calc(88vh - 72px);
+  overflow: auto;
+  padding: 22px;
+}
+
+.checkinSearchGrid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.checkinSearchGrid label {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.checkinSearchGrid input {
+  min-width: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 11px;
+  padding: 10px;
+  font: inherit;
+}
+
+.checkinSearchGrid button,
+.checkinResults button {
+  border: 0;
+  border-radius: 11px;
+  padding: 10px 13px;
+  background: #1d4ed8;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.checkinResults {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.checkinResults article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  padding: 14px;
+  background: #f8fbff;
+}
+
+.checkinResults p,
+.checkinResults small { margin: 3px 0 0; color: #64748b; }
+.checkinResults button:disabled { cursor: not-allowed; opacity: .55; }
+
+@media (max-width: 760px) {
+  .checkinSearchGrid { grid-template-columns: 1fr; }
+  .checkinResults article { align-items: stretch; flex-direction: column; }
 }
 
 .queueTypeLegend small {
@@ -578,6 +512,11 @@
 .queueItemActive {
   background: #eff6ff;
   outline: 2px solid #bfdbfe;
+}
+
+.queueItem:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
 }
 
 .queueNo {
@@ -1256,22 +1195,389 @@
 
 .calendarCard {
   width: 100%;
-  background: #ffffff;
-  border: 1px solid #eef2f7;
-  border-radius: 26px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfeff 100%);
+  border: 1px solid #dcecf0;
+  border-radius: 24px;
+  box-shadow: 0 18px 45px rgba(35, 93, 107, 0.1);
   overflow: hidden;
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .calendarHeader {
-  min-height: 68px;
-  padding: 14px 18px;
-  border-bottom: 1px solid #f1f5f9;
+  position: relative;
+  min-height: 82px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #dcecf0;
+  background: linear-gradient(135deg, #f7fdff 0%, #eef9fb 100%);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.calendarHeader::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 3px;
+  content: "";
+  background: linear-gradient(90deg, #16899a, #36b5ae, #9bd7c4);
+}
+
+.calendarMenuWrap {
+  position: relative;
+  z-index: 20;
+}
+
+.calendarMenuButton {
+  width: 46px;
+  height: 46px;
+  padding: 10px;
+  border: 1px solid #d6e8ec;
+  border-radius: 14px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(30, 103, 118, 0.11);
+  transition: 0.18s ease;
+}
+
+.calendarMenuButton:hover {
+  border-color: #8ccbd1;
+  transform: translateY(-1px);
+}
+
+.calendarMenuButton span {
+  width: 22px;
+  height: 2px;
+  border-radius: 999px;
+  background: #277184;
+}
+
+.calendarMenu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 285px;
+  padding: 8px;
+  border: 1px solid #d9e9ed;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 20px 45px rgba(23, 74, 88, 0.18);
+  backdrop-filter: blur(14px);
+  animation: calendarMenuIn 0.16s ease-out;
+}
+
+.calendarMenu button {
+  width: 100%;
+  padding: 11px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  color: #244b58;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Queue section follows the same card/header/menu language as the calendar. */
+.todaySection {
+  position: relative;
+  width: 100%;
+  border: 1px solid #dcecf0;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfeff 100%);
+  box-shadow: 0 18px 45px rgba(35, 93, 107, 0.1);
+  overflow: visible;
+}
+
+.todaySection > .sectionTitleRow {
+  position: relative;
+  min-height: 82px;
+  padding: 16px 78px 16px 20px;
+  border-bottom: 1px solid #dcecf0;
+  border-radius: 24px 24px 0 0;
+  background: linear-gradient(135deg, #f7fdff 0%, #eef9fb 100%);
+}
+
+.todaySection > .sectionTitleRow::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 3px;
+  content: "";
+  background: linear-gradient(90deg, #16899a, #36b5ae, #9bd7c4);
+}
+
+.todaySection .queueCardsGrid {
+  min-height: 750px;
+  margin: 0;
+  border: 0;
+  border-radius: 0 0 24px 24px;
+  box-shadow: none;
+}
+
+.queueTypeLegend {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 30;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.queueTypeLegend > .calendarMenuButton {
+  width: 46px;
+  height: 46px;
+  padding: 10px;
+  border: 1px solid #d6e8ec;
+  border-radius: 14px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.queueTypeLegend > .calendarMenuButton span {
+  width: 22px;
+  height: 2px;
+  padding: 0;
+  border-radius: 999px;
+  background: #277184;
+}
+
+.queueMenuContent {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(340px, calc(100vw - 40px));
+  max-height: min(620px, calc(100dvh - 120px));
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid #d9e9ed;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 20px 45px rgba(23, 74, 88, 0.18);
+  backdrop-filter: blur(14px);
+}
+
+.queueMenuLabel {
+  margin: 5px 8px 7px;
+  color: #78909c;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.queueMenuContent .queueMenuItem {
+  width: 100%;
+  min-height: 64px;
+  margin: 5px 0;
+  padding: 9px 10px;
+  border: 1px solid #e5edf0;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #173849;
+  box-shadow: 0 3px 10px rgba(36, 83, 96, 0.04);
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+}
+
+.queueMenuContent .queueMenuItem:hover {
+  border-color: #b9dfe2;
+  background: #f7fcfc;
+  box-shadow: 0 8px 18px rgba(36, 112, 121, 0.1);
+  transform: translateY(-1px);
+}
+
+.queueMenuContent .queueFilterActive {
+  border-color: #8fd3d1 !important;
+  background: #eefaf9 !important;
+  color: #173849 !important;
+  box-shadow: 0 7px 18px rgba(15, 118, 110, 0.12) !important;
+}
+
+.queueMenuIcon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.queueMenuIconAll {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.queueMenuIconOnline {
+  background: #eaf3ff;
+  color: #2563eb;
+}
+
+.queueMenuIconWalkin {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.queueMenuIconAdd {
+  background: #e8f8f6;
+  color: #0f9f94;
+}
+
+.queueMenuIconCheckin {
+  background: #fff1f2;
+  color: #e2556e;
+}
+
+.queueMenuText {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.queueMenuText strong {
+  color: #183b4b;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.queueMenuText small {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #78909c;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.queueMenuDivider {
+  height: 1px;
+  margin: 10px 5px;
+  background: #e7eff1;
+}
+
+.accessCodeBadge {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.accessCodeEyeButton {
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #4338ca;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.accessCodeEyeButton:hover {
+  background: #dbeafe;
+}
+
+.accessCodeEyeButton:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 1px;
+}
+
+.saveDateNotice {
+  flex: 1;
+  margin: 0;
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.calendarMenu button + button {
+  border-top: 1px solid #edf4f5;
+}
+
+.calendarMenu button:hover {
+  background: #f0fafb;
+}
+
+.calendarMenu button > span:last-child,
+.calendarMenu strong,
+.calendarMenu small {
+  min-width: 0;
+  display: block;
+}
+
+.calendarMenu strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.calendarMenu small {
+  margin-top: 2px;
+  color: #78939b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.menuHolidayIcon,
+.menuBookingIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid !important;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.menuHolidayIcon {
+  background: #fff1f2;
+  color: #e05263;
+}
+
+.menuBookingIcon {
+  background: #e8f8f6;
+  color: #168778;
+}
+
+@keyframes calendarMenuIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .holidayBtn {
@@ -1351,7 +1657,7 @@
 }
 
 .calendarControl {
-  padding: 14px 18px 10px;
+  padding: 20px 20px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1359,9 +1665,247 @@
 
 .calendarControl h3 {
   margin: 0;
-  color: #234b5f;
-  font-size: 19px;
+  color: #173f4c;
+  font-size: 21px;
   font-weight: 900;
+}
+
+.calendarMonthTitle span {
+  display: block;
+  margin-bottom: 2px;
+  color: #6c929b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.advanceBookingOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3100;
+  padding: 24px;
+  background: rgba(15, 42, 51, 0.48);
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(5px);
+}
+
+.advanceBookingConfirmLayer {
+  z-index: 4200 !important;
+}
+
+.medicalSaveConfirmLayer {
+  z-index: 4300 !important;
+}
+
+.advanceBookingModal {
+  width: min(620px, 100%);
+  overflow: hidden;
+  border: 1px solid rgba(177, 220, 222, 0.9);
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 28px 80px rgba(8, 49, 60, 0.28);
+  animation: advanceModalIn 0.2s ease-out;
+}
+
+.advanceBookingHeader {
+  min-height: 90px;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, #eaf9f8 0%, #f5fcfd 55%, #edf7ff 100%);
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 13px;
+  border-bottom: 1px solid #d9ecef;
+}
+
+.advanceBookingTitleIcon {
+  width: 50px;
+  height: 50px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #178c99, #27aca1);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 24px rgba(23, 140, 153, 0.22);
+  font-size: 23px;
+}
+
+.advanceBookingHeader p,
+.advanceBookingHeader h3 {
+  margin: 0;
+}
+
+.advanceBookingHeader p {
+  color: #52909a;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.advanceBookingHeader h3 {
+  margin-top: 2px;
+  color: #174754;
+  font-size: 21px;
+  font-weight: 900;
+}
+
+.advanceBookingHeader > button {
+  width: 38px;
+  height: 38px;
+  border: 1px solid #d4e7ea;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #4f747d;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.advanceBookingBody {
+  padding: 24px;
+}
+
+.advanceBookingIntro {
+  margin: 0 0 16px;
+  color: #627f87;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.advanceWeekRow {
+  padding: 17px;
+  border: 1px solid #cfe6e8;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #f8fdfd, #f1faf8);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.advanceWeekRow small,
+.advanceWeekRow strong {
+  display: block;
+}
+
+.advanceWeekRow small {
+  margin-bottom: 4px;
+  color: #6b9299;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.advanceWeekRow strong {
+  color: #193f49;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.advanceWeekRow > button {
+  min-width: 154px;
+  min-height: 42px;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #168b91, #20a88f);
+  color: #ffffff;
+  box-shadow: 0 9px 20px rgba(22, 139, 145, 0.2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.advanceWeekRow > button:disabled {
+  cursor: wait;
+  opacity: 0.66;
+  box-shadow: none;
+}
+
+.advanceWeekRow > .advanceWeekOpened {
+  background: #e2f3ec;
+  color: #26735f;
+  cursor: default;
+  opacity: 1;
+}
+
+.advanceWeekRow > .advanceWeekCancel {
+  border: 1px solid #f2c7cb;
+  background: #fff1f2;
+  color: #c84652;
+  box-shadow: none;
+}
+
+.advanceWeekRow > .advanceWeekCancel:hover:not(:disabled) {
+  border-color: #eaa4aa;
+  background: #ffe4e6;
+  transform: translateY(-1px);
+}
+
+.advanceBookingNote {
+  padding: 14px 22px;
+  border-top: 1px solid #e4f0f1;
+  background: #f7fbfc;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #5c7c84;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.advanceBookingNote span {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #dff2f1;
+  display: grid;
+  place-items: center;
+  color: #168778;
+  font-family: serif;
+  font-weight: 900;
+}
+
+.noAdvanceWeek {
+  padding: 22px;
+  border: 1px dashed #c9dde0;
+  border-radius: 16px;
+  background: #f8fbfc;
+  color: #68848b;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.advanceBookingLoading {
+  padding: 18px;
+  border-radius: 16px;
+  background: #f2f8f9;
+}
+
+.advanceBookingLoading span {
+  display: block;
+  width: 100%;
+  height: 13px;
+  border-radius: 999px;
+  background: #dbeaec;
+  animation: loadingPulse 1s ease-in-out infinite alternate;
+}
+
+.advanceBookingLoading span + span {
+  width: 62%;
+  margin-top: 10px;
+}
+
+@keyframes advanceModalIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes loadingPulse {
+  to { opacity: 0.5; }
 }
 
 .calendarActions {
@@ -1399,111 +1943,248 @@
 }
 
 .monthGrid {
-  padding: 0 18px 14px;
+  margin: 0 18px 14px;
+  padding: 12px;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
+  gap: 7px;
+  border: 1px solid #deecef;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #f7fbfc 0%, #f1f8f9 100%);
 }
 
 .weekdayLabel {
   text-align: center;
-  color: #64748b;
-  font-size: 12px;
+  color: #547680;
+  font-size: 11px;
   font-weight: 900;
-  padding-bottom: 2px;
+  padding: 5px 2px 8px;
+  letter-spacing: 0.04em;
+}
+
+.weekdayLabel:first-child {
+  color: #d75963;
+}
+
+.weekdayLabel:nth-child(7) {
+  color: #4d78b5;
 }
 
 .dayButton {
+  position: relative;
   min-width: 0;
-  min-height: 68px;
-  border: 1px solid #e5eff5;
-  border-radius: 16px;
-  background: #ffffff;
+  min-height: 90px;
+  overflow: hidden;
+  border: 1px solid #dce9ec;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.96);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 5px;
   cursor: pointer;
-  box-shadow: 0 3px 8px rgba(47, 134, 165, 0.06);
-  transition: 0.18s ease;
+  box-shadow: 0 4px 12px rgba(40, 99, 112, 0.055);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   font-family: inherit;
-  padding: 8px 4px;
+  padding: 8px;
 }
 
 .dayButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 7px 16px rgba(47, 134, 165, 0.13);
+  z-index: 2;
+  border-color: #89c9cf;
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(38, 111, 124, 0.14);
+}
+
+.dayCellTop {
+  min-height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
 }
 
 .dayName {
-  color: #94a3b8;
-  font-size: 10px;
+  color: #8099a0;
+  font-size: 9px;
   font-weight: 800;
 }
 
-.dayButton strong {
-  width: 28px;
-  height: 28px;
+.todayBadge,
+.advanceBadge {
+  max-width: 48px;
+  overflow: hidden;
+  padding: 2px 5px;
   border-radius: 999px;
+  font-size: 7px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todayBadge {
+  background: #dff5f6;
+  color: #177c88;
+}
+
+.advanceBadge {
+  background: #e8edff;
+  color: #5265b7;
+}
+
+.dayButton .dayNumber {
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #31556a;
-  font-size: 16px;
+  color: #244d59;
+  font-size: 17px;
   font-weight: 900;
+  transition: 0.18s ease;
 }
 
-.dayButton small {
-  min-height: 14px;
-  color: #8aa5b4;
-  font-size: 10px;
+.dayStatus {
+  min-width: 0;
+  min-height: 18px;
+  padding: 3px 5px;
+  border-radius: 7px;
+  background: #f2f7f8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dayStatus i {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #a5b8bd;
+}
+
+.dayStatus small {
+  min-width: 0;
+  overflow: hidden;
+  color: #718c94;
+  font-size: 8px;
   font-weight: 800;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dayMuted {
-  opacity: 0.36;
+  opacity: 0.3;
+  filter: saturate(0.5);
 }
 
 .dayToday {
-  background: #eff6ff;
-  border-color: #bfdbfe;
+  border-color: #87ccd2;
+  background: linear-gradient(145deg, #f4fdfe, #eaf8f9);
+  box-shadow: inset 0 0 0 1px rgba(66, 164, 175, 0.11);
 }
 
-.dayToday strong {
-  background: #2f86a5;
+.dayToday .dayNumber {
+  background: linear-gradient(145deg, #258fa0, #36ada5);
   color: #ffffff;
 }
 
-.dayAvailable strong {
-  background: #08bd6f;
-  color: #ffffff;
+.dayAvailable .dayStatus {
+  background: #eaf9f1;
 }
 
-.dayClosed strong {
-  background: #e65b5b;
-  color: #ffffff;
+.dayAvailable .dayStatus i {
+  background: #20ad70;
 }
 
-.dayFull strong {
-  background: #ff9f43;
-  color: #ffffff;
+.dayAvailable .dayStatus small {
+  color: #27805d;
+}
+
+.dayClosed {
+  border-color: #f1d3d6;
+  background: #fffafa;
+}
+
+.dayClosed .dayNumber {
+  color: #cf5a63;
+  background: #fff0f1;
+}
+
+.dayClosed .dayStatus {
+  background: #fff0f1;
+}
+
+.dayClosed .dayStatus i {
+  background: #df6570;
+}
+
+.dayClosed .dayStatus small {
+  color: #bd505a;
+}
+
+.dayFull .dayStatus {
+  background: #fff5e9;
+}
+
+.dayFull .dayStatus i {
+  background: #f0a448;
+}
+
+.dayFull .dayStatus small {
+  color: #b6772d;
+}
+
+.dayAdvance:not(.daySelected) {
+  border-color: #cdd6f5;
+  background: linear-gradient(145deg, #fbfcff, #f3f6ff);
+}
+
+.dayAdvance:not(.daySelected)::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  content: "";
+  background: linear-gradient(90deg, #7187d6, #65bfc3);
 }
 
 .daySelected {
-  background: #2563eb;
-  border-color: #2563eb;
-  box-shadow: 0 12px 22px rgba(37, 99, 235, 0.28);
+  border-color: #167e8d;
+  background: linear-gradient(145deg, #147889, #229b99);
+  box-shadow: 0 12px 24px rgba(21, 120, 137, 0.25);
   opacity: 1;
 }
 
-.daySelected .dayName,
-.daySelected small {
-  color: rgba(255, 255, 255, 0.75);
+.daySelected .dayName {
+  color: rgba(255, 255, 255, 0.72);
 }
 
-.daySelected strong {
+.daySelected .dayNumber {
   background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.daySelected .dayStatus {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.daySelected .dayStatus i {
+  background: #ffffff;
+}
+
+.daySelected .dayStatus small {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.daySelected .todayBadge,
+.daySelected .advanceBadge {
+  background: rgba(255, 255, 255, 0.17);
   color: #ffffff;
 }
 
@@ -1550,127 +2231,8 @@
   background: #e65b5b;
 }
 
-.selectedDatePanel {
-  margin: 0 20px 20px;
-  padding: 15px;
-  border-radius: 20px;
-  background: #f8fafc;
-  border: 1px solid #e5eff5;
-}
-
-.selectedDateHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.selectedDateHeader strong {
-  color: #334155;
-  font-size: 15px;
-  font-weight: 900;
-}
-
-.queuePill,
-.closedPill {
-  border-radius: 999px;
-  padding: 3px 9px;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.queuePill {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.closedPill {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.selectedSessionGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.selectedSessionCard {
-  background: #ffffff;
-  border-radius: 16px;
-  border: 1px solid #e5eff5;
-  padding: 12px;
-}
-
-.selectedSessionTitle {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 9px;
-  color: #475569;
-}
-
-.selectedSessionTitle span {
-  font-size: 17px;
-}
-
-.selectedSessionTitle strong {
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.appointmentItem {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 8px 9px;
-  margin-bottom: 7px;
-}
-
-.appointmentItem:last-child {
-  margin-bottom: 0;
-}
-
-.appointmentItem span {
-  width: 22px;
-  height: 22px;
-  border-radius: 8px;
-  background: #dbeafe;
-  color: #1d4ed8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 900;
-  flex-shrink: 0;
-}
-
-.appointmentItem p {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  color: #334155;
-  font-size: 13px;
-  font-weight: 800;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.appointmentItem small {
-  color: #94a3b8;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.noAppointment {
-  margin: 0;
-  padding: 10px 0;
-  text-align: center;
-  color: #94a3b8;
-  font-size: 13px;
+.legendAdvance {
+  background: linear-gradient(135deg, #7187d6, #65bfc3);
 }
 
 /* ===== Responsive ===== */
@@ -1698,7 +2260,7 @@
   }
 
   .dayButton {
-    min-height: 66px;
+    min-height: 82px;
   }
 
   .queueCardBody {
@@ -1743,15 +2305,6 @@
     padding: 12px 16px;
   }
 
-  .brand {
-    font-size: 18px;
-  }
-
-  .logoIcon {
-    width: 54px;
-    height: 54px;
-  }
-
   .wrapper {
     height: auto;
     min-height: calc(100dvh - 76px);
@@ -1776,15 +2329,24 @@
   }
 
   .queueCardHeader,
-  .calendarHeader,
-  .calendarControl,
-  .selectedDateHeader {
+.calendarHeader,
+.calendarControl {
     align-items: flex-start;
   }
 
   .calendarHeader,
   .calendarControl {
     flex-direction: column;
+  }
+
+  .calendarHeader {
+    padding-right: 72px;
+  }
+
+  .calendarMenuWrap {
+    position: absolute;
+    top: 15px;
+    right: 16px;
   }
 
   .calendarActions {
@@ -1801,34 +2363,45 @@
   }
 
   .monthGrid {
-    padding: 0 12px 14px;
-    gap: 5px;
+    margin: 0 10px 12px;
+    padding: 8px;
+    gap: 4px;
+    border-radius: 16px;
   }
 
   .dayButton {
-    min-height: 58px;
-    border-radius: 13px;
+    min-height: 72px;
+    padding: 6px;
+    border-radius: 11px;
   }
 
-  .dayButton strong {
-    width: 25px;
-    height: 25px;
-    font-size: 12px;
+  .dayButton .dayNumber {
+    width: 27px;
+    height: 27px;
+    border-radius: 9px;
+    font-size: 13px;
   }
 
-  .dayName,
-  .dayButton small {
-    font-size: 9px;
+  .dayName {
+    font-size: 8px;
   }
 
-  .selectedDatePanel,
+  .dayStatus {
+    padding: 2px 4px;
+  }
+
+  .dayStatus small {
+    font-size: 7px;
+  }
+
+  .todayBadge,
+  .advanceBadge {
+    display: none;
+  }
+
   .calendarLegend {
     margin-left: 12px;
     margin-right: 12px;
-  }
-
-  .selectedSessionGrid {
-    grid-template-columns: 1fr;
   }
 
   .buttonRow {
@@ -1850,6 +2423,49 @@
 }
 
 @media (max-width: 480px) {
+  .calendarMenu {
+    position: fixed;
+    top: 74px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+
+  .advanceBookingOverlay {
+    padding: 12px;
+  }
+
+  .advanceBookingModal {
+    border-radius: 20px;
+  }
+
+  .advanceBookingHeader {
+    grid-template-columns: 44px minmax(0, 1fr) 34px;
+    padding: 15px;
+  }
+
+  .advanceBookingTitleIcon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .advanceBookingHeader h3 {
+    font-size: 17px;
+  }
+
+  .advanceBookingBody {
+    padding: 18px 15px;
+  }
+
+  .advanceWeekRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .advanceWeekRow > button {
+    width: 100%;
+  }
+
   .patientTop {
     flex-direction: column;
   }

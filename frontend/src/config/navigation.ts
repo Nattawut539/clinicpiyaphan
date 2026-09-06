@@ -9,6 +9,7 @@ import {
   Home,
   Info,
   LayoutGrid,
+  ScrollText,
   Stethoscope,
   Users,
 } from 'lucide-react';
@@ -19,6 +20,8 @@ export type NavigationItem = {
   label: string;
   shortLabel?: string;
   icon: ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
+  superAdminOnly?: boolean;
+  allowedRoles?: string[];
 };
 
 export const userNavigationItems: NavigationItem[] = [
@@ -35,8 +38,14 @@ export const adminNavigationItems: NavigationItem[] = [
   { href: '/admin/dashboard', label: 'หน้าหลัก', icon: LayoutGrid },
   { href: '/admin/admins', label: 'รายชื่อผู้ป่วย', icon: Users },
   { href: '/admin/appointment', label: 'รายการจองคิว', icon: CalendarDays },
-  { href: '/admin/medicalrecords', label: 'เวชระเบียน', icon: ClipboardList },
+  {
+    href: '/admin/medicalrecords',
+    label: 'เวชระเบียน',
+    icon: ClipboardList,
+    allowedRoles: ['doctor', 'super_admin', 'superadmin'],
+  },
   { href: '/admin/compile', label: 'คะแนนการบริการ', icon: BarChart3 },
+  { href: '/admin/audit-logs', label: 'บันทึกการใช้งานระบบ', icon: ScrollText, superAdminOnly: true },
   { href: '/admin/help', label: 'ช่วยเหลือ', icon: HelpCircle },
 ];
 

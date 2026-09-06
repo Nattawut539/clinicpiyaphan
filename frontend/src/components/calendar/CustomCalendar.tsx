@@ -30,6 +30,7 @@ interface Props {
   onDateSelect: (date: string) => void;
   minDate?: string;
   maxDate?: string;
+  allowedRanges?: Array<{ start: string; end: string }>;
   helperText?: string;
   allowPastDates?: boolean;
   allowUnavailableDates?: boolean;
@@ -39,6 +40,7 @@ export default function CustomCalendar({
   onDateSelect,
   minDate,
   maxDate,
+  allowedRanges,
   helperText,
   allowPastDates = false,
   allowUnavailableDates = false,
@@ -50,9 +52,9 @@ export default function CustomCalendar({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const loadMonthStatus = async () => {
+    const loadMonthStatus = async (showLoading: boolean) => {
       try {
-        setLoading(true);
+        if (showLoading) setLoading(true);
 
         const year = currentDate.year();
         const month = currentDate.month() + 1;
@@ -69,11 +71,22 @@ export default function CustomCalendar({
         console.error('Load calendar status error:', err);
         setAppointmentData([]);
       } finally {
-        setLoading(false);
+        if (showLoading) setLoading(false);
       }
     };
 
-    loadMonthStatus();
+    const syncWhenVisible = () => {
+      if (document.visibilityState === 'visible') void loadMonthStatus(false);
+    };
+
+    void loadMonthStatus(true);
+    window.addEventListener('focus', syncWhenVisible);
+    document.addEventListener('visibilitychange', syncWhenVisible);
+
+    return () => {
+      window.removeEventListener('focus', syncWhenVisible);
+      document.removeEventListener('visibilitychange', syncWhenVisible);
+    };
   }, [currentDate]);
 
   const buddhistYear = currentDate.year() + 543;
@@ -101,7 +114,11 @@ export default function CustomCalendar({
 
   const isOutsideAllowedRange = (date: Dayjs) => {
     const formatted = date.format('YYYY-MM-DD');
-    return Boolean((minDate && formatted < minDate) || (maxDate && formatted > maxDate));
+    const outsideBounds = Boolean((minDate && formatted < minDate) || (maxDate && formatted > maxDate));
+    const outsideConfiguredRanges = Boolean(
+      allowedRanges?.length && !allowedRanges.some((range) => formatted >= range.start && formatted <= range.end)
+    );
+    return outsideBounds || outsideConfiguredRanges;
   };
 
   const prevMonth = () => {

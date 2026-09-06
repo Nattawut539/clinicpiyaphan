@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const pool = require("../../tools/db");
 const { FRONTEND_URL, JWT_SECRET } = require("../../tools/config");
+const { cookieOptions, clearCookieOptions } = require("../../tools/cookies");
 
 const router = express.Router();
 
@@ -30,7 +31,7 @@ const rand = () => crypto.randomBytes(16).toString("hex");
 function createOAuthState(nonce) {
   const payload = Buffer.from(
     JSON.stringify({ nonce, iat: Date.now() }),
-    "utf8"
+    "utf8",
   ).toString("base64url");
   const sig = crypto
     .createHmac("sha256", JWT_SECRET)
@@ -83,18 +84,8 @@ router.get("/line/login", (req, res) => {
 
   const nonce = rand();
   const state = createOAuthState(nonce);
-  res.cookie("line_state", state, {
-    httpOnly: true,
-    sameSite: "Lax",
-    path: "/",
-    maxAge: 10 * 60 * 1000,
-  });
-  res.cookie("line_nonce", nonce, {
-    httpOnly: true,
-    sameSite: "Lax",
-    path: "/",
-    maxAge: 10 * 60 * 1000,
-  });
+  res.cookie("line_state", state, cookieOptions({ httpOnly: true, maxAge: 10 * 60 * 1000 }));
+  res.cookie("line_nonce", nonce, cookieOptions({ httpOnly: true, maxAge: 10 * 60 * 1000 }));
 
   const authURL = new URL("https://access.line.me/oauth2/v2.1/authorize");
   authURL.searchParams.set("response_type", "code");
@@ -115,7 +106,9 @@ router.get("/line/callback", async (req, res, next) => {
 
   try {
     const stateData =
-      stateCookie && state === stateCookie ? { nonce: nonceCookie } : verifyOAuthState(String(state));
+      stateCookie && state === stateCookie
+        ? { nonce: nonceCookie }
+        : verifyOAuthState(String(state));
 
     if (!code || !state || !stateData) {
       const e = new Error("Invalid state");
@@ -123,8 +116,8 @@ router.get("/line/callback", async (req, res, next) => {
       throw e;
     }
 
-    res.clearCookie("line_state", { path: "/" });
-    res.clearCookie("line_nonce", { path: "/" });
+    res.clearCookie("line_state", clearCookieOptions({ httpOnly: true }));
+    res.clearCookie("line_nonce", clearCookieOptions({ httpOnly: true }));
 
     const tokenRes = await axios.post(
       "https://api.line.me/oauth2/v2.1/token",
@@ -135,7 +128,7 @@ router.get("/line/callback", async (req, res, next) => {
         client_id: LINE_CHANNEL_ID,
         client_secret: LINE_CHANNEL_SECRET,
       }),
-      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } },
     );
     const { access_token } = tokenRes.data;
 
@@ -146,7 +139,7 @@ router.get("/line/callback", async (req, res, next) => {
         client_id: LINE_CHANNEL_ID,
         nonce: nonceCookie || stateData.nonce || "",
       }),
-      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } },
     );
 
     const prof = await axios.get("https://api.line.me/v2/profile", {
@@ -161,16 +154,17 @@ router.get("/line/callback", async (req, res, next) => {
 
     const client = await pool.connect();
     let user_id, role;
+    let sessionVersion = 1;
     try {
       await client.query("BEGIN");
       let found = await client.query(
-        "SELECT user_id, role FROM clinic.users WHERE line_id=$1",
-        [lineUserId]
+        "SELECT user_id, role, account_status, session_version FROM clinic.users WHERE line_id=$1",
+        [lineUserId],
       );
 
       if (!found.rowCount && email) {
         found = await client.query(
-          `SELECT u.user_id, u.role
+          `SELECT u.user_id, u.role, u.account_status, u.session_version
            FROM clinic.users u
            LEFT JOIN clinic.user_details d ON d.user_id = u.user_id
            WHERE LOWER(u.email) = $1
@@ -180,19 +174,26 @@ router.get("/line/callback", async (req, res, next) => {
              ELSE 1
            END
            LIMIT 1`,
-          [email]
+          [email],
         );
       }
 
       if (found.rowCount) {
         ({ user_id, role } = found.rows[0]);
+        sessionVersion = Number(found.rows[0].session_version || 1);
+        if (String(found.rows[0].account_status || "active") !== "active") {
+          const error = new Error("Account is not active");
+          error.status = 403;
+          throw error;
+        }
         await client.query(
           `UPDATE clinic.users
            SET line_id = COALESCE(line_id, $1),
                email = COALESCE(email, $2),
+               registration_source = 'line',
                last_login_at = NOW()
            WHERE user_id = $3`,
-          [lineUserId, email, user_id]
+          [lineUserId, email, user_id],
         );
         await client.query(
           `UPDATE clinic.user_details
@@ -200,17 +201,21 @@ router.get("/line/callback", async (req, res, next) => {
                first_name = COALESCE(first_name, $2),
                profile_image = COALESCE(NULLIF(profile_image, ''), $3)
            WHERE user_id = $4`,
-          [email, displayName, pictureUrl, user_id]
+          [email, displayName, pictureUrl, user_id],
         );
       } else {
         const ins = await client.query(
-          "INSERT INTO clinic.users (line_id, email, role) VALUES ($1, $2, $3) RETURNING user_id, role",
-          [lineUserId, email, "user"]
+          `INSERT INTO clinic.users
+           (line_id, email, role, account_status, registration_source)
+           VALUES ($1, $2, $3, 'active', 'line')
+           RETURNING user_id, role, session_version`,
+          [lineUserId, email, "user"],
         );
         ({ user_id, role } = ins.rows[0]);
+        sessionVersion = Number(ins.rows[0].session_version || 1);
         await client.query(
           "INSERT INTO clinic.user_details (user_id, first_name, profile_image, email) VALUES ($1,$2,$3,$4)",
-          [user_id, displayName, pictureUrl, email]
+          [user_id, displayName, pictureUrl, email],
         );
       }
       await client.query("COMMIT");
@@ -222,31 +227,22 @@ router.get("/line/callback", async (req, res, next) => {
     }
 
     const normalizedRole = String(role || "").toLowerCase();
-    const token = jwt.sign(
-      { sub: user_id, role: normalizedRole },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    res.cookie("authToken", token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: false,
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+    const token = jwt.sign({ sub: user_id, role: normalizedRole, sv: sessionVersion }, JWT_SECRET, {
+      expiresIn: "7d",
     });
+
+    const authCookieMaxAge = 7 * 24 * 60 * 60 * 1000;
+    res.cookie("authToken", token, cookieOptions({ httpOnly: true, maxAge: authCookieMaxAge }));
 
     const isUserRole = normalizedRole === "user" || normalizedRole === "users";
-    res.clearCookie(isUserRole ? "adminToken" : "userToken", { path: "/" });
-    res.cookie(isUserRole ? "userToken" : "adminToken", token, {
-      httpOnly: false,
-      sameSite: "lax",
-      secure: false,
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.clearCookie(isUserRole ? "adminToken" : "userToken", clearCookieOptions({ httpOnly: false }));
+    res.cookie(isUserRole ? "userToken" : "adminToken", token,
+      cookieOptions({ httpOnly: false, maxAge: authCookieMaxAge }));
 
-    const dest = new URL(ROLE_HOME[normalizedRole] || "/", FRONTEND_URL).toString();
+    const dest = new URL(
+      ROLE_HOME[normalizedRole] || "/",
+      FRONTEND_URL,
+    ).toString();
     return res.redirect(dest);
   } catch (err) {
     next(err);

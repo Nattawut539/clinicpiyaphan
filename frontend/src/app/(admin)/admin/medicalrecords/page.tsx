@@ -101,7 +101,7 @@ function decodeJwtPayload(token: string): JwtPayload | null {
     }
 }
 
-const ALLOWED_ROLES = new Set(["admin", "doctor", "staff", "superadmin", "super_admin"]);
+const ALLOWED_ROLES = new Set(["doctor", "superadmin", "super_admin"]);
 
 type VisitRow = {
     appointment_id: string | number;
@@ -313,12 +313,6 @@ function getQueueOrder(row: VisitRow) {
     return Number.MAX_SAFE_INTEGER;
 }
 
-function isFutureVisitDate(dateKey?: string) {
-    if (!dateKey) return false;
-
-    return dayjs(dateKey).startOf("day").isAfter(dayjs().startOf("day"));
-}
-
 function getSessionOrder(row: VisitRow) {
     if (row.avaliable_date === "morning") return 1;
     if (row.avaliable_date === "afternoon") return 2;
@@ -398,6 +392,8 @@ interface RecordFormPageProps {
     existingRecord?: Partial<MedicalRecordForm> | null;
     saving: boolean;
     saved: boolean;
+    canSave: boolean;
+    saveBlockedReason?: string;
     onBack: () => void;
     onSave: (data: MedicalRecordForm) => Promise<void>;
     onPrint: (patient: VisitRow, currentForm: MedicalRecordForm) => Promise<void>;
@@ -408,6 +404,8 @@ function RecordFormPage({
     existingRecord,
     saving,
     saved,
+    canSave,
+    saveBlockedReason,
     onBack,
     onSave,
     onPrint,
@@ -821,6 +819,22 @@ function RecordFormPage({
                                     />
                                 </div>
                             ))}
+                            {[
+                                { label: "แพ้ยา", value: patient.drug_allergy },
+                                { label: "แพ้อาหาร", value: patient.food_allergy },
+                                { label: "โรคประจำตัว", value: patient.congenital_disease },
+                            ].map(({ label, value }) => (
+                                <div key={label} className={styles.formGroup}>
+                                    <label>{label}</label>
+                                    <input
+                                        className={styles.patientMedicalReadonly}
+                                        type="text"
+                                        value={String(value || "ไม่มี")}
+                                        readOnly
+                                        aria-label={`${label}ของผู้ป่วย`}
+                                    />
+                                </div>
+                            ))}
                         </div>
 
                         <div className={styles.drawingSummary}>
@@ -1024,6 +1038,7 @@ function RecordFormPage({
                 </div>
 
                 <div className={styles.bottomActionBar}>
+                    {!canSave && <p className={styles.saveDateNotice}>{saveBlockedReason}</p>}
                     <button type="button" onClick={onBack} className={styles.cancelBottomBtn}>
                         <XCircle size={18} />
                         ยกเลิก
@@ -1032,7 +1047,7 @@ function RecordFormPage({
                     <button
                         type="button"
                         onClick={() => setShowSaveConfirm(true)}
-                        disabled={saving}
+                        disabled={saving || !canSave}
                         className={styles.saveBottomBtn}
                     >
                         <Save size={18} />
@@ -1217,6 +1232,8 @@ export default function MedicalRecordsListPage() {
     const isToday = (dayKey: string) => dayKey === todayKey;
 
     const openRecord = async (patient: VisitRow) => {
+        if (dayjs(patient.visit_date).format("YYYY-MM-DD") !== todayKey) return;
+
         const token = getAuthToken();
 
         setSelectedPatient(patient);
@@ -1501,6 +1518,11 @@ export default function MedicalRecordsListPage() {
     const handleSave = async (data: MedicalRecordForm) => {
         if (!selectedPatient) return;
 
+        if (dayjs(selectedPatient.visit_date).format("YYYY-MM-DD") !== todayKey) {
+            setErrorMsg("บันทึกเวชระเบียนได้เฉพาะวันเข้าตรวจเท่านั้น ไม่สามารถบันทึกย้อนหลังหรือก่อนวันนัดได้");
+            return;
+        }
+
         const token = getAuthToken();
 
         if (!token) {
@@ -1629,6 +1651,12 @@ export default function MedicalRecordsListPage() {
                                 existingRecord={existingRecord}
                                 saving={saving}
                                 saved={saved}
+                                canSave={dayjs(selectedPatient.visit_date).format("YYYY-MM-DD") === todayKey}
+                                saveBlockedReason={
+                                    dayjs(selectedPatient.visit_date).format("YYYY-MM-DD") < todayKey
+                                        ? "เลยวันเข้าตรวจแล้ว จึงเปิดดูได้แต่ไม่สามารถบันทึกย้อนหลังได้"
+                                        : "ยังไม่ถึงวันนัด จึงยังไม่สามารถบันทึกเวชระเบียนได้"
+                                }
                                 onBack={() => {
                                     setSelectedPatient(null);
                                     setExistingRecord(null);
@@ -1718,7 +1746,9 @@ export default function MedicalRecordsListPage() {
                                                                 Boolean(r.has_medical_record);
 
                                                             const session = getSessionText(r.time_label);
-                                                            const isLocked = isFutureVisitDate(dayKey);
+                                                            const isPast = dayKey < todayKey;
+                                                            const isFuture = dayKey > todayKey;
+                                                            const isLocked = isPast || isFuture;
 
                                                             return (
                                                             <tr key={String(r.appointment_id ?? `${dayKey}-${idx}`)}>
@@ -1763,6 +1793,11 @@ export default function MedicalRecordsListPage() {
                                                                             <CheckCircle size={13} strokeWidth={2.5} />
                                                                             บันทึกแล้ว
                                                                         </span>
+                                                                    ) : isPast ? (
+                                                                        <span className={styles.expiredRecordStatus}>
+                                                                            <Circle size={9} fill="currentColor" />
+                                                                            หมดเวลาบันทึก
+                                                                        </span>
                                                                     ) : (
                                                                         <span className={styles.notRecordedStatus}>
                                                                             <Circle size={9} fill="currentColor" />
@@ -1779,19 +1814,23 @@ export default function MedicalRecordsListPage() {
                                                                         }}
                                                                         disabled={isLocked}
                                                                         className={
-                                                                            isLocked
+                                                                            isPast
+                                                                                ? styles.recordIconExpired
+                                                                                : isFuture
                                                                                 ? styles.recordIconLocked
                                                                                 : hasRecord
                                                                                     ? styles.recordIconDone
                                                                                     : styles.recordIconBtn
                                                                         }
-                                                                        title="เปิดเวชระเบียน"
+                                                                        title={
+                                                                            isPast
+                                                                                ? "เลยวันเข้าตรวจแล้ว ไม่สามารถเปิดหรือแก้ไขเวชระเบียนได้"
+                                                                                : isFuture
+                                                                                    ? "ยังไม่ถึงวันเข้าตรวจ"
+                                                                                    : "เปิดเวชระเบียน"
+                                                                        }
                                                                     >
-                                                                        {isLocked ? (
-                                                                            <XCircle size={23} strokeWidth={2.2} />
-                                                                        ) : (
-                                                                            <FileText size={23} strokeWidth={2.2} />
-                                                                        )}
+                                                                        <FileText size={23} strokeWidth={2.2} />
                                                                     </button>
                                                                 </td>
                                                             </tr>

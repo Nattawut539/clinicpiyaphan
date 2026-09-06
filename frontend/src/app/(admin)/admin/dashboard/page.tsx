@@ -11,6 +11,7 @@ import { API_BASE } from '@/lib/api';
 import Sidebar from '@/components/admin-shell/AdminSidebar';
 import AdminHeaderActions from '@/components/admin-shell/AdminHeaderActions';
 import ThaiDatePicker from '@/components/date/ThaiDatePicker';
+import { CalendarCheck, Eye, EyeOff, ListFilter, Search, UserPlus, Users } from 'lucide-react';
 
 
 dayjs.locale('th');
@@ -28,8 +29,12 @@ type QueueTicket = {
     service_type: string | null;
     status: string;
     created_at?: string;
+    hour_of_day?: number | null;
     has_measurement?: boolean;
     has_medical_record?: boolean;
+    access_code?: string | null;
+    access_code_expires_at?: string | null;
+    access_code_used_at?: string | null;
 };
 
 type PatientDetail = {
@@ -49,6 +54,7 @@ type PatientDetail = {
 
 type Measurement = {
     measurement_id: number;
+    queue_id?: number | null;
     queue_number: string;
     weight: number | null;
     height: number | null;
@@ -60,6 +66,16 @@ type Measurement = {
     systolic_bp?: number | null;
     diastolic_bp?: number | null;
     created_at: string;
+};
+
+type PendingHardwarePrint = {
+    message_id: string;
+    device_id: string;
+    mode: 'online' | 'walk_in';
+    measurement_id: number;
+    queue_number: string;
+    weight: number;
+    height: number;
 };
 
 type VitalDraft = {
@@ -79,6 +95,9 @@ type PatientDraft = {
     gender: string;
     blood_type: string;
     phone: string;
+    drug_allergy: string;
+    food_allergy: string;
+    congenital_disease: string;
 };
 
 type QueueFilter = 'all' | 'A' | 'B';
@@ -126,6 +145,9 @@ const emptyPatientDraft: PatientDraft = {
     gender: '',
     blood_type: '',
     phone: '',
+    drug_allergy: '',
+    food_allergy: '',
+    congenital_disease: '',
 };
 
 function getEmptyWalkinDraft(): WalkinDraft {
@@ -232,6 +254,9 @@ type ApprovedAppointment = {
     service_type?: string | null;
     has_measurement?: boolean;
     has_medical_record?: boolean;
+    access_code?: string | null;
+    access_code_expires_at?: string | null;
+    access_code_used_at?: string | null;
 };
 
 type CalendarSlot = {
@@ -241,6 +266,26 @@ type CalendarSlot = {
     status: 'open' | 'locked' | 'closed';
     is_empty?: boolean;
     is_bookable?: boolean;
+};
+
+type AdvanceBookingWeek = {
+    week_start: string;
+    week_end: string;
+    created_at?: string;
+};
+
+type CheckinAppointment = {
+    appointment_id: number;
+    status: string;
+    service_type: string;
+    service_date: string;
+    hour_of_day: number;
+    first_name: string;
+    last_name: string;
+    masked_email?: string | null;
+    queue_number?: string | null;
+    has_measurement?: boolean;
+    checked_in_at?: string | null;
 };
 
 const API = API_BASE.endsWith('/api') ? API_BASE : `${API_BASE}/api`;
@@ -289,6 +334,19 @@ function jsonHeaders() {
 
 function getQueueTime(queue?: QueueTicket | null) {
     if (!queue) return '-';
+
+    if (
+        queue.prefix === 'A' &&
+        queue.hour_of_day !== null &&
+        queue.hour_of_day !== undefined &&
+        Number.isFinite(Number(queue.hour_of_day))
+    ) {
+        return `${String(queue.hour_of_day).padStart(2, '0')}:00 น.`;
+    }
+
+    if (queue.prefix === 'B' && queue.created_at && dayjs(queue.created_at).isValid()) {
+        return `${dayjs(queue.created_at).format('HH:mm')} น.`;
+    }
 
     if (queue.avaliable_date === 'morning') {
         return '07:00 น. - 11:00 น.';
@@ -434,14 +492,31 @@ export default function DashboardPage() {
     const [walkinSaving, setWalkinSaving] = useState(false);
     const [walkinLookupStatus, setWalkinLookupStatus] = useState<'idle' | 'searching' | 'found' | 'not_found'>('idle');
     const [walkinDraft, setWalkinDraft] = useState<WalkinDraft>(() => getEmptyWalkinDraft());
+    const [checkinOpen, setCheckinOpen] = useState(false);
+    const [checkinSearching, setCheckinSearching] = useState(false);
+    const [checkinSavingId, setCheckinSavingId] = useState<number | null>(null);
+    const [checkinIdentity, setCheckinIdentity] = useState({ national_id: '', phone: '' });
+    const [checkinResults, setCheckinResults] = useState<CheckinAppointment[]>([]);
     const lastWalkinLookupKey = useRef('');
+    const patientSelectionVersion = useRef(0);
+    const selectedUserIdRef = useRef<number | null>(null);
+    const selectedQueueIdRef = useRef<number | null>(null);
+    const hardwarePrintsInFlight = useRef<Set<string>>(new Set());
 
     const [, setSymptoms] = useState('');
     const [vitalDraft, setVitalDraft] = useState<VitalDraft>(emptyVitalDraft);
     const [vitalTouched, setVitalTouched] = useState(false);
     const [patientDraft, setPatientDraft] = useState<PatientDraft>(emptyPatientDraft);
     const [patientDraftDirty, setPatientDraftDirty] = useState(false);
+    const [medicalSaving, setMedicalSaving] = useState(false);
+    const [visibleAccessCodeKeys, setVisibleAccessCodeKeys] = useState<Set<string>>(() => new Set());
     const [customHolidays, setCustomHolidays] = useState<string[]>([]);
+    const [calendarMenuOpen, setCalendarMenuOpen] = useState(false);
+    const [queueMenuOpen, setQueueMenuOpen] = useState(false);
+    const [advanceBookingOpen, setAdvanceBookingOpen] = useState(false);
+    const [advanceBookingLoading, setAdvanceBookingLoading] = useState(false);
+    const [advanceBookingSaving, setAdvanceBookingSaving] = useState(false);
+    const [advanceBookingWeeks, setAdvanceBookingWeeks] = useState<AdvanceBookingWeek[]>([]);
     // const todayText = `${dayjs(selectedCalendarDate).format('D MMMM')} ${dayjs(selectedCalendarDate).year() + 543}`;
     const todayText = dayjs().locale("th").format("D MMMM");
     const buddhistYear = dayjs().year() + 543;
@@ -454,6 +529,64 @@ export default function DashboardPage() {
     const setPatientValue = (key: keyof PatientDraft, value: string) => {
         setPatientDraftDirty(true);
         setPatientDraft((current) => ({ ...current, [key]: value }));
+    };
+
+    const searchAppointmentCheckin = async () => {
+        const nationalId = checkinIdentity.national_id.replace(/\D/g, '');
+        const phone = checkinIdentity.phone.replace(/\D/g, '');
+        if (nationalId.length !== 13 || phone.length < 9 || phone.length > 10) {
+            await Swal.fire({ icon: 'warning', title: 'ข้อมูลไม่ครบ', text: 'กรอกเลขบัตรประชาชน 13 หลัก และเบอร์โทรศัพท์ 9-10 หลัก' });
+            return;
+        }
+        try {
+            setCheckinSearching(true);
+            const params = new URLSearchParams({
+                national_id: nationalId,
+                phone,
+            });
+            const response = await fetch(`${API}/appointments/check-in/search?${params}`, { headers: authHeaders(), cache: 'no-store' });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(data?.message || 'ค้นหานัดหมายไม่สำเร็จ');
+            setCheckinResults(Array.isArray(data) ? data : []);
+        } catch (searchError) {
+            await Swal.fire({ icon: 'error', title: 'ค้นหาไม่สำเร็จ', text: searchError instanceof Error ? searchError.message : 'กรุณาลองใหม่' });
+        } finally {
+            setCheckinSearching(false);
+        }
+    };
+
+    const confirmAppointmentCheckin = async (appointment: CheckinAppointment) => {
+        const confirmed = await Swal.fire({
+            icon: 'question',
+                title: 'ยืนยันเลขบัตรประชาชนและเบอร์โทรแล้ว?',
+            text: `${appointment.first_name} ${appointment.last_name} · ${appointment.service_type}`,
+            showCancelButton: true,
+            confirmButtonText: 'ยืนยันและออกรหัส',
+            cancelButtonText: 'ยกเลิก',
+        });
+        if (!confirmed.isConfirmed) return;
+        try {
+            setCheckinSavingId(appointment.appointment_id);
+            const response = await fetch(`${API}/appointments/${appointment.appointment_id}/check-in`, {
+                method: 'POST',
+                headers: jsonHeaders(),
+                body: JSON.stringify({ ...checkinIdentity, verification_note: 'ตรวจเลขบัตรประชาชนและเบอร์โทรศัพท์ที่จุดบริการ' }),
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(data?.message || 'Check-in ไม่สำเร็จ');
+            await Swal.fire({
+                icon: 'success',
+                title: 'Check-in สำเร็จ',
+                html: `<p>หมายเลขคิว <b>${data.queue_number}</b></p><p>รหัสเครื่องชั่ง</p><div style="font-size:32px;font-weight:800;letter-spacing:6px">${data.access_code}</div><p>หมดอายุ ${dayjs(data.expires_at).format('HH:mm น.')}</p>`,
+                confirmButtonText: 'ปิด',
+            });
+            await searchAppointmentCheckin();
+            await fetchQueuesToday();
+        } catch (checkinError) {
+            await Swal.fire({ icon: 'error', title: 'Check-in ไม่สำเร็จ', text: checkinError instanceof Error ? checkinError.message : 'กรุณาลองใหม่' });
+        } finally {
+            setCheckinSavingId(null);
+        }
     };
 
     const setWalkinValue = (key: keyof WalkinDraft, value: string) => {
@@ -587,7 +720,7 @@ export default function DashboardPage() {
                     visit_time: walkinDraft.visit_time,
                     avaliable_date: avaliableDate,
                     receipt_queue: walkinDraft.receipt_queue || null,
-                    service_type: walkinDraft.receipt_queue || 'Walk-in',
+                    service_type: 'Walk-in',
                     patient: {
                         first_name: walkinDraft.first_name,
                         last_name: walkinDraft.last_name,
@@ -613,7 +746,7 @@ export default function DashboardPage() {
             });
             const data = await res.json().catch(() => null);
 
-            if (!res.ok) throw new Error(data?.message || 'บันทึกคิว B ไม่สำเร็จ');
+            if (!res.ok) throw new Error(data?.message || data?.error || 'บันทึกคิว B ไม่สำเร็จ');
 
             await fetchQueuesToday();
             await fetchApprovedAppointments();
@@ -644,13 +777,163 @@ export default function DashboardPage() {
         return new Set(customHolidays);
     }, [customHolidays]);
 
+    const advanceWeekRange = useMemo(() => {
+        const today = now.startOf('day');
+        const isoDay = today.day() === 0 ? 7 : today.day();
+        const weekStart = today.add(8 - isoDay, 'day');
+        const monthEnd = today.endOf('month').startOf('day');
+
+        if (!weekStart.isSame(today, 'month')) return null;
+
+        const fullWeekEnd = weekStart.add(6, 'day');
+        const weekEnd = fullWeekEnd.isAfter(monthEnd) ? monthEnd : fullWeekEnd;
+        return {
+            start: weekStart.format('YYYY-MM-DD'),
+            end: weekEnd.format('YYYY-MM-DD'),
+        };
+    }, [now]);
+
+    const isAdvanceWeekOpen = Boolean(
+        advanceWeekRange && advanceBookingWeeks.some((week) => week.week_start === advanceWeekRange.start)
+    );
+
+    const openAdvanceBookingManager = async () => {
+        setCalendarMenuOpen(false);
+        setAdvanceBookingOpen(true);
+        setAdvanceBookingLoading(true);
+        try {
+            const response = await fetch(`${API}/calendar/advance-booking-weeks`, {
+                headers: authHeaders(),
+                cache: 'no-store',
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(data?.error || 'โหลดข้อมูลการเปิดจองล่วงหน้าไม่สำเร็จ');
+            setAdvanceBookingWeeks(Array.isArray(data) ? data : []);
+        } catch (error) {
+            setAdvanceBookingOpen(false);
+            Swal.fire({
+                icon: 'error',
+                title: 'โหลดข้อมูลไม่สำเร็จ',
+                text: getErrorMessage(error, 'เกิดข้อผิดพลาด'),
+                confirmButtonColor: '#167d8d',
+            });
+        } finally {
+            setAdvanceBookingLoading(false);
+        }
+    };
+
+    const confirmAdvanceBooking = async () => {
+        if (!advanceWeekRange || isAdvanceWeekOpen) return;
+
+        setAdvanceBookingSaving(true);
+        try {
+            const response = await fetch(`${API}/calendar/advance-booking-weeks`, {
+                method: 'POST',
+                headers: jsonHeaders(),
+                body: JSON.stringify({ week_start: advanceWeekRange.start }),
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(data?.error || 'เปิดจองล่วงหน้าไม่สำเร็จ');
+
+            setAdvanceBookingWeeks((current) => [...current, data]);
+            await fetchCalendarMonth();
+            setAdvanceBookingOpen(false);
+            Swal.fire({
+                icon: 'success',
+                title: 'เปิดจองล่วงหน้าแล้ว',
+                text: `ผู้ใช้สามารถจองวันที่ ${dayjs(data.week_start).locale('th').format('D MMMM')} - ${dayjs(data.week_end).locale('th').format('D MMMM')} ได้แล้ว`,
+                timer: 1800,
+                showConfirmButton: false,
+            });
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'เปิดจองล่วงหน้าไม่สำเร็จ',
+                text: getErrorMessage(error, 'เกิดข้อผิดพลาด'),
+                confirmButtonColor: '#167d8d',
+            });
+        } finally {
+            setAdvanceBookingSaving(false);
+        }
+    };
+
+    const cancelAdvanceBooking = async () => {
+        if (!advanceWeekRange || !isAdvanceWeekOpen) return;
+
+        const confirmation = await Swal.fire({
+            icon: 'warning',
+            title: 'ยกเลิกการเปิดจองล่วงหน้า?',
+            text: 'หลังยืนยัน ผู้ใช้จะไม่สามารถเลือกจองสัปดาห์นี้ได้',
+            showCancelButton: true,
+            confirmButtonText: 'ยืนยันการยกเลิก',
+            cancelButtonText: 'กลับไปตรวจสอบ',
+            confirmButtonColor: '#dc5a64',
+            cancelButtonColor: '#78939b',
+            reverseButtons: true,
+            customClass: {
+                container: styles.advanceBookingConfirmLayer,
+            },
+        });
+        if (!confirmation.isConfirmed) return;
+
+        setAdvanceBookingSaving(true);
+        try {
+            const response = await fetch(
+                `${API}/calendar/advance-booking-weeks/${advanceWeekRange.start}`,
+                { method: 'DELETE', headers: authHeaders() },
+            );
+            const data = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(data?.error || 'ยกเลิกการเปิดจองล่วงหน้าไม่สำเร็จ');
+
+            setAdvanceBookingWeeks((current) =>
+                current.filter((week) => week.week_start !== advanceWeekRange.start)
+            );
+            setAdvanceBookingOpen(false);
+            Swal.fire({
+                icon: 'success',
+                title: 'ยกเลิกการเปิดจองแล้ว',
+                text: 'ช่วงวันที่ดังกล่าวกลับสู่สถานะยังไม่เปิดจองล่วงหน้า',
+                timer: 1700,
+                showConfirmButton: false,
+            });
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'ไม่สามารถยกเลิกได้',
+                text: getErrorMessage(error, 'เกิดข้อผิดพลาด'),
+                confirmButtonColor: '#167d8d',
+                customClass: {
+                    container: styles.advanceBookingConfirmLayer,
+                },
+            });
+        } finally {
+            setAdvanceBookingSaving(false);
+        }
+    };
+
     const selectQueue = (queue: QueueTicket) => {
+        patientSelectionVersion.current += 1;
+        selectedUserIdRef.current = queue.user_id;
+        selectedQueueIdRef.current = queue.queue_id;
+        setPatient(null);
+        setLatestMeasurement(null);
+        setVitalDraft(emptyVitalDraft);
+        setVitalTouched(false);
+        setSyncedMeasurementId(null);
         setSelectedAppointment(null);
         setSelectedQueue(queue);
         setPatientPanelOpen(true);
     };
 
     const selectAppointment = (appointment: ApprovedAppointment) => {
+        patientSelectionVersion.current += 1;
+        selectedUserIdRef.current = appointment.user_id;
+        selectedQueueIdRef.current = appointment.queue_id ?? null;
+        setPatient(null);
+        setLatestMeasurement(null);
+        setVitalDraft(emptyVitalDraft);
+        setVitalTouched(false);
+        setSyncedMeasurementId(null);
         setSelectedQueue(null);
         setSelectedAppointment(appointment);
         setPatientPanelOpen(true);
@@ -927,9 +1210,12 @@ export default function DashboardPage() {
         }
     };
 
-    const fetchPatientDetail = async (userId?: number | null) => {
+    const fetchPatientDetail = async (
+        userId?: number | null,
+        selectionVersion = patientSelectionVersion.current,
+    ) => {
         if (!userId) {
-            setPatient(null);
+            if (selectionVersion === patientSelectionVersion.current) setPatient(null);
             return;
         }
 
@@ -943,16 +1229,27 @@ export default function DashboardPage() {
             }
 
             const data: PatientDetail = await res.json();
+            if (
+                selectionVersion !== patientSelectionVersion.current ||
+                selectedUserIdRef.current !== userId ||
+                Number(data.user_id) !== Number(userId)
+            ) return;
             setPatient(data);
         } catch (error) {
             console.error('fetchPatientDetail:', error);
-            setPatient(null);
+            if (
+                selectionVersion === patientSelectionVersion.current &&
+                selectedUserIdRef.current === userId
+            ) setPatient(null);
         }
     };
 
-    const fetchLatestMeasurement = async (queueId?: number | null) => {
+    const fetchLatestMeasurement = async (
+        queueId?: number | null,
+        selectionVersion = patientSelectionVersion.current,
+    ) => {
         if (!queueId) {
-            setLatestMeasurement(null);
+            if (selectionVersion === patientSelectionVersion.current) setLatestMeasurement(null);
             return;
         }
 
@@ -967,14 +1264,27 @@ export default function DashboardPage() {
 
             const data: Measurement[] = await res.json();
 
+            if (
+                selectionVersion !== patientSelectionVersion.current ||
+                selectedQueueIdRef.current !== queueId
+            ) return;
+
             if (data.length > 0) {
-                setLatestMeasurement(data[0]);
+                const measurement = data[0];
+                if (measurement.queue_id != null && Number(measurement.queue_id) !== Number(queueId)) {
+                    setLatestMeasurement(null);
+                    return;
+                }
+                setLatestMeasurement(measurement);
             } else {
                 setLatestMeasurement(null);
             }
         } catch (error) {
             console.error('fetchLatestMeasurement:', error);
-            setLatestMeasurement(null);
+            if (
+                selectionVersion === patientSelectionVersion.current &&
+                selectedQueueIdRef.current === queueId
+            ) setLatestMeasurement(null);
         }
     };
 
@@ -1010,6 +1320,9 @@ export default function DashboardPage() {
                 gender: patientDraft.gender.trim(),
                 blood_type: patientDraft.blood_type.trim(),
                 phone: patientDraft.phone.trim(),
+                drug_allergy: patientDraft.drug_allergy.trim(),
+                food_allergy: patientDraft.food_allergy.trim(),
+                congenital_disease: patientDraft.congenital_disease.trim(),
             }),
         });
 
@@ -1042,6 +1355,15 @@ export default function DashboardPage() {
             if (!holidayRes.ok) throw new Error('โหลดวันหยุดไม่สำเร็จ');
             const holidayData: Array<{ holiday_date: string }> = await holidayRes.json();
             setCustomHolidays(holidayData.map((item) => dayjs(item.holiday_date).format('YYYY-MM-DD')));
+
+            const advanceRes = await fetch(`${API}/calendar/advance-booking-weeks`, {
+                headers: authHeaders(),
+                cache: 'no-store',
+            });
+            if (advanceRes.ok) {
+                const advanceData: AdvanceBookingWeek[] = await advanceRes.json();
+                setAdvanceBookingWeeks(Array.isArray(advanceData) ? advanceData : []);
+            }
         } catch (error) {
             console.error('fetchCalendarMonth:', error);
             setCalendarSlots([]);
@@ -1052,11 +1374,13 @@ export default function DashboardPage() {
         const selectedUserId = selectedQueue?.user_id ?? selectedAppointment?.user_id;
         const selectedVisitDate = selectedQueue?.service_date ?? selectedAppointment?.service_date ?? null;
         const measurementQueueId = selectedQueue?.queue_id ?? selectedAppointment?.queue_id ?? null;
+        const medicalPopupClass = { container: styles.medicalSaveConfirmLayer };
 
         if (!selectedQueue && !selectedAppointment) {
             Swal.fire({
                 icon: 'warning',
                 title: 'กรุณาเลือกคิวก่อน',
+                customClass: medicalPopupClass,
             });
             return;
         }
@@ -1066,26 +1390,55 @@ export default function DashboardPage() {
                 icon: 'warning',
                 title: 'ไม่พบข้อมูลผู้ป่วย',
                 text: 'คิวนี้อาจเป็น walk-in ที่ยังไม่ได้ผูกกับผู้ป่วย',
+                customClass: medicalPopupClass,
             });
             return;
         }
 
+        if (!selectedVisitDate || dayjs(selectedVisitDate).format('YYYY-MM-DD') !== now.format('YYYY-MM-DD')) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'ยังไม่สามารถบันทึกได้',
+                text: 'บันทึกข้อมูลได้เฉพาะวันที่ผู้ป่วยมีนัดหรือมีคิวเข้ารับบริการเท่านั้น',
+                customClass: medicalPopupClass,
+            });
+            return;
+        }
+
+        const hasVitalDraft = Object.values(vitalDraft).some((value) => value.trim());
+        const parsedBp = parseBpValue(vitalDraft.bp);
+
+        if (vitalDraft.bp.trim() && !parsedBp) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'รูปแบบ BP ไม่ถูกต้อง',
+                text: 'กรุณากรอกความดันเป็นรูปแบบ เช่น 120/80',
+                confirmButtonColor: '#0f766e',
+                customClass: medicalPopupClass,
+            });
+            return;
+        }
+
+        const confirmation = await Swal.fire({
+            icon: 'question',
+            title: 'ยืนยันการบันทึกข้อมูล?',
+            text: `ต้องการบันทึกข้อมูลของ ${selectedPatientName || selectedDisplayNumber} คิว ${selectedDisplayNumber} วันที่ ${dayjs(selectedVisitDate).locale('th').format('D MMMM')} ${dayjs(selectedVisitDate).year() + 543} ใช่หรือไม่`,
+            showCancelButton: true,
+            confirmButtonText: 'ยืนยันบันทึก',
+            cancelButtonText: 'ตรวจสอบอีกครั้ง',
+            confirmButtonColor: '#0f766e',
+            cancelButtonColor: '#64748b',
+            reverseButtons: true,
+            customClass: medicalPopupClass,
+        });
+
+        if (!confirmation.isConfirmed) return;
+
+        setMedicalSaving(true);
         try {
             await savePatientDraft(selectedUserId);
 
             let savedMeasurement = latestMeasurement;
-            const hasVitalDraft = Object.values(vitalDraft).some((value) => value.trim());
-            const parsedBp = parseBpValue(vitalDraft.bp);
-
-            if (vitalDraft.bp.trim() && !parsedBp) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'รูปแบบ BP ไม่ถูกต้อง',
-                    text: 'กรุณากรอกความดันเป็นรูปแบบ เช่น 120/80',
-                    confirmButtonColor: '#0f766e',
-                });
-                return;
-            }
 
             if (measurementQueueId && hasVitalDraft) {
                 const measurementRes = await fetch(`${API}/measurements`, {
@@ -1116,24 +1469,33 @@ export default function DashboardPage() {
                 setSyncedMeasurementId(savedMeasurement?.measurement_id ?? null);
             }
 
-            Swal.fire({
+            await Promise.all([fetchQueuesToday(), fetchApprovedAppointments()]);
+
+            await Swal.fire({
                 icon: 'success',
                 title: 'บันทึกข้อมูลสำเร็จ',
-                timer: 1300,
-                showConfirmButton: false,
+                text: 'ระบบบันทึกข้อมูลผู้ป่วยเรียบร้อยแล้ว',
+                confirmButtonText: 'กลับสู่ Dashboard',
+                confirmButtonColor: '#0f766e',
+                customClass: medicalPopupClass,
             });
 
             setSymptoms('');
             setVitalDraft(emptyVitalDraft);
             setVitalTouched(false);
             setSyncedMeasurementId(null);
-            await Promise.all([fetchQueuesToday(), fetchApprovedAppointments()]);
+            setPatientPanelOpen(false);
+            setSelectedQueue(null);
+            setSelectedAppointment(null);
         } catch (error: unknown) {
-            Swal.fire({
+            await Swal.fire({
                 icon: 'error',
                 title: 'บันทึกไม่สำเร็จ',
                 text: getErrorMessage(error, 'เกิดข้อผิดพลาด'),
+                customClass: medicalPopupClass,
             });
+        } finally {
+            setMedicalSaving(false);
         }
     };
 
@@ -1151,6 +1513,8 @@ export default function DashboardPage() {
         };
 
         init();
+    // Initial dashboard hydration only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -1162,6 +1526,65 @@ export default function DashboardPage() {
     }, []);
 
     useEffect(() => {
+        let active = true;
+
+        const refreshHardwareQueues = async () => {
+            try {
+                const response = await fetch(`${API}/today`, { headers: authHeaders() });
+                if (!response.ok || !active) return;
+                const data: QueueTicket[] = await response.json();
+                if (!active) return;
+                setQueues(data);
+                setSelectedQueue((current) => {
+                    if (!current) return current;
+                    return data.find((queue) => queue.queue_id === current.queue_id) || null;
+                });
+            } catch (error) {
+                console.error('refreshHardwareQueues:', error);
+            }
+        };
+
+        const processHardwarePrints = async () => {
+            try {
+                const response = await fetch(`${API}/hardware/pending-print`, {
+                    headers: authHeaders(),
+                });
+                if (!response.ok || !active) return;
+                const jobs: PendingHardwarePrint[] = await response.json();
+
+                await Promise.all(jobs.map(async (job) => {
+                    if (hardwarePrintsInFlight.current.has(job.message_id)) return;
+                    const bmi = calcBmiText(String(job.weight), String(job.height));
+                    if (!bmi) return;
+
+                    hardwarePrintsInFlight.current.add(job.message_id);
+                    try {
+                        await fetch(`${API}/hardware/print`, {
+                            method: 'POST',
+                            headers: jsonHeaders(),
+                            body: JSON.stringify({ message_id: job.message_id, bmi: Number(bmi) }),
+                        });
+                    } finally {
+                        hardwarePrintsInFlight.current.delete(job.message_id);
+                    }
+                }));
+            } catch (error) {
+                console.error('processHardwarePrints:', error);
+            }
+        };
+
+        const queueTimer = window.setInterval(refreshHardwareQueues, 5000);
+        const printTimer = window.setInterval(processHardwarePrints, 2000);
+        processHardwarePrints();
+
+        return () => {
+            active = false;
+            window.clearInterval(queueTimer);
+            window.clearInterval(printTimer);
+        };
+    }, []);
+
+    useEffect(() => {
         if (!walkinOpen) return;
 
         const timer = window.setTimeout(() => {
@@ -1169,37 +1592,37 @@ export default function DashboardPage() {
         }, 650);
 
         return () => window.clearTimeout(timer);
+    // The draft fields are the debounce triggers; the lookup function reads their latest values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [walkinOpen, walkinDraft.national_id, walkinDraft.first_name, walkinDraft.last_name]);
 
     useEffect(() => {
         fetchApprovedAppointments();
         fetchCalendarMonth();
+    // Calendar month is the only intended refresh trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [calendarMonth]);
 
     useEffect(() => {
+        const selectionVersion = ++patientSelectionVersion.current;
+        const selectedUserId = selectedQueue?.user_id ?? selectedAppointment?.user_id ?? null;
+        const selectedQueueId = selectedQueue?.queue_id ?? selectedAppointment?.queue_id ?? null;
+        selectedUserIdRef.current = selectedUserId;
+        selectedQueueIdRef.current = selectedQueueId;
+
+        setPatient(null);
+        setLatestMeasurement(null);
+        setSymptoms('');
+        setVitalDraft(emptyVitalDraft);
+        setVitalTouched(false);
+        setPatientDraft(emptyPatientDraft);
+        setPatientDraftDirty(false);
+        setSyncedMeasurementId(null);
+
         if (selectedQueue || selectedAppointment) {
-            fetchPatientDetail(selectedQueue?.user_id ?? selectedAppointment?.user_id);
+            fetchPatientDetail(selectedUserId, selectionVersion);
 
-            const queueId = selectedQueue?.queue_id ?? selectedAppointment?.queue_id ?? null;
-            if (queueId) {
-                fetchLatestMeasurement(queueId);
-            } else {
-                setLatestMeasurement(null);
-            }
-
-            setSymptoms('');
-            setVitalDraft(emptyVitalDraft);
-            setVitalTouched(false);
-            setSyncedMeasurementId(null);
-        } else {
-            setPatient(null);
-            setLatestMeasurement(null);
-            setSymptoms('');
-            setVitalDraft(emptyVitalDraft);
-            setVitalTouched(false);
-            setPatientDraft(emptyPatientDraft);
-            setPatientDraftDirty(false);
-            setSyncedMeasurementId(null);
+            if (selectedQueueId) fetchLatestMeasurement(selectedQueueId, selectionVersion);
         }
     }, [selectedQueue, selectedAppointment]);
 
@@ -1218,12 +1641,20 @@ export default function DashboardPage() {
             gender: stringifyMeasurement(patient.gender),
             blood_type: stringifyMeasurement(patient.blood_type),
             phone: stringifyMeasurement(patient.phone),
+            drug_allergy: stringifyMeasurement(patient.drug_allergy),
+            food_allergy: stringifyMeasurement(patient.food_allergy),
+            congenital_disease: stringifyMeasurement(patient.congenital_disease),
         });
         setPatientDraftDirty(false);
     }, [patient]);
 
     useEffect(() => {
         if (!latestMeasurement || latestMeasurement.measurement_id === syncedMeasurementId || vitalTouched) return;
+        const activeQueueId = selectedQueue?.queue_id ?? selectedAppointment?.queue_id ?? null;
+        if (
+            !activeQueueId ||
+            (latestMeasurement.queue_id != null && Number(latestMeasurement.queue_id) !== Number(activeQueueId))
+        ) return;
 
         setVitalDraft({
             cc: stringifyMeasurement(latestMeasurement.chief_complaint),
@@ -1235,17 +1666,18 @@ export default function DashboardPage() {
             bp: formatBpValue(latestMeasurement.systolic_bp, latestMeasurement.diastolic_bp),
         });
         setSyncedMeasurementId(latestMeasurement.measurement_id);
-    }, [latestMeasurement, syncedMeasurementId, vitalTouched]);
+    }, [latestMeasurement, selectedAppointment?.queue_id, selectedQueue?.queue_id, syncedMeasurementId, vitalTouched]);
 
     useEffect(() => {
-        if (!selectedQueue) return;
+        const activeQueueId = selectedQueue?.queue_id ?? selectedAppointment?.queue_id ?? null;
+        if (!activeQueueId) return;
 
         const measurementTimer = window.setInterval(() => {
-            fetchLatestMeasurement(selectedQueue.queue_id);
+            fetchLatestMeasurement(activeQueueId, patientSelectionVersion.current);
         }, 5000);
 
         return () => window.clearInterval(measurementTimer);
-    }, [selectedQueue]);
+    }, [selectedAppointment?.queue_id, selectedQueue?.queue_id]);
 
     const selectedPatientName = `${patientDraft.first_name || ''} ${patientDraft.last_name || ''}`.trim();
     const liveBmiText = calcBmiText(vitalDraft.bw, vitalDraft.ht);
@@ -1260,11 +1692,52 @@ export default function DashboardPage() {
     const selectedDisplayNumber = selectedQueue?.queue_number || selectedAppointment?.queue_number || (selectedAppointment ? getAppointmentTime(selectedAppointment) : '-');
     const selectedTimeText = selectedQueue ? getQueueTime(selectedQueue) : getAppointmentTime(selectedAppointment);
     const selectedSourceText = patient?.patient_code || selectedQueue?.source || selectedAppointment?.service_type || '-';
-    const selectedSessionBadge = selectedAppointment && !selectedQueue
-        ? selectedAppointment.hour_of_day < 12
-            ? 'นัดหมายช่วงเช้า'
-            : 'นัดหมายช่วงบ่าย'
-        : selectedQueueMeta;
+    const selectedSessionBadge = selectedQueue?.prefix === 'B'
+        ? 'Walk-in'
+        : selectedAppointment && !selectedQueue
+            ? selectedAppointment.hour_of_day < 12
+                ? 'นัดหมายช่วงเช้า'
+                : 'นัดหมายช่วงบ่าย'
+            : selectedQueueMeta;
+    const selectedVisitDate = selectedQueue?.service_date ?? selectedAppointment?.service_date ?? null;
+    const selectedVisitIsToday = Boolean(
+        selectedVisitDate && dayjs(selectedVisitDate).format('YYYY-MM-DD') === now.format('YYYY-MM-DD'),
+    );
+
+    const visibleAccessCode = (item: QueueTicket | ApprovedAppointment) => {
+        if (!item.access_code || item.access_code_used_at || !item.access_code_expires_at) return null;
+        return dayjs(item.access_code_expires_at).valueOf() > now.valueOf() ? item.access_code : null;
+    };
+
+    const renderAccessCode = (item: QueueTicket | ApprovedAppointment, key: string) => {
+        const code = visibleAccessCode(item);
+        if (!code) return null;
+
+        const isHidden = !visibleAccessCodeKeys.has(key);
+        return (
+            <span className={styles.accessCodeBadge}>
+                <span>รหัสชั่ง {isHidden ? '••••••' : code}</span>
+                <button
+                    type="button"
+                    className={styles.accessCodeEyeButton}
+                    aria-label={isHidden ? 'แสดงรหัสเครื่องชั่ง' : 'ซ่อนรหัสเครื่องชั่ง'}
+                    title={isHidden ? 'แสดงรหัสเครื่องชั่ง' : 'ซ่อนรหัสเครื่องชั่ง'}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        setVisibleAccessCodeKeys((current) => {
+                            const next = new Set(current);
+                            if (next.has(key)) next.delete(key);
+                            else next.add(key);
+                            return next;
+                        });
+                    }}
+                    onKeyDown={(event) => event.stopPropagation()}
+                >
+                    {isHidden ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+            </span>
+        );
+    };
 
     const selectedCalendarAppointments = appointments.filter((item) =>
         dayjs(item.service_date).format('YYYY-MM-DD') === selectedCalendarDate
@@ -1385,6 +1858,38 @@ export default function DashboardPage() {
                 <AdminHeaderActions />
             </header>
 
+            {checkinOpen && (
+                <div className={styles.walkinOverlay} onMouseDown={() => setCheckinOpen(false)}>
+                    <div className={styles.checkinModal} onMouseDown={(event) => event.stopPropagation()}>
+                        <div className={styles.walkinHeader}>
+                            <div><p>Appointment Check-in</p><h2>ค้นหานัดหมายและออกรหัสเครื่องชั่ง</h2></div>
+                            <button type="button" onClick={() => setCheckinOpen(false)}>×</button>
+                        </div>
+                        <div className={styles.checkinBody}>
+                            <div className={styles.checkinSearchGrid}>
+                                <label>เลขบัตรประชาชน<input value={checkinIdentity.national_id} maxLength={13} onChange={(event) => setCheckinIdentity((current) => ({ ...current, national_id: event.target.value.replace(/\D/g, '') }))} /></label>
+                                <label>เบอร์โทรศัพท์<input value={checkinIdentity.phone} maxLength={10} inputMode="tel" onChange={(event) => setCheckinIdentity((current) => ({ ...current, phone: event.target.value.replace(/\D/g, '') }))} /></label>
+                                <button type="button" onClick={searchAppointmentCheckin} disabled={checkinSearching}>{checkinSearching ? 'กำลังค้นหา...' : 'ค้นหานัดหมายวันนี้'}</button>
+                            </div>
+                            <div className={styles.checkinResults}>
+                                {checkinResults.length === 0 ? <p>ยังไม่พบรายการนัดหมาย</p> : checkinResults.map((item) => (
+                                    <article key={item.appointment_id}>
+                                        <div>
+                                            <strong>{item.first_name} {item.last_name}</strong>
+                                            <p>{item.service_type} · {String(item.hour_of_day).padStart(2, '0')}:00 น. · {item.masked_email || 'ไม่มีอีเมล'}</p>
+                                            <small>สถานะ {item.status} · คิว {item.queue_number || '-'}</small>
+                                        </div>
+                                        <button type="button" disabled={checkinSavingId === item.appointment_id || item.has_measurement} onClick={() => confirmAppointmentCheckin(item)}>
+                                            {item.has_measurement ? 'ชั่งแล้ว' : checkinSavingId === item.appointment_id ? 'กำลังออก...' : 'ยืนยันและ Check-in'}
+                                        </button>
+                                    </article>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {walkinOpen && (
                 <div className={styles.walkinOverlay} onMouseDown={() => setWalkinOpen(false)}>
                     <div className={styles.walkinModal} onMouseDown={(event) => event.stopPropagation()}>
@@ -1441,8 +1946,16 @@ export default function DashboardPage() {
                                     </div>
                                 </label>
                                 <label>
-                                    <span>คิวที่ใบเสร็จ</span>
-                                    <input value={walkinDraft.receipt_queue} onChange={(event) => setWalkinValue('receipt_queue', event.target.value)} placeholder="เช่น R001" />
+                                    <span>หมายเลขคิว Walk-in</span>
+                                    <input
+                                        value={walkinDraft.receipt_queue}
+                                        onChange={(event) => {
+                                            const value = event.target.value.toUpperCase();
+                                            const digits = value.replace(/\D/g, '').slice(0, 3);
+                                            setWalkinValue('receipt_queue', value ? `B${digits}` : '');
+                                        }}
+                                        placeholder="เช่น B001"
+                                    />
                                 </label>
                                 <button type="button" className={styles.walkinNowBtn} onClick={useCurrentWalkinDateTime}>
                                     ใช้วันเดือนปีและเวลาปัจจุบัน
@@ -1610,28 +2123,74 @@ export default function DashboardPage() {
                             <div className={styles.queueTypeLegend}>
                                 <button
                                     type="button"
-                                    className={queueFilter === 'all' ? styles.queueFilterActive : ''}
-                                    onClick={() => setQueueFilter('all')}
+                                    className={styles.calendarMenuButton}
+                                    aria-label="เปิดเมนูจัดการคิว"
+                                    aria-haspopup="menu"
+                                    aria-expanded={queueMenuOpen}
+                                    onClick={() => setQueueMenuOpen((open) => !open)}
                                 >
-                                    ทั้งหมด
+                                    <span />
+                                    <span />
+                                    <span />
+                                </button>
+                                {queueMenuOpen && (
+                                <div className={styles.queueMenuContent} role="menu">
+                                <p className={styles.queueMenuLabel}>ตัวกรองคิว</p>
+                                <button
+                                    type="button"
+                                    className={`${styles.queueMenuItem} ${queueFilter === 'all' ? styles.queueFilterActive : ''}`}
+                                    aria-current={queueFilter === 'all' ? 'true' : undefined}
+                                    onClick={() => { setQueueFilter('all'); setQueueMenuOpen(false); }}
+                                >
+                                    <span className={`${styles.queueMenuIcon} ${styles.queueMenuIconAll}`}><ListFilter size={20} /></span>
+                                    <span className={styles.queueMenuText}>
+                                        <strong>คิวทั้งหมด</strong>
+                                        <small>แสดงคิวออนไลน์และคิวหน้าคลินิก</small>
+                                    </span>
                                 </button>
                                 <button
                                     type="button"
-                                    className={`${styles.onlineQueueLegend} ${queueFilter === 'A' ? styles.queueFilterActive : ''}`}
-                                    onClick={() => setQueueFilter('A')}
+                                    className={`${styles.queueMenuItem} ${queueFilter === 'A' ? styles.queueFilterActive : ''}`}
+                                    aria-current={queueFilter === 'A' ? 'true' : undefined}
+                                    onClick={() => { setQueueFilter('A'); setQueueMenuOpen(false); }}
                                 >
-                                    <b>A</b> จองออนไลน์
+                                    <span className={`${styles.queueMenuIcon} ${styles.queueMenuIconOnline}`}><CalendarCheck size={20} /></span>
+                                    <span className={styles.queueMenuText}>
+                                        <strong>คิวจองออนไลน์</strong>
+                                        <small>แสดงเฉพาะผู้ป่วยคิว A</small>
+                                    </span>
                                 </button>
                                 <button
                                     type="button"
-                                    className={`${styles.walkinQueueLegend} ${queueFilter === 'B' ? styles.queueFilterActive : ''}`}
-                                    onClick={() => setQueueFilter('B')}
+                                    className={`${styles.queueMenuItem} ${queueFilter === 'B' ? styles.queueFilterActive : ''}`}
+                                    aria-current={queueFilter === 'B' ? 'true' : undefined}
+                                    onClick={() => { setQueueFilter('B'); setQueueMenuOpen(false); }}
                                 >
-                                    <b>B</b> ผู้ป่วยมาถึงคลินิก
+                                    <span className={`${styles.queueMenuIcon} ${styles.queueMenuIconWalkin}`}><Users size={20} /></span>
+                                    <span className={styles.queueMenuText}>
+                                        <strong>คิวผู้ป่วย Walk-in</strong>
+                                        <small>แสดงเฉพาะผู้ป่วยคิว B</small>
+                                    </span>
                                 </button>
-                                <button type="button" className={styles.addWalkinBtn} onClick={openWalkinForm}>
-                                    เพิ่มคิว B
+
+                                <div className={styles.queueMenuDivider} />
+                                <p className={styles.queueMenuLabel}>จัดการคิว</p>
+                                <button type="button" className={styles.queueMenuItem} onClick={() => { setQueueMenuOpen(false); openWalkinForm(); }}>
+                                    <span className={`${styles.queueMenuIcon} ${styles.queueMenuIconAdd}`}><UserPlus size={20} /></span>
+                                    <span className={styles.queueMenuText}>
+                                        <strong>เพิ่มผู้ป่วย Walk-in</strong>
+                                        <small>สร้างคิว B สำหรับผู้ป่วยหน้าคลินิก</small>
+                                    </span>
                                 </button>
+                                <button type="button" className={styles.queueMenuItem} onClick={() => { setQueueMenuOpen(false); setCheckinResults([]); setCheckinOpen(true); }}>
+                                    <span className={`${styles.queueMenuIcon} ${styles.queueMenuIconCheckin}`}><Search size={20} /></span>
+                                    <span className={styles.queueMenuText}>
+                                        <strong>ตรวจสอบนัดและ Check-in</strong>
+                                        <small>ค้นด้วยเลขบัตรประชาชนและเบอร์โทร</small>
+                                    </span>
+                                </button>
+                                </div>
+                                )}
                             </div>
 
                             <div className={styles.queueCardsGrid}>
@@ -1644,11 +2203,18 @@ export default function DashboardPage() {
                                     <div className={styles.queueCardBody}>
                                         {selectedDateIsToday && visibleMorningQueues.length > 0 ? (
                                             visibleMorningQueues.map((queue, index) => (
-                                                <button
+                                                <div
                                                     key={queue.queue_id}
-                                                    type="button"
+                                                    role="button"
+                                                    tabIndex={0}
                                                     className={`${styles.queueItem} ${selectedQueue?.queue_id === queue.queue_id ? styles.queueItemActive : ''}`}
                                                     onClick={() => selectQueue(queue)}
+                                                    onKeyDown={(event) => {
+                                                        if (event.key === 'Enter' || event.key === ' ') {
+                                                            event.preventDefault();
+                                                            selectQueue(queue);
+                                                        }
+                                                    }}
                                                 >
                                                     <span className={styles.queueNo}>{index + 1}</span>
 
@@ -1657,17 +2223,26 @@ export default function DashboardPage() {
                                                         <small>{getQueueTypeLabel(queue.prefix)} • {queue.service_type || 'ตรวจทั่วไป'} • {getQueueTime(queue)}</small>
                                                     </span>
 
+                                                    {renderAccessCode(queue, `queue:${queue.queue_id}`)}
+
                                                     <span className={statusBadgeClass(getVisitStatus(queue))}>{statusText(getVisitStatus(queue))}</span>
                                                     <span className={styles.eyeMark}>ดู</span>
-                                                </button>
+                                                </div>
                                             ))
                                         ) : visibleMorningAppointments.length > 0 ? (
                                             visibleMorningAppointments.map((item, index) => (
-                                                <button
+                                                <div
                                                     key={item.appointment_id}
-                                                    type="button"
+                                                    role="button"
+                                                    tabIndex={0}
                                                     className={`${styles.queueItem} ${selectedAppointment?.appointment_id === item.appointment_id ? styles.queueItemActive : ''}`}
                                                     onClick={() => selectAppointment(item)}
+                                                    onKeyDown={(event) => {
+                                                        if (event.key === 'Enter' || event.key === ' ') {
+                                                            event.preventDefault();
+                                                            selectAppointment(item);
+                                                        }
+                                                    }}
                                                 >
                                                     <span className={styles.queueNo}>{getAppointmentOrderLabel(item, index)}</span>
 
@@ -1676,9 +2251,11 @@ export default function DashboardPage() {
                                                         <small>{appointmentName(item)} • {getAppointmentTime(item)}</small>
                                                     </span>
 
+                                                    {renderAccessCode(item, `appointment:${item.appointment_id}`)}
+
                                                     <span className={statusBadgeClass(getVisitStatus(item))}>{statusText(getVisitStatus(item))}</span>
                                                     <span className={styles.eyeMark}>ดู</span>
-                                                </button>
+                                                </div>
                                             ))
                                         ) : (
                                             <div className={styles.emptyQueue}>
@@ -1698,11 +2275,18 @@ export default function DashboardPage() {
                                     <div className={styles.queueCardBody}>
                                         {selectedDateIsToday && visibleAfternoonQueues.length > 0 ? (
                                             visibleAfternoonQueues.map((queue, index) => (
-                                                <button
+                                                <div
                                                     key={queue.queue_id}
-                                                    type="button"
+                                                    role="button"
+                                                    tabIndex={0}
                                                     className={`${styles.queueItem} ${selectedQueue?.queue_id === queue.queue_id ? styles.queueItemActive : ''}`}
                                                     onClick={() => selectQueue(queue)}
+                                                    onKeyDown={(event) => {
+                                                        if (event.key === 'Enter' || event.key === ' ') {
+                                                            event.preventDefault();
+                                                            selectQueue(queue);
+                                                        }
+                                                    }}
                                                 >
                                                     <span className={styles.queueNo}>{index + 1}</span>
 
@@ -1711,17 +2295,26 @@ export default function DashboardPage() {
                                                         <small>{getQueueTypeLabel(queue.prefix)} • {queue.service_type || 'ตรวจทั่วไป'} • {getQueueTime(queue)}</small>
                                                     </span>
 
+                                                    {renderAccessCode(queue, `queue:${queue.queue_id}`)}
+
                                                     <span className={statusBadgeClass(getVisitStatus(queue))}>{statusText(getVisitStatus(queue))}</span>
                                                     <span className={styles.eyeMark}>ดู</span>
-                                                </button>
+                                                </div>
                                             ))
                                         ) : visibleAfternoonAppointments.length > 0 ? (
                                             visibleAfternoonAppointments.map((item, index) => (
-                                                <button
+                                                <div
                                                     key={item.appointment_id}
-                                                    type="button"
+                                                    role="button"
+                                                    tabIndex={0}
                                                     className={`${styles.queueItem} ${selectedAppointment?.appointment_id === item.appointment_id ? styles.queueItemActive : ''}`}
                                                     onClick={() => selectAppointment(item)}
+                                                    onKeyDown={(event) => {
+                                                        if (event.key === 'Enter' || event.key === ' ') {
+                                                            event.preventDefault();
+                                                            selectAppointment(item);
+                                                        }
+                                                    }}
                                                 >
                                                     <span className={styles.queueNo}>{getAppointmentOrderLabel(item, index)}</span>
 
@@ -1730,9 +2323,11 @@ export default function DashboardPage() {
                                                         <small>{appointmentName(item)} • {getAppointmentTime(item)}</small>
                                                     </span>
 
+                                                    {renderAccessCode(item, `appointment:${item.appointment_id}`)}
+
                                                     <span className={statusBadgeClass(getVisitStatus(item))}>{statusText(getVisitStatus(item))}</span>
                                                     <span className={styles.eyeMark}>ดู</span>
-                                                </button>
+                                                </div>
                                             ))
                                         ) : (
                                             <div className={styles.emptyQueue}>
@@ -1858,6 +2453,39 @@ export default function DashboardPage() {
                                     </div>
 
                                     <div>
+                                        <span>แพ้ยา</span>
+                                        <input
+                                            className={styles.vitalInput}
+                                            type="text"
+                                            value={patientDraft.drug_allergy}
+                                            onChange={(event) => setPatientValue('drug_allergy', event.target.value)}
+                                            placeholder="ไม่มี"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <span>แพ้อาหาร</span>
+                                        <input
+                                            className={styles.vitalInput}
+                                            type="text"
+                                            value={patientDraft.food_allergy}
+                                            onChange={(event) => setPatientValue('food_allergy', event.target.value)}
+                                            placeholder="ไม่มี"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <span>โรคประจำตัว</span>
+                                        <input
+                                            className={styles.vitalInput}
+                                            type="text"
+                                            value={patientDraft.congenital_disease}
+                                            onChange={(event) => setPatientValue('congenital_disease', event.target.value)}
+                                            placeholder="ไม่มี"
+                                        />
+                                    </div>
+
+                                    <div>
                                         <span>BW น้ำหนัก</span>
                                         <input
                                             className={styles.vitalInput}
@@ -1947,13 +2575,16 @@ export default function DashboardPage() {
                                 )}
 
                                 <div className={styles.buttonRow}>
+                                    {!selectedVisitIsToday && (selectedQueue || selectedAppointment) && (
+                                        <p className={styles.saveDateNotice}>บันทึกได้เมื่อถึงวันที่ผู้ป่วยเข้ารับบริการเท่านั้น</p>
+                                    )}
                                     <button
                                         type="button"
                                         className={styles.greenBtn}
                                         onClick={saveMedical}
-                                        disabled={!selectedQueue && !selectedAppointment}
+                                        disabled={medicalSaving || (!selectedQueue && !selectedAppointment) || !selectedVisitIsToday}
                                     >
-                                        บันทึก
+                                        {medicalSaving ? 'กำลังบันทึก...' : 'บันทึก'}
                                     </button>
                                 </div>
                                     </div>
@@ -1971,24 +2602,63 @@ export default function DashboardPage() {
                                             <h2>ปฏิทินการจองประจำเดือน</h2>
                                         </div>
                                     </div>
+
+                                    <div className={styles.calendarMenuWrap}>
+                                        <button
+                                            type="button"
+                                            className={styles.calendarMenuButton}
+                                            aria-label="เปิดเมนูจัดการปฏิทิน"
+                                            aria-haspopup="menu"
+                                            aria-expanded={calendarMenuOpen}
+                                            onClick={() => setCalendarMenuOpen((open) => !open)}
+                                        >
+                                            <span />
+                                            <span />
+                                            <span />
+                                        </button>
+
+                                        {calendarMenuOpen && (
+                                            <div className={styles.calendarMenu} role="menu">
+                                                <button
+                                                    type="button"
+                                                    role="menuitem"
+                                                    onClick={() => {
+                                                        setCalendarMenuOpen(false);
+                                                        void openHolidayManager();
+                                                    }}
+                                                >
+                                                    <span className={styles.menuHolidayIcon}>✦</span>
+                                                    <span>
+                                                        <strong>จัดการวันหยุด</strong>
+                                                        <small>เพิ่ม แก้ไข หรือยกเลิกวันหยุด</small>
+                                                    </span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    role="menuitem"
+                                                    onClick={() => void openAdvanceBookingManager()}
+                                                >
+                                                    <span className={styles.menuBookingIcon}>＋</span>
+                                                    <span>
+                                                        <strong>เปิดสัปดาห์จอง</strong>
+                                                        <small>เปิดรับจองสัปดาห์ถัดไปล่วงหน้า</small>
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className={styles.panelBody}>
                                     <div className={styles.panelBodyInner}>
                                 <div className={styles.calendarControl}>
-                                    <h3>
-                                        {calendarMonth.locale('th').format('MMMM')} {calendarMonth.year() + 543}
-                                    </h3>
+                                    <div className={styles.calendarMonthTitle}>
+                                        <h3>
+                                            {calendarMonth.locale('th').format('MMMM')} {calendarMonth.year() + 543}
+                                        </h3>
+                                    </div>
 
                                     <div className={styles.calendarActions}>
-                                        <button
-                                            type="button"
-                                            className={styles.holidayBtn}
-                                            onClick={openHolidayManager}
-                                        >
-                                            + จัดการวันหยุด
-                                        </button>
-
                                         <div className={styles.calendarButtons}>
                                             <button
                                                 type="button"
@@ -2030,6 +2700,9 @@ export default function DashboardPage() {
                                         const isThisMonth = day.month() === calendarMonth.month();
                                         const isToday = day.isSame(dayjs(), 'day');
                                         const isSelected = key === selectedCalendarDate;
+                                        const isAdvanceBookingDay = advanceBookingWeeks.some(
+                                            (week) => key >= week.week_start && key <= week.week_end
+                                        );
                                         const count = appointments.filter((item) =>
                                             dayjs(item.service_date).format('YYYY-MM-DD') === key
                                         ).length;
@@ -2045,20 +2718,29 @@ export default function DashboardPage() {
                                                         setCalendarMonth(day.startOf('month'));
                                                     }
                                                 }}
-                                                className={`${styles.dayButton} ${!isThisMonth ? styles.dayMuted : ''} ${isSelected ? styles.daySelected : ''} ${isToday ? styles.dayToday : ''} ${status === 'available' ? styles.dayAvailable : ''} ${status === 'closed' ? styles.dayClosed : ''} ${status === 'full' ? styles.dayFull : ''}`}
+                                                className={`${styles.dayButton} ${!isThisMonth ? styles.dayMuted : ''} ${isSelected ? styles.daySelected : ''} ${isToday ? styles.dayToday : ''} ${isAdvanceBookingDay ? styles.dayAdvance : ''} ${status === 'available' ? styles.dayAvailable : ''} ${status === 'closed' ? styles.dayClosed : ''} ${status === 'full' ? styles.dayFull : ''}`}
                                             >
-                                                <span className={styles.dayName}>{day.locale('th').format('dd')}</span>
-                                                <strong>{day.date()}</strong>
+                                                <span className={styles.dayCellTop}>
+                                                    <span className={styles.dayName}>{day.locale('th').format('dd')}</span>
+                                                    {isToday && <span className={styles.todayBadge}>วันนี้</span>}
+                                                    {!isToday && isAdvanceBookingDay && (
+                                                        <span className={styles.advanceBadge}>ล่วงหน้า</span>
+                                                    )}
+                                                </span>
+                                                <strong className={styles.dayNumber}>{day.date()}</strong>
 
-                                                {status === 'closed' ? (
-                                                    <small>ปิด</small>
-                                                ) : count > 0 ? (
-                                                    <small>{count} คิว</small>
-                                                ) : status === 'available' ? (
-                                                    <small>ว่าง</small>
-                                                ) : (
-                                                    <small>&nbsp;</small>
-                                                )}
+                                                <span className={styles.dayStatus}>
+                                                    <i />
+                                                    {status === 'closed' ? (
+                                                        <small>ปิดรับจอง</small>
+                                                    ) : count > 0 ? (
+                                                        <small>{count} คิว</small>
+                                                    ) : status === 'available' ? (
+                                                        <small>คิวว่าง</small>
+                                                    ) : (
+                                                        <small>ยังไม่มีคิว</small>
+                                                    )}
+                                                </span>
                                             </button>
                                         );
                                     })}
@@ -2069,10 +2751,95 @@ export default function DashboardPage() {
                                     <span><i className={styles.legendAvailable}></i>ว่าง</span>
                                     <span><i className={styles.legendFull}></i>มีจอง</span>
                                     <span><i className={styles.legendClosed}></i>ปิด/ล็อก</span>
+                                    <span><i className={styles.legendAdvance}></i>เปิดล่วงหน้า</span>
                                 </div>
                                     </div>
                                 </div>
                             </article>
+
+                            {advanceBookingOpen && (
+                                <div
+                                    className={styles.advanceBookingOverlay}
+                                    role="presentation"
+                                    onMouseDown={(event) => {
+                                        if (event.target === event.currentTarget && !advanceBookingSaving) {
+                                            setAdvanceBookingOpen(false);
+                                        }
+                                    }}
+                                >
+                                    <section
+                                        className={styles.advanceBookingModal}
+                                        role="dialog"
+                                        aria-modal="true"
+                                        aria-labelledby="advance-booking-title"
+                                    >
+                                        <div className={styles.advanceBookingHeader}>
+                                            <div className={styles.advanceBookingTitleIcon}>📅</div>
+                                            <div>
+                                                <p>Advance booking</p>
+                                                <h3 id="advance-booking-title">เปิดจองสัปดาห์ล่วงหน้า</h3>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                aria-label="ปิด"
+                                                onClick={() => setAdvanceBookingOpen(false)}
+                                                disabled={advanceBookingSaving}
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+
+                                        <div className={styles.advanceBookingBody}>
+                                            <p className={styles.advanceBookingIntro}>
+                                                กรุณาตรวจสอบช่วงวันที่ก่อนเปิดให้ผู้ใช้จองล่วงหน้า
+                                            </p>
+
+                                            {advanceBookingLoading ? (
+                                                <div className={styles.advanceBookingLoading}>
+                                                    <span />
+                                                    <span />
+                                                </div>
+                                            ) : advanceWeekRange ? (
+                                                <div className={styles.advanceWeekRow}>
+                                                    <div>
+                                                        <small>สัปดาห์ถัดไป</small>
+                                                        <strong>
+                                                            {dayjs(advanceWeekRange.start).locale('th').format('D MMMM')} -{' '}
+                                                            {dayjs(advanceWeekRange.end).locale('th').format('D MMMM')} {' '}
+                                                            {dayjs(advanceWeekRange.end).year() + 543}
+                                                        </strong>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => void (
+                                                            isAdvanceWeekOpen
+                                                                ? cancelAdvanceBooking()
+                                                                : confirmAdvanceBooking()
+                                                        )}
+                                                        disabled={advanceBookingSaving}
+                                                        className={isAdvanceWeekOpen ? styles.advanceWeekCancel : ''}
+                                                    >
+                                                        {advanceBookingSaving
+                                                            ? 'กำลังดำเนินการ...'
+                                                            : isAdvanceWeekOpen
+                                                                ? 'ยกเลิกการเปิดจอง'
+                                                                : 'เปิดการจองล่วงหน้า'}
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className={styles.noAdvanceWeek}>
+                                                    ไม่มีสัปดาห์ถัดไปที่อยู่ภายในเดือนปัจจุบัน
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className={styles.advanceBookingNote}>
+                                            <span>i</span>
+                                            เปิดจองล่วงหน้าได้เฉพาะวันที่ภายในเดือนปัจจุบันเท่านั้น
+                                        </div>
+                                    </section>
+                                </div>
+                            )}
                         </section>
                     </div>
                 </main>

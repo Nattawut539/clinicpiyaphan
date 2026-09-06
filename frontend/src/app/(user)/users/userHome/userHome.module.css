@@ -583,14 +583,14 @@
   }
 
   .heroGrid {
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(260px, 22vw, 320px);
+    column-gap: clamp(24px, 3vw, 48px);
     align-items: flex-start;
-    justify-content: space-between;
   }
 
   .quickInfo {
-    width: 208px;
-    flex-shrink: 0;
+    width: 100%;
   }
 
   .twoColumnGrid {

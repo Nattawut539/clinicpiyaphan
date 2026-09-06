@@ -1,6 +1,6 @@
 /* พื้นหลัง – Glass Light + Gradient Soft */
 .container {
-  height: 100vh;
+  min-height: 100dvh;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -18,7 +18,8 @@
   border-radius: 24px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
   text-align: center;
-  width: 400px;
+  box-sizing: border-box;
+  width: min(100%, 450px);
   animation: fadeScale 0.35s ease;
   border: 1px solid rgba(255, 255, 255, 0.4);
 }
@@ -108,10 +109,42 @@
   box-shadow: 0 6px 18px rgba(214, 40, 40, 0.45);
 }
 
+.cancelBtn:disabled,
+.logoutBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  transform: none;
+}
+
 /* Loading */
 .loading {
   color: #333;
   font-size: 18px;
   text-align: center;
   margin-top: 40px;
+}
+
+@media (max-width: 520px) {
+  .container {
+    padding: 16px;
+  }
+
+  .card {
+    padding: 34px 22px;
+    border-radius: 20px;
+  }
+
+  .avatar {
+    width: 112px;
+    height: 112px;
+  }
+
+  .buttonRow {
+    gap: 10px;
+  }
+
+  .cancelBtn,
+  .logoutBtn {
+    padding-inline: 10px;
+  }
 }

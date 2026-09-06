@@ -124,7 +124,7 @@ async function saveManualMeasurement(req, res, next) {
   try {
     await withContext(req, async (client) => {
       const queueResult = await client.query(
-        `SELECT queue_id, queue_number
+        `SELECT queue_id, queue_number, service_date::text
          FROM clinic.queue_tickets
          WHERE ($1::int IS NOT NULL AND queue_id = $1)
             OR (
@@ -142,6 +142,14 @@ async function saveManualMeasurement(req, res, next) {
       }
 
       const queue = queueResult.rows[0];
+      const today = await client.query(
+        `SELECT (now() AT TIME ZONE 'Asia/Bangkok')::date::text AS value`,
+      );
+      if (queue.service_date !== today.rows[0].value) {
+        return res.status(409).json({
+          message: "บันทึกข้อมูลการตรวจได้เฉพาะวันที่ผู้ป่วยมีคิวเท่านั้น",
+        });
+      }
       const parsedWeight = Number.parseFloat(weight);
       const parsedHeight = Number.parseFloat(height);
       const parsedTemperature = parseOptionalNumber(temperature);
@@ -235,7 +243,7 @@ router.get("/measurements/user/:user_id/latest", requireStaff, async (req, res, 
   }
 });
 
-router.get("/:queue_number", requireStaff, async (req, res, next) => {
+router.get("/measurements/queue-number/:queue_number", requireStaff, async (req, res, next) => {
   const { service_date = null } = req.query;
 
   try {

@@ -34,6 +34,11 @@ interface HelpItem {
     description: string | null
     visibility: 'private' | 'shared'
     updated_at: string
+    category?: string | null
+    request_status?: string
+    review_note?: string | null
+    verification_method?: string | null
+    email?: string | null
 }
 
 interface UserProfile {
@@ -65,7 +70,9 @@ export default function HelpDashboard() {
 
     const [search, setSearch] = useState('');
 
-    const filteredHelps = helps.filter((item) => {
+    const accountRequests = helps.filter((item) => item.category === 'account_deactivation');
+    const faqItems = helps.filter((item) => item.category !== 'account_deactivation');
+    const filteredHelps = faqItems.filter((item) => {
         const keyword = search.trim().toLowerCase();
 
         if (!keyword) return true;
@@ -106,7 +113,7 @@ export default function HelpDashboard() {
             .then(res => res.json())
             .then(data => setAdmin(data))
             .catch(err => console.error('โหลดข้อมูลผู้ใช้ล้มเหลว:', err))
-    }, [])
+    }, [token])
     const fetchHelps = async () => {
         const res = await fetch(`${API_BASE}/help/all`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -117,7 +124,9 @@ export default function HelpDashboard() {
 
     useEffect(() => {
         if (token) fetchHelps()
-    }, [])
+    // fetchHelps is intentionally invoked only when the authenticated token is established.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token])
     const handleToggle = (id: number) => {
         setExpandedId(expandedId === id ? null : id)
     }
@@ -224,6 +233,38 @@ export default function HelpDashboard() {
         }
     };
 
+    const handleAccountRequest = async (item: HelpItem, requestStatus: 'approved' | 'rejected') => {
+        const reviewNote = window.prompt(requestStatus === 'approved' ? 'ระบุผลการตรวจสอบและเหตุผลที่อนุมัติ' : 'ระบุเหตุผลที่ปฏิเสธ');
+        if (!reviewNote?.trim()) return;
+        const verificationMethod = requestStatus === 'approved'
+            ? window.prompt('ระบุวิธีตรวจตัวตน เช่น ตรวจบัตรประชาชนและวันเกิด')
+            : '';
+        if (requestStatus === 'approved' && !verificationMethod?.trim()) return;
+        const ok = await confirmAction(requestStatus === 'approved'
+            ? 'เมื่ออนุมัติ บัญชีผู้ใช้จะถูกปิดใช้งานและ session เดิมจะถูกยกเลิก ยืนยันหรือไม่?'
+            : 'ยืนยันการปฏิเสธคำร้องนี้หรือไม่?');
+        if (!ok) return;
+        const res = await fetch(`${API_BASE}/help/${item.help_id}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${Cookies.get('adminToken')}`,
+            },
+            body: JSON.stringify({
+                request_status: requestStatus,
+                review_note: reviewNote.trim(),
+                verification_method: verificationMethod?.trim() || '',
+            }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+            await Swal.fire({ icon: 'error', title: 'ดำเนินการไม่สำเร็จ', text: data?.message || 'กรุณาลองใหม่' });
+            return;
+        }
+        await Swal.fire({ icon: 'success', title: 'บันทึกผลคำร้องแล้ว', timer: 1400, showConfirmButton: false });
+        await fetchHelps();
+    };
+
     return (
         <div className={styles.container}>
             <header className={styles.header}>
@@ -243,13 +284,41 @@ export default function HelpDashboard() {
                 <Sidebar />
 
                 <section className={styles.contentArea}>
+                    <div className={styles.requestCard}>
+                        <div className={styles.faqTitleGroup}>
+                            <Activity size={24} />
+                            <div>
+                                <h2>คำร้องหยุดใช้งานบัญชี</h2>
+                                <p>{accountRequests.filter((item) => item.request_status === 'pending').length} รายการรอตรวจสอบ</p>
+                            </div>
+                        </div>
+                        <div className={styles.requestList}>
+                            {accountRequests.length === 0 ? (
+                                <p className={styles.requestEmpty}>ยังไม่มีคำร้อง</p>
+                            ) : accountRequests.map((item) => (
+                                <article key={item.help_id}>
+                                    <div>
+                                        <strong>{item.email || 'ไม่พบอีเมล'}</strong>
+                                        <p>{item.description || '-'}</p>
+                                        <small>สถานะ: {item.request_status || 'pending'}{item.review_note ? ` · ${item.review_note}` : ''}</small>
+                                    </div>
+                                    {item.request_status === 'pending' && (
+                                        <div className={styles.requestActions}>
+                                            <button type="button" onClick={() => handleAccountRequest(item, 'rejected')}>ปฏิเสธ</button>
+                                            <button type="button" onClick={() => handleAccountRequest(item, 'approved')}>ตรวจสอบแล้วและอนุมัติ</button>
+                                        </div>
+                                    )}
+                                </article>
+                            ))}
+                        </div>
+                    </div>
                     <div className={styles.faqCard}>
                         <div className={styles.faqHeader}>
                             <div className={styles.faqTitleGroup}>
                                 <HelpCircle size={24} strokeWidth={2.2} />
                                 <div>
                                     <h2>คำถามที่พบบ่อย (FAQ)</h2>
-                                    <p>{helps.length} คำถาม</p>
+                                    <p>{faqItems.length} คำถาม</p>
                                 </div>
                             </div>
 
@@ -438,7 +507,7 @@ export default function HelpDashboard() {
 
                         <div className={styles.faqFooter}>
                             <p>
-                                แสดง {filteredHelps.length} จาก {helps.length} คำถาม
+                                แสดง {filteredHelps.length} จาก {faqItems.length} คำถาม
                             </p>
                         </div>
                     </div>

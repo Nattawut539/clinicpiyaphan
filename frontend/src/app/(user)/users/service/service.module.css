@@ -1,95 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap');
-
-/* โครงหน้าหลัก */
-.wrapper{
-  font-family: 'Prompt', sans-serif;
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;      /* กันล้นแนวตั้ง */
-  padding-top: 93px;      /* เว้น header */
-  padding-bottom: 42px;   /* เว้น footer */
-  background: #f5f7fb;
-  box-sizing: border-box;
-  overflow-x: hidden;     /* ไม่ให้มีสกรอล์แนวนอน */
-}
-
-/* พื้นที่จัดเลย์เอาต์ (4 กล่อง) */
-.canvas{
-  flex: 1 1 auto;
-  min-height: 0;
-
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 16px;         /* ระยะกันชนซ้าย/ขวาเล็กน้อย */
-  padding: 0 8px;
-  box-sizing: border-box;
-
-  display: grid;
-  grid-template-columns: repeat(100, 1fr);        /* 100 คอลัมน์ = แบ่ง % ง่าย */
-  grid-template-rows: minmax(240px,1fr) minmax(240px,1fr);
-  gap: 24px;                                       /* ช่องว่างแทนเส้น */
-}
-
-/* กล่องพื้นฐาน (จะลบพื้นหลัง/เงาได้ถ้าต้องโปร่ง) */
-.box{
-  background: #fff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 6px 18px rgba(0,0,0,.06);
-  box-sizing: border-box;
-}
-
-/* ตำแหน่งให้ตรงรูป (บน 35/65, ล่าง 62/38) */
-.box1{ grid-row: 1; grid-column: 1 / span 35; }   /* ซ้ายบน 35% */
-.box2{ grid-row: 1; grid-column: 36 / span 65; }  /* ขวาบน 65% ต่อชิดจาก box1 */
-.box3{ grid-row: 2; grid-column: 1 / span 62; }   /* ซ้ายล่าง 62% */
-.box4{ grid-row: 2; grid-column: 63 / span 38; }  /* ขวาล่าง 38% ต่อชิดจาก box3 */
-
-/* ตัวหนังสือ */
-.box h3{
-  margin: 0 0 8px 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #2f86a5;
-}
-.box p{
-  margin: 0;
-  color: #333;
-  line-height: 1.6;
-  font-size: 15px;
-}
-
-/* มือถือ: เรียงเป็นหนึ่งคอลัมน์ */
 @media (max-width: 768px){
-  .canvas{
-    max-width: none;
-    margin: 0 12px;
-    padding: 0;
-    grid-template-columns: 1fr;
-    grid-template-rows: auto;
-  }
-  .box1,.box2,.box3,.box4{
-    grid-column: 1 / -1;
-    grid-row: auto;
-  }
 }
 
-
-/* =========================================================
-   User Services UI from Figma
-========================================================= */
 
 .servicesPage {
   width: 100%;
-  min-height: 100vh;
+  min-height: calc(100vh - 120px);
+  min-height: calc(100dvh - 120px);
   padding: 16px;
-  padding-top: 93px;
+  padding-top: 24px;
   padding-bottom: 42px;
   background: #f8fafc;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  font-family: "Prompt", sans-serif;
   box-sizing: border-box;
 }
 
@@ -313,16 +236,12 @@
   .servicesGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .serviceItemWide {
-    grid-column: span 2;
-  }
 }
 
 @media (min-width: 768px) {
   .servicesPage {
     padding: 24px;
-    padding-top: 93px;
+    padding-top: 24px;
     padding-bottom: 42px;
   }
 
@@ -330,5 +249,12 @@
   .welfareCard,
   .priceCard {
     padding: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .servicesPage {
+    min-height: calc(100vh - 140px);
+    min-height: calc(100dvh - 140px);
   }
 }

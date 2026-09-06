@@ -54,12 +54,15 @@ interface Patient {
     weight?: string | number | null;
     height?: string | number | null;
     bmi?: string | number | null;
+    account_status?: string;
+    status_reason?: string | null;
 }
 
 type Profile = {
     first_name: string;
     last_name: string;
     profile_image?: string | null;
+    role?: string | null;
 };
 
 type PatientFull = Patient & {
@@ -87,6 +90,8 @@ type AppointmentHistory = {
     appointment_time?: string;
     time?: string;
 };
+
+const EMPTY_CLAIM_FORM = { email: '', password: '', confirmPassword: '' };
 
 function getAppointmentDate(appointment: AppointmentHistory) {
     const value = appointment.service_date || appointment.appointment_date;
@@ -142,6 +147,11 @@ export default function PatientListPage() {
     const [selectedPatient, setSelectedPatient] = useState<PatientFull | null>(null);
     const [viewLoading, setViewLoading] = useState(false);
     const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+    const [claimFormOpen, setClaimFormOpen] = useState(false);
+    const [claimForm, setClaimForm] = useState(EMPTY_CLAIM_FORM);
+    const [claimSaving, setClaimSaving] = useState(false);
+    const [claimError, setClaimError] = useState('');
+    const [claimNotice, setClaimNotice] = useState('');
 
     const router = useRouter();
     dayjs.locale("th");
@@ -183,6 +193,27 @@ export default function PatientListPage() {
 
         const data = await res.json();
         setAllPatients(Array.isArray(data) ? data : []);
+    }
+
+    async function reactivatePatientAccount(patient: PatientFull) {
+        const reason = window.prompt('ระบุเหตุผลที่เปิดใช้งานบัญชีกลับคืน');
+        if (!reason?.trim()) return;
+        const res = await fetch(`${API_BASE}/users/${patient.user_id}/account-status`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            credentials: 'include',
+            body: JSON.stringify({ account_status: 'active', reason: reason.trim() }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+            setError(data?.message || 'เปิดใช้งานบัญชีไม่สำเร็จ');
+            return;
+        }
+        setSuccess(data?.email_sent
+            ? 'เปิดขั้นตอนยืนยันบัญชีแล้ว และส่ง OTP ไปยังอีเมลผู้ป่วยแล้ว'
+            : 'เปิดขั้นตอนยืนยันบัญชีแล้ว แต่ยังส่ง OTP ไม่สำเร็จ');
+        setSelectedPatient((current) => current ? { ...current, account_status: data.account_status } : current);
+        await fetchAllPatients();
     }
 
     async function fetchPatientFull(userId: number): Promise<PatientFull | null> {
@@ -252,10 +283,14 @@ export default function PatientListPage() {
         setViewOpen(true);
         setViewLoading(true);
         setAvatarLoadFailed(false);
+        setClaimFormOpen(false);
+        setClaimForm(EMPTY_CLAIM_FORM);
+        setClaimError('');
+        setClaimNotice('');
         setSelectedPatient(normalizePatient(p));
 
         const full = await fetchPatientFull(p.user_id);
-        if (full) setSelectedPatient(full);
+        if (full) setSelectedPatient({ ...normalizePatient(p), ...full, account_status: p.account_status, status_reason: p.status_reason });
 
         setViewLoading(false);
     };
@@ -263,7 +298,52 @@ export default function PatientListPage() {
     const closeView = () => {
         setViewOpen(false);
         setSelectedPatient(null);
+        setClaimFormOpen(false);
+        setClaimForm(EMPTY_CLAIM_FORM);
+        setClaimError('');
+        setClaimNotice('');
     };
+
+    async function createWalkinOnlineAccount() {
+        if (!selectedPatient) return;
+        const email = claimForm.email.trim().toLowerCase();
+        if (!email || !claimForm.password) {
+            setClaimError('กรุณากรอกอีเมลและรหัสผ่านให้ครบ');
+            return;
+        }
+        if (claimForm.password !== claimForm.confirmPassword) {
+            setClaimError('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน');
+            return;
+        }
+
+        try {
+            setClaimSaving(true);
+            setClaimError('');
+            setClaimNotice('');
+            const response = await fetch(`${API_BASE}/patients/${selectedPatient.user_id}/claim-account`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                credentials: 'include',
+                body: JSON.stringify({ email, password: claimForm.password }),
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(data?.message || 'สร้างบัญชีออนไลน์ไม่สำเร็จ');
+
+            setSelectedPatient((current) => current ? {
+                ...current,
+                email,
+                account_status: data.account_status || 'pending_verification',
+            } : current);
+            setClaimFormOpen(false);
+            setClaimForm(EMPTY_CLAIM_FORM);
+            setClaimNotice(data?.message || 'สร้างบัญชีออนไลน์แล้ว');
+            await fetchAllPatients();
+        } catch (claimAccountError) {
+            setClaimError(claimAccountError instanceof Error ? claimAccountError.message : 'สร้างบัญชีออนไลน์ไม่สำเร็จ');
+        } finally {
+            setClaimSaving(false);
+        }
+    }
 
     async function handleSmartSearch() {
         try {
@@ -316,6 +396,7 @@ export default function PatientListPage() {
                         first_name: data?.first_name || '',
                         last_name: data?.last_name || '',
                         profile_image: data?.profile_image || null,
+                        role: data?.role || null,
                     });
                 } else {
                     setProfile(null);
@@ -329,6 +410,8 @@ export default function PatientListPage() {
                 setError('โหลดข้อมูลผู้ป่วยไม่สำเร็จ');
             }
         })();
+    // Initial page load; fetchAllPatients is intentionally not a reactive trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (
@@ -525,6 +608,76 @@ export default function PatientListPage() {
                                                     ปี
                                                 </p>
                                             </div>
+                                        </div>
+
+                                        <div className={styles.accountStatusPanel}>
+                                            <span>สถานะบัญชี: <strong>{selectedPatient.account_status || 'active'}</strong></span>
+                                            {selectedPatient.status_reason && <small>เหตุผลล่าสุด: {selectedPatient.status_reason}</small>}
+                                            {['super_admin', 'superadmin'].includes(String(profile?.role || '').toLowerCase()) && selectedPatient.account_status === 'deactivated' && (
+                                                <button type="button" onClick={() => reactivatePatientAccount(selectedPatient)}>
+                                                    เปิดใช้งานบัญชีกลับคืนและส่ง OTP
+                                                </button>
+                                            )}
+                                            {['admin', 'super_admin', 'superadmin'].includes(String(profile?.role || '').toLowerCase()) && selectedPatient.account_status === 'unclaimed' && !claimFormOpen && (
+                                                <button type="button" onClick={() => {
+                                                    setClaimForm({ ...EMPTY_CLAIM_FORM, email: selectedPatient.email || '' });
+                                                    setClaimError('');
+                                                    setClaimNotice('');
+                                                    setClaimFormOpen(true);
+                                                }}>
+                                                    สร้างบัญชีออนไลน์
+                                                </button>
+                                            )}
+                                            {claimNotice && <p className={styles.claimSuccess}>{claimNotice}</p>}
+                                            {claimFormOpen && selectedPatient.account_status === 'unclaimed' && (
+                                                <div className={styles.claimAccountForm}>
+                                                    <div>
+                                                        <strong>สร้างบัญชีออนไลน์จากผู้ป่วย Walk-in</strong>
+                                                        <small>บัญชีใหม่จะใช้รหัสผู้ป่วยและประวัติการรักษาเดิม</small>
+                                                    </div>
+                                                    <label>
+                                                        <span>Gmail / อีเมลผู้ป่วย</span>
+                                                        <input
+                                                            type="email"
+                                                            value={claimForm.email}
+                                                            onChange={(event) => setClaimForm((current) => ({ ...current, email: event.target.value }))}
+                                                            placeholder="name@gmail.com"
+                                                            autoComplete="off"
+                                                        />
+                                                    </label>
+                                                    <label>
+                                                        <span>รหัสผ่านชั่วคราว</span>
+                                                        <input
+                                                            type="password"
+                                                            value={claimForm.password}
+                                                            onChange={(event) => setClaimForm((current) => ({ ...current, password: event.target.value }))}
+                                                            placeholder="อย่างน้อย 8 ตัว มีตัวอักษรและตัวเลข"
+                                                            autoComplete="new-password"
+                                                        />
+                                                    </label>
+                                                    <label>
+                                                        <span>ยืนยันรหัสผ่าน</span>
+                                                        <input
+                                                            type="password"
+                                                            value={claimForm.confirmPassword}
+                                                            onChange={(event) => setClaimForm((current) => ({ ...current, confirmPassword: event.target.value }))}
+                                                            autoComplete="new-password"
+                                                        />
+                                                    </label>
+                                                    <small>ระบบจะส่ง OTP ไปยังอีเมล ส่วนรหัสผ่านให้แจ้งผู้ป่วยโดยตรงและไม่ส่งผ่านอีเมล</small>
+                                                    {claimError && <p className={styles.claimError}>{claimError}</p>}
+                                                    <div className={styles.claimActions}>
+                                                        <button type="button" className={styles.claimCancelButton} onClick={() => {
+                                                            setClaimFormOpen(false);
+                                                            setClaimForm(EMPTY_CLAIM_FORM);
+                                                            setClaimError('');
+                                                        }} disabled={claimSaving}>ยกเลิก</button>
+                                                        <button type="button" onClick={createWalkinOnlineAccount} disabled={claimSaving}>
+                                                            {claimSaving ? 'กำลังสร้าง...' : 'สร้างบัญชีและส่ง OTP'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className={styles.modernInfoGrid}>
