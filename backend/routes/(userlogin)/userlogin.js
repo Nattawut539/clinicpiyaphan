@@ -53,7 +53,16 @@ router.post("/login", async (req, res) => {
       });
     }
     if (accountStatus !== "active") {
-      return res.status(403).json({ error: "บัญชีนี้ไม่อยู่ในสถานะพร้อมใช้งาน", code: "ACCOUNT_INACTIVE" });
+      const messages = {
+        deactivated: "บัญชีนี้ถูกหยุดใช้งานตามคำขอ หากต้องการกลับมาใช้บัญชีเดิม กรุณาติดต่อคลินิก",
+        suspended: "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อคลินิกเพื่อตรวจสอบสถานะบัญชี",
+        duplicate: "บัญชีนี้ถูกปิดเนื่องจากเป็นบัญชีซ้ำ กรุณาติดต่อคลินิกเพื่อใช้บัญชีเดิม",
+      };
+      return res.status(403).json({
+        error: messages[accountStatus] || "บัญชีนี้ไม่อยู่ในสถานะพร้อมใช้งาน กรุณาติดต่อคลินิก",
+        code: "ACCOUNT_INACTIVE",
+        account_status: accountStatus,
+      });
     }
 
     const normalizedRole = String(user.role || "").toLowerCase(); // ปรับ Role เป็นตัวพิมพ์เล็ก(ช่วยให้ตรวจสอบ Role ได้ง่าย)

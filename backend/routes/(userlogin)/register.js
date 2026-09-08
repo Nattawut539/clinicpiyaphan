@@ -4,11 +4,6 @@ const pool = require("../../tools/db");
 const { issueEmailVerification } = require("../../tools/emailVerification");
 const router = express.Router();
 
-//ตรวจสอบการทำงานของไฟล์ว่าเชื่อมต่อกับ server.js หรือไม่
-router.get("/register/health", (_req, res) => {
-  res.json({ ok: true, path: "/api/users/register" });
-});
-
 //Router สมัครสมาชิก
 router.post("/register", async (req, res) => {
   //สมัครสมาชิกจะเป็น role user เท่านั้น

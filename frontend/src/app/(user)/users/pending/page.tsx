@@ -9,7 +9,7 @@ import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone';
 import Swal from 'sweetalert2';
 import { useRouter } from 'next/navigation';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import { API_BASE } from '@/lib/api';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 

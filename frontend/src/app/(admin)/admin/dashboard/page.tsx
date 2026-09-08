@@ -2,7 +2,7 @@
 
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import dayjs from 'dayjs';
 import 'dayjs/locale/th';
 import Swal from 'sweetalert2';

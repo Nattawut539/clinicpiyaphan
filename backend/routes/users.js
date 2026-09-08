@@ -9,9 +9,9 @@ const {
   uploadProfileImage,
   cleanupUncommittedUpload,
   validateProfileImageContent,
-  getPublicProfileImagePath,
   commitProfileImage,
-  acceptProfileImage,
+  persistProfileImage,
+  finalizeProfileImage,
   discardUploadedProfileImage,
 } = require("../tools/profileImageUpload");
 
@@ -46,19 +46,6 @@ router.get("/patients", authRequired, requireStaff, async (req, res) => {
     res.status(500).json({ message: "Server error", detail: String(e?.message || e) });
   }
 });
-router.get("/patients-debug", requireStaff, async (_req, res) => {
-  try {
-    const { rows } = await pool.query(`
-      SELECT COUNT(*) AS total_users
-      FROM clinic.users
-      WHERE role = 'user'
-    `);
-    res.json(rows[0]);
-  } catch (e) {
-    res.status(500).json({ message: String(e?.message || e) });
-  }
-});
-
 router.get("/patients/lookup", requireStaff, async (req, res) => {
   const nationalId = String(req.query.national_id || "").trim();
   const firstName = String(req.query.first_name || "").trim();
@@ -444,7 +431,8 @@ router.put("/patients/:user_id", requireStaff, async (req, res) => {
          RETURNING *`;
       const { rows } = await client.query(sql, vals);
       if (!rows.length) return res.status(404).json({ message: "not found" });
-      res.json({ message: "updated", detail: rows[0] });
+      const { profile_image_drive_id: _storageId, ...detail } = rows[0];
+      res.json({ message: "updated", detail });
     });
   } catch (e) {
     console.error("PUT /patients/:id error:", e);
@@ -472,38 +460,44 @@ router.put(
       return res.status(400).json({ message: "no file" });
     }
 
-    const finalImage = getPublicProfileImagePath(req.file) || imageUrl;
+    if (!req.file && !/^https:\/\//i.test(imageUrl)) {
+      return res.status(400).json({ message: "imageUrl must be an HTTPS URL" });
+    }
     let previousImage = null;
 
     try {
-      await withContext(req, async (client) => {
+      const image = await persistProfileImage(req, id) || { profile_image: imageUrl, profile_image_drive_id: null };
+      const saved = await withContext(req, async (client) => {
         const existing = await client.query(
-          `SELECT profile_image FROM user_details WHERE user_id = $1 FOR UPDATE`,
+          `SELECT profile_image, profile_image_drive_id FROM user_details WHERE user_id = $1 FOR UPDATE`,
           [id],
         );
         if (!existing.rows.length) {
-          return res.status(404).json({ message: "not found" });
+          throw Object.assign(new Error("not found"), { status: 404 });
         }
-        previousImage = existing.rows[0].profile_image;
+        previousImage = existing.rows[0];
 
         const { rows } = await client.query(
           `UPDATE user_details
-             SET profile_image = $1, updated_at = NOW()
+             SET profile_image = $1, profile_image_drive_id = $3, updated_at = NOW()
            WHERE user_id = $2
            RETURNING profile_image`,
-          [finalImage, id]
+          [image.profile_image, id, image.profile_image_drive_id]
         );
-        if (!rows.length) return res.status(404).json({ message: "not found" });
-        acceptProfileImage(req);
-        res.json({ message: "updated", profile_image: rows[0].profile_image });
+        await finalizeProfileImage(client, req, previousImage);
+        if (!req.file && previousImage.profile_image_drive_id) {
+          await require("../tools/profileImageCleanup").queueDriveCleanup(client, previousImage.profile_image_drive_id);
+        }
+        return rows[0];
       });
-      if (res.statusCode < 400) commitProfileImage(req, previousImage);
+      commitProfileImage(req, previousImage);
+      res.json({ message: "updated", profile_image: saved.profile_image });
     } catch (e) {
       await discardUploadedProfileImage(req).catch(() => false);
       console.error("PUT /patients/:id/profile error:", e);
       res
-        .status(500)
-        .json({ message: "Server error", detail: String(e?.message || e) });
+        .status(e.status || 500)
+        .json({ message: e.status === 404 ? "not found" : "บันทึกรูปโปรไฟล์ไม่สำเร็จ" });
     }
   }
 );
@@ -518,14 +512,21 @@ router.delete("/patients/:user_id", requireStaff, async (req, res) => {
   }
 
   try {
-    await withContext(req, async (client) => {
+    const driveFileId = await withContext(req, async (client) => {
       const patient = await client.query(
-        `SELECT user_id FROM clinic.users WHERE user_id = $1 AND role = 'user'`,
+        `SELECT user_id FROM clinic.users
+         WHERE user_id = $1 AND role = 'user' FOR UPDATE`,
         [id]
       );
       if (!patient.rowCount) {
-        return res.status(404).json({ message: "ไม่พบบัญชีผู้ป่วย" });
+        throw Object.assign(new Error("ไม่พบบัญชีผู้ป่วย"), { status: 404 });
       }
+      const profileImage = await client.query(
+        `SELECT profile_image_drive_id FROM clinic.user_details
+         WHERE user_id = $1 FOR UPDATE`,
+        [id],
+      );
+      const profileImageDriveId = profileImage.rows[0]?.profile_image_drive_id || null;
 
       // Delete queue rows explicitly before the user. Letting the user FK set
       // queue_tickets.user_id to NULL fires the queue/appointment validation
@@ -545,14 +546,22 @@ router.delete("/patients/:user_id", requireStaff, async (req, res) => {
         `DELETE FROM clinic.users WHERE user_id = $1 AND role = 'user'`,
         [id]
       );
-      if (!rowCount) return res.status(404).json({ message: "ไม่พบบัญชีผู้ป่วย" });
-      res.json({ message: "ลบบัญชีผู้ป่วยเรียบร้อยแล้ว" });
+      if (!rowCount) throw Object.assign(new Error("ไม่พบบัญชีผู้ป่วย"), { status: 404 });
+      if (profileImageDriveId) {
+        await require("../tools/profileImageCleanup").queueDriveCleanup(client, profileImageDriveId);
+      }
+      return profileImageDriveId;
     });
+    if (driveFileId) {
+      require("../tools/profileImageCleanup").cleanupDriveImage(driveFileId)
+        .catch(() => console.error("Deleted patient's Drive image cleanup pending"));
+    }
+    res.json({ message: "ลบบัญชีผู้ป่วยเรียบร้อยแล้ว" });
   } catch (e) {
     console.error("DELETE /patients/:id error:", e);
     res
-      .status(500)
-      .json({ message: "ลบบัญชีผู้ป่วยไม่สำเร็จ", detail: String(e?.message || e) });
+      .status(e.status || 500)
+      .json({ message: e.status === 404 ? e.message : "ลบบัญชีผู้ป่วยไม่สำเร็จ" });
   }
 });
 
@@ -594,7 +603,7 @@ router.get("/me/profile", authRequired, async (req, res) => {
       return res.status(404).json({ message: "ไม่พบโปรไฟล์" });
 
     const row = profile.rows[0];
-    const detail = row.detail || {};
+    const { profile_image_drive_id: _storageId, ...detail } = row.detail || {};
     const firstName =
       String(detail.first_name || "").trim() ||
       row.username ||
@@ -631,12 +640,19 @@ router.put(
       return res.status(400).json({ message: "กรุณาระบุสถานะและเหตุผล" });
     }
     try {
-      const targetStatus = requestedStatus === "active" ? "pending_verification" : requestedStatus;
+      const sourceResult = requestedStatus === "active"
+        ? await pool.query(`SELECT registration_source, email FROM clinic.users WHERE user_id = $1`, [userId])
+        : null;
+      const source = String(sourceResult?.rows[0]?.registration_source || "").toLowerCase();
+      const canUseSocialLogin = ["line", "google"].includes(source);
+      const targetStatus = requestedStatus === "active"
+        ? (canUseSocialLogin ? "active" : "pending_verification")
+        : requestedStatus;
       const result = await pool.query(
         `UPDATE clinic.users
-         SET account_status = $1, status_reason = $2, status_changed_at = now(),
-             status_changed_by = $3, deactivated_at = CASE WHEN $1 = 'deactivated' THEN now() ELSE NULL END,
-             email_verified_at = CASE WHEN $1 = 'pending_verification' THEN NULL ELSE email_verified_at END,
+         SET account_status = $1::varchar, status_reason = $2, status_changed_at = now(),
+             status_changed_by = $3, deactivated_at = CASE WHEN $1::varchar = 'deactivated' THEN now() ELSE NULL END,
+             email_verified_at = CASE WHEN $1::varchar = 'pending_verification' THEN NULL ELSE email_verified_at END,
              session_version = session_version + 1
          WHERE user_id = $4
          RETURNING user_id, email, account_status`,
@@ -644,7 +660,7 @@ router.put(
       );
       if (!result.rowCount) return res.status(404).json({ message: "ไม่พบบัญชี" });
       let emailSent = false;
-      if (requestedStatus === "active" && result.rows[0].email) {
+      if (requestedStatus === "active" && targetStatus === "pending_verification" && result.rows[0].email) {
         try {
           await issueEmailVerification(userId, result.rows[0].email);
           emailSent = true;
@@ -902,8 +918,9 @@ router.patch("/me/google-profile", authRequired, async (req, res) => {
       }
     }
 
+    const { profile_image_drive_id: _storageId, ...completedDetail } = completed.detail;
     return res.json({
-      ...completed.detail,
+      ...completedDetail,
       user_id: userId,
       email: req.user.email,
       registration_source: "google",
@@ -912,6 +929,161 @@ router.patch("/me/google-profile", authRequired, async (req, res) => {
     });
   } catch (error) {
     console.error("PATCH /users/me/google-profile error:", error);
+    const mapped = pgErrorToHttp(error);
+    return res.status(mapped.status).json({ message: mapped.message });
+  }
+});
+
+// Complete a LINE account and add email/password as another sign-in method.
+router.patch("/me/line-profile", authRequired, async (req, res) => {
+  if (req.user.registration_source !== "line") {
+    return res.status(403).json({ message: "หน้านี้ใช้สำหรับบัญชี LINE เท่านั้น" });
+  }
+
+  const userId = req.user.user_id;
+  const nationalId = String(req.body?.national_id || "").replace(/\D/g, "");
+  const firstName = String(req.body?.first_name || "").trim();
+  const lastName = String(req.body?.last_name || "").trim();
+  const birthDate = String(req.body?.birth_date || "").slice(0, 10);
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const password = String(req.body?.password || "");
+
+  if (!/^\d{13}$/.test(nationalId)) {
+    return res.status(400).json({ message: "เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก" });
+  }
+  if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100) {
+    return res.status(400).json({ message: "กรุณากรอกชื่อและนามสกุลให้ถูกต้อง" });
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate) || Number.isNaN(Date.parse(`${birthDate}T00:00:00Z`))) {
+    return res.status(400).json({ message: "กรุณากรอกวันเกิดให้ถูกต้อง" });
+  }
+  if (new Date(`${birthDate}T00:00:00Z`) > new Date()) {
+    return res.status(400).json({ message: "วันเกิดต้องไม่เป็นวันในอนาคต" });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ message: "กรุณากรอกอีเมลให้ถูกต้อง" });
+  }
+  if (!/^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(password)) {
+    return res.status(400).json({ message: "รหัสผ่านต้องมีอย่างน้อย 6 ตัว และมีทั้งตัวอักษรกับตัวเลข" });
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(password, 10);
+    const completed = await withContext(req, async (client) => {
+      const duplicateEmail = await client.query(
+        `SELECT 1 FROM clinic.users WHERE lower(email) = $1 AND user_id <> $2 LIMIT 1`,
+        [email, userId],
+      );
+      if (duplicateEmail.rowCount) return { duplicateEmail: true };
+
+      const duplicateNationalId = await client.query(
+        `SELECT 1 FROM clinic.user_details WHERE national_id = $1 AND user_id <> $2 LIMIT 1`,
+        [nationalId, userId],
+      );
+      if (duplicateNationalId.rowCount) return { duplicateNationalId: true };
+
+      const saved = await client.query(
+        `UPDATE clinic.user_details
+         SET national_id = $1, first_name = $2, last_name = $3,
+             birth_date = $4, email = $5, updated_at = now()
+         WHERE detail_id = (
+           SELECT detail_id FROM clinic.user_details
+           WHERE user_id = $6 ORDER BY detail_id DESC LIMIT 1
+         )
+         RETURNING *`,
+        [nationalId, firstName, lastName, birthDate, email, userId],
+      );
+
+      let detail = saved.rows[0];
+      if (!detail) {
+        const inserted = await client.query(
+          `INSERT INTO clinic.user_details
+           (user_id, national_id, first_name, last_name, birth_date, email)
+           VALUES ($1,$2,$3,$4,$5,$6)
+           RETURNING *`,
+          [userId, nationalId, firstName, lastName, birthDate, email],
+        );
+        detail = inserted.rows[0];
+      }
+
+      await client.query(
+        `UPDATE clinic.users
+         SET email = $1, password_hash = $2, profile_completed_at = COALESCE(profile_completed_at, now()),
+             account_status = 'active', email_verified_at = COALESCE(email_verified_at, now()),
+             status_reason = 'เพิ่มอีเมลเข้าสู่ระบบผ่านบัญชี LINE', status_changed_at = now()
+         WHERE user_id = $3`,
+        [email, passwordHash, userId],
+      );
+
+      const notification = await client.query(
+        `INSERT INTO clinic.user_notifications
+         (user_id, source_type, source_id, event_key, title, message, severity,
+          target_url, event_at, email_required, expires_at)
+         VALUES ($1,'security',$2,'line_email_access',
+                 'แจ้งเตือนการเพิ่มอีเมลเข้าสู่ระบบ',
+                 'อีเมลถูกเพิ่มเป็นช่องทางเข้าสู่ระบบของบัญชี LINE เรียบร้อยแล้ว',
+                 'info','/users/userHome',now(),true,now() + interval '1 month')
+         ON CONFLICT (user_id, source_type, source_id, event_key) DO NOTHING
+         RETURNING notification_id`,
+        [userId, String(userId)],
+      );
+
+      return { detail, notificationId: notification.rows[0]?.notification_id || null };
+    });
+
+    if (completed.duplicateEmail) {
+      return res.status(409).json({ message: "อีเมลนี้มีบัญชีอยู่แล้ว กรุณาใช้อีเมลเดิมเข้าสู่ระบบหรือติดต่อคลินิกเพื่อเชื่อมบัญชี" });
+    }
+    if (completed.duplicateNationalId) {
+      return res.status(409).json({ message: "เลขบัตรประชาชนนี้มีอยู่ในระบบแล้ว กรุณาติดต่อคลินิกเพื่อเชื่อมกับบัญชีเดิม" });
+    }
+
+    let emailNotificationSent = false;
+    if (completed.notificationId) {
+      const claimed = await pool.query(
+        `UPDATE clinic.user_notifications
+         SET email_sent_at = now(), updated_at = now()
+         WHERE notification_id = $1 AND email_sent_at IS NULL
+         RETURNING notification_id`,
+        [completed.notificationId],
+      );
+      if (claimed.rowCount) {
+        try {
+          const loginTime = new Date().toLocaleString("th-TH", {
+            timeZone: "Asia/Bangkok",
+            dateStyle: "long",
+            timeStyle: "short",
+          });
+          await sendClinicMail({
+            to: email,
+            subject: "แจ้งเตือนการเพิ่มอีเมลเข้าสู่ระบบบัญชี LINE",
+            html: `<p>สวัสดี ${escapeHtml(firstName)}</p>
+              <p>อีเมล <b>${escapeHtml(email)}</b> ถูกเพิ่มเป็นช่องทางเข้าสู่ระบบของบัญชี LINE เรียบร้อยแล้ว</p>
+              <p><b>วันที่และเวลา:</b> ${escapeHtml(loginTime)}</p>
+              <p>ครั้งต่อไปคุณสามารถเลือกเข้าสู่ระบบด้วย LINE หรือใช้อีเมลนี้พร้อมรหัสผ่านที่ตั้งไว้</p>
+              <p>หากคุณไม่ได้เป็นผู้ดำเนินการ กรุณาติดต่อเจ้าหน้าที่คลินิกทันที</p>`,
+          });
+          emailNotificationSent = true;
+        } catch (mailError) {
+          await pool.query(
+            `UPDATE clinic.user_notifications SET email_sent_at = NULL, updated_at = now()
+             WHERE notification_id = $1`,
+            [completed.notificationId],
+          ).catch((resetError) => console.error("Reset LINE access email notification failed:", resetError.message));
+          console.error("LINE profile access notification email failed:", mailError.message);
+        }
+      }
+    }
+
+    return res.json({
+      user_id: userId,
+      email,
+      registration_source: "line",
+      profile_completed: true,
+      email_notification_sent: emailNotificationSent,
+    });
+  } catch (error) {
+    console.error("PATCH /users/me/line-profile error:", error);
     const mapped = pgErrorToHttp(error);
     return res.status(mapped.status).json({ message: mapped.message });
   }
@@ -995,23 +1167,24 @@ router.patch(
       return res.status(400).json({ message: "รองรับเฉพาะไฟล์รูปภาพ" });
     }
 
-    const profileImage = getPublicProfileImagePath(req.file);
     let previousImage = null;
 
     try {
-      await withContext(req, async (client) => {
+      const profileImage = await persistProfileImage(req, userId);
+      const result = await withContext(req, async (client) => {
+        await client.query("SELECT user_id FROM clinic.users WHERE user_id=$1 FOR UPDATE", [userId]);
         const existingProfileImage = await client.query(
-          `SELECT profile_image FROM clinic.user_details WHERE user_id = $1 FOR UPDATE`,
+          `SELECT profile_image, profile_image_drive_id FROM clinic.user_details WHERE user_id = $1 FOR UPDATE`,
           [userId],
         );
-        previousImage = existingProfileImage.rows[0]?.profile_image || null;
+        previousImage = existingProfileImage.rows[0] || null;
 
         const duplicate = await client.query(
           `SELECT 1 FROM clinic.users WHERE LOWER(email) = $1 AND user_id <> $2 LIMIT 1`,
           [email, userId]
         );
         if (duplicate.rowCount) {
-          return res.status(409).json({ message: "อีเมลนี้ถูกใช้งานแล้ว" });
+          throw Object.assign(new Error("อีเมลนี้ถูกใช้งานแล้ว"), { status: 409 });
         }
         if (nationalId) {
           const duplicateNationalId = await client.query(
@@ -1019,7 +1192,7 @@ router.patch(
             [nationalId, userId],
           );
           if (duplicateNationalId.rowCount) {
-            return res.status(409).json({ message: "เลขบัตรประชาชนนี้มีอยู่ในระบบแล้ว กรุณาติดต่อเจ้าหน้าที่เพื่อเชื่อมบัญชี" });
+            throw Object.assign(new Error("เลขบัตรประชาชนนี้มีอยู่ในระบบแล้ว กรุณาติดต่อเจ้าหน้าที่เพื่อเชื่อมบัญชี"), { status: 409 });
           }
         }
 
@@ -1065,15 +1238,15 @@ router.patch(
         payload.first_name = firstName;
         payload.last_name = lastName;
         payload.email = email;
-        if (profileImage && existingFields.has("profile_image")) payload.profile_image = profileImage;
+        if (profileImage) Object.assign(payload, profileImage);
 
         for (const [field, value] of Object.entries(payload)) {
           if (value === "__INVALID_DATE__") {
-            return res.status(400).json({ message: `${fieldLabels[field] || field} ต้องอยู่ในรูปแบบ YYYY-MM-DD` });
+            throw Object.assign(new Error(`${fieldLabels[field] || field} ต้องอยู่ในรูปแบบ YYYY-MM-DD`), { status: 400 });
           }
           const limit = fieldLimits[field];
           if (limit && value && String(value).length > limit) {
-            return res.status(400).json({ message: `${fieldLabels[field] || field} ต้องไม่เกิน ${limit} ตัวอักษร` });
+            throw Object.assign(new Error(`${fieldLabels[field] || field} ต้องไม่เกิน ${limit} ตัวอักษร`), { status: 400 });
           }
         }
 
@@ -1083,7 +1256,7 @@ router.patch(
             [payload.province_code]
           );
           if (!province.rowCount) {
-            return res.status(400).json({ message: "รหัสจังหวัดไม่ถูกต้อง" });
+            throw Object.assign(new Error("รหัสจังหวัดไม่ถูกต้อง"), { status: 400 });
           }
         }
 
@@ -1132,19 +1305,22 @@ router.patch(
           [profileCompleted, userId],
         );
 
-        acceptProfileImage(req);
-        return res.json({
+        await finalizeProfileImage(client, req, previousImage);
+        const { profile_image_drive_id: _storageId, ...publicDetail } = savedDetail;
+        return {
           user_id: userId,
           patient_code: String(userId).padStart(3, "0"),
           role: req.user.role,
           profile_completed: profileCompleted,
-          ...savedDetail,
-        });
+          ...publicDetail,
+        };
       });
-      if (res.statusCode < 400) commitProfileImage(req, previousImage);
+      commitProfileImage(req, previousImage);
+      return res.json(result);
     } catch (error) {
       await discardUploadedProfileImage(req).catch(() => false);
       console.error("PATCH /me/profile error:", error);
+      if (error.status) return res.status(error.status).json({ message: error.message });
       const mapped = pgErrorToHttp(error);
       if (mapped.status !== 500) {
         return res.status(mapped.status).json({ message: mapped.message });

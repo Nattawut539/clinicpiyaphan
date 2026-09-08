@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import { useRouter } from 'next/navigation';
 import styles from './admin.module.css';
 import { API_BASE } from '@/lib/api';

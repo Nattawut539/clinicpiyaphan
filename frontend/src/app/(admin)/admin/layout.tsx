@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {

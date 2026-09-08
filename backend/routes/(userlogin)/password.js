@@ -18,9 +18,8 @@ const SMTP_USER = process.env.SMTP_USER || process.env.MAIL_USER;
 const SMTP_PASS = process.env.SMTP_PASS || process.env.MAIL_PASS;
 const MAIL_FROM = process.env.MAIL_FROM || SMTP_USER;
 
-//ฟังก์ชันสร้างรหัส OTP แบบสุ่ม 6 หลัก
-// Math.random สร้างตัวเลขสุ่มระหว่าง 0 ถึง 1 จากนั้นคูณด้วย 900000 แล้วบวก 100000
-// Math.floor ตัดเศษทศนิยมออก , "" + แปลงตัวเลขเป็นข้อความ , slice(-6) ตัดเอาเฉพาะ 6 หลักสุดท้าย
+// ฟังก์ชันสร้าง OTP ตัวเลข 6 หลักด้วยตัวสุ่มแบบเข้ารหัสของ Node.js
+// crypto.randomInt สุ่มค่าตั้งแต่ 0 ถึง 999999 และ padStart เติมเลข 0 ด้านหน้าให้ครบ 6 หลัก
 function genOTP() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, "0");
 }

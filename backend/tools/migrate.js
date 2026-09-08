@@ -12,11 +12,13 @@ const ensureQueueSchema = require("./ensureQueueSchema");
 const ensureAdvisorRequirementsSchema = require("./ensureAdvisorRequirementsSchema");
 const { ensureAuditSchema } = require("./audit");
 const pool = require("./db");
+const ensureProfileImageSchema = require("./ensureProfileImageSchema");
 
 async function migrate() {
   await ensureQueueSchema();
   await ensureAdvisorRequirementsSchema();
   await ensureAuditSchema();
+  await ensureProfileImageSchema();
   console.log("Database migrations completed");
 }
 

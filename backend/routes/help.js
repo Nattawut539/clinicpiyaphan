@@ -311,21 +311,33 @@ router.get("/help/all", requireStaff, async (req, res) => {
       `
       SELECT
         h.*,
-        u.email
+        COALESCE(u.email, d.email) AS email,
+        NULLIF(TRIM(CONCAT(COALESCE(d.first_name, ''), ' ', COALESCE(d.last_name, ''))), '') AS account_name,
+        u.registration_source,
+        u.account_status
       FROM clinic.help_requests h
       LEFT JOIN clinic.users u ON h.user_id = u.user_id
+      LEFT JOIN clinic.user_details d ON h.user_id = d.user_id
       ORDER BY h.updated_at DESC
       LIMIT $1 OFFSET $2
       `,
       [limit, offset]
     );
 
-    const count = await pool.query(`SELECT COUNT(*) FROM clinic.help_requests`);
+    const count = await pool.query(`
+      SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (
+          WHERE category = 'account_deactivation' AND request_status = 'pending'
+        ) AS pending_deactivation_count
+      FROM clinic.help_requests
+    `);
 
     res.json({
       page,
       limit,
-      total: Number(count.rows[0].count),
+      total: Number(count.rows[0].total),
+      pending_deactivation_count: Number(count.rows[0].pending_deactivation_count),
       data: data.rows,
     });
   } catch (err) {

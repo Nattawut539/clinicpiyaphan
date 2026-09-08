@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 import React, { useEffect, useRef, useState } from 'react'
-import Cookies from 'js-cookie'
+import Cookies from '@/lib/cookies'
 import Link from 'next/link';
 import styles from './Help.module.css'
 import { API_BASE } from '@/lib/api'
@@ -24,6 +24,10 @@ import {
     X,
     Save,
     MessageCircleQuestion,
+    ShieldCheck,
+    Ban,
+    Menu,
+    RotateCcw,
 } from 'lucide-react';
 
 
@@ -39,12 +43,22 @@ interface HelpItem {
     review_note?: string | null
     verification_method?: string | null
     email?: string | null
+    account_name?: string | null
+    registration_source?: string | null
+    user_id?: number | null
+    account_status?: string | null
+}
+
+type AccountRequestDecision = {
+    item: HelpItem
+    status: 'approved' | 'rejected'
 }
 
 interface UserProfile {
     first_name: string
     last_name: string
     profile_image: string | null
+    role?: string | null
 }
 
 export default function HelpDashboard() {
@@ -65,6 +79,14 @@ export default function HelpDashboard() {
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editingTitle, setEditingTitle] = useState('')
     const [editingResponse, setEditingResponse] = useState('');
+    const [requestDecision, setRequestDecision] = useState<AccountRequestDecision | null>(null);
+    const [requestReviewNote, setRequestReviewNote] = useState('');
+    const [requestVerificationMethod, setRequestVerificationMethod] = useState('');
+    const [requestDecisionError, setRequestDecisionError] = useState('');
+    const [requestDecisionSaving, setRequestDecisionSaving] = useState(false);
+    const [activePanel, setActivePanel] = useState<'faq' | 'requests'>('faq');
+    const [showHelpMenu, setShowHelpMenu] = useState(false);
+    const [pendingRequestCount, setPendingRequestCount] = useState(0);
 
     const latestItemRef = useRef<HTMLDivElement | null>(null);
 
@@ -115,11 +137,12 @@ export default function HelpDashboard() {
             .catch(err => console.error('โหลดข้อมูลผู้ใช้ล้มเหลว:', err))
     }, [token])
     const fetchHelps = async () => {
-        const res = await fetch(`${API_BASE}/help/all`, {
+        const res = await fetch(`${API_BASE}/help/all?limit=100`, {
             headers: { Authorization: `Bearer ${token}` },
         })
         const json = await res.json()
-        setHelps(json.data)
+        setHelps(Array.isArray(json.data) ? json.data : [])
+        setPendingRequestCount(Number(json.pending_deactivation_count) || 0)
     }
 
     useEffect(() => {
@@ -233,35 +256,112 @@ export default function HelpDashboard() {
         }
     };
 
-    const handleAccountRequest = async (item: HelpItem, requestStatus: 'approved' | 'rejected') => {
-        const reviewNote = window.prompt(requestStatus === 'approved' ? 'ระบุผลการตรวจสอบและเหตุผลที่อนุมัติ' : 'ระบุเหตุผลที่ปฏิเสธ');
-        if (!reviewNote?.trim()) return;
-        const verificationMethod = requestStatus === 'approved'
-            ? window.prompt('ระบุวิธีตรวจตัวตน เช่น ตรวจบัตรประชาชนและวันเกิด')
-            : '';
-        if (requestStatus === 'approved' && !verificationMethod?.trim()) return;
-        const ok = await confirmAction(requestStatus === 'approved'
-            ? 'เมื่ออนุมัติ บัญชีผู้ใช้จะถูกปิดใช้งานและ session เดิมจะถูกยกเลิก ยืนยันหรือไม่?'
-            : 'ยืนยันการปฏิเสธคำร้องนี้หรือไม่?');
-        if (!ok) return;
-        const res = await fetch(`${API_BASE}/help/${item.help_id}/status`, {
+    const openAccountRequestModal = (item: HelpItem, status: 'approved' | 'rejected') => {
+        setRequestDecision({ item, status });
+        setRequestReviewNote('');
+        setRequestVerificationMethod('');
+        setRequestDecisionError('');
+    };
+
+    const closeAccountRequestModal = () => {
+        if (requestDecisionSaving) return;
+        setRequestDecision(null);
+        setRequestDecisionError('');
+    };
+
+    const submitAccountRequestDecision = async () => {
+        if (!requestDecision) return;
+        const reviewNote = requestReviewNote.trim();
+        const verificationMethod = requestVerificationMethod.trim();
+        if (!reviewNote) {
+            setRequestDecisionError(requestDecision.status === 'approved'
+                ? 'กรุณาระบุผลการตรวจสอบและเหตุผลที่อนุมัติ'
+                : 'กรุณาระบุเหตุผลที่ปฏิเสธ');
+            return;
+        }
+        if (requestDecision.status === 'approved' && !verificationMethod) {
+            setRequestDecisionError('กรุณาระบุวิธีตรวจสอบตัวตน');
+            return;
+        }
+
+        setRequestDecisionSaving(true);
+        setRequestDecisionError('');
+        try {
+            const res = await fetch(`${API_BASE}/help/${requestDecision.item.help_id}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${Cookies.get('adminToken')}`,
+                },
+                body: JSON.stringify({
+                    request_status: requestDecision.status,
+                    review_note: reviewNote,
+                    verification_method: verificationMethod,
+                }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                setRequestDecisionError(data?.message || 'ดำเนินการไม่สำเร็จ กรุณาลองใหม่');
+                return;
+            }
+            setRequestDecision(null);
+            await Swal.fire({ icon: 'success', title: 'บันทึกผลคำร้องแล้ว', timer: 1400, showConfirmButton: false });
+            await fetchHelps();
+        } catch {
+            setRequestDecisionError('ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่');
+        } finally {
+            setRequestDecisionSaving(false);
+        }
+    };
+
+    const reactivateAccount = async (item: HelpItem) => {
+        if (!item.user_id) return;
+        const result = await Swal.fire({
+            title: 'คืนการใช้งานบัญชี',
+            text: `บัญชี ${item.account_name || item.email || `#${item.user_id}`} จะกลับเข้าสู่ขั้นตอนเปิดใช้งาน`,
+            input: 'textarea',
+            inputLabel: 'เหตุผลที่คืนบัญชี',
+            inputPlaceholder: 'เช่น ผู้ใช้ยืนยันว่าต้องการกลับมาใช้บัญชีเดิม',
+            inputAttributes: { 'aria-label': 'เหตุผลที่คืนบัญชี' },
+            showCancelButton: true,
+            confirmButtonText: 'ยืนยันการคืนบัญชี',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#0f9f8f',
+            reverseButtons: true,
+            preConfirm: (value) => {
+                if (!String(value || '').trim()) {
+                    Swal.showValidationMessage('กรุณาระบุเหตุผลที่คืนบัญชี');
+                    return false;
+                }
+                return String(value).trim();
+            },
+        });
+        if (!result.isConfirmed) return;
+
+        const res = await fetch(`${API_BASE}/users/${item.user_id}/account-status`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${Cookies.get('adminToken')}`,
             },
-            body: JSON.stringify({
-                request_status: requestStatus,
-                review_note: reviewNote.trim(),
-                verification_method: verificationMethod?.trim() || '',
-            }),
+            body: JSON.stringify({ account_status: 'active', reason: result.value }),
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) {
-            await Swal.fire({ icon: 'error', title: 'ดำเนินการไม่สำเร็จ', text: data?.message || 'กรุณาลองใหม่' });
+            await Swal.fire({ icon: 'error', title: 'คืนบัญชีไม่สำเร็จ', text: data?.message || 'กรุณาลองใหม่อีกครั้ง' });
             return;
         }
-        await Swal.fire({ icon: 'success', title: 'บันทึกผลคำร้องแล้ว', timer: 1400, showConfirmButton: false });
+        await Swal.fire({
+            icon: 'success',
+            title: 'คืนบัญชีเรียบร้อย',
+            text: data?.email_sent
+                ? 'ระบบส่ง OTP ให้ผู้ใช้ยืนยันบัญชีอีกครั้งแล้ว'
+                : data?.account_status === 'active'
+                    ? 'บัญชีสามารถกลับเข้าสู่ระบบได้แล้ว'
+                    : 'บัญชีเข้าสู่ขั้นตอนยืนยันตัวตนแล้ว',
+            timer: 2200,
+            showConfirmButton: false,
+        });
         await fetchHelps();
     };
 
@@ -284,35 +384,58 @@ export default function HelpDashboard() {
                 <Sidebar />
 
                 <section className={styles.contentArea}>
-                    <div className={styles.requestCard}>
-                        <div className={styles.faqTitleGroup}>
-                            <Activity size={24} />
-                            <div>
-                                <h2>คำร้องหยุดใช้งานบัญชี</h2>
-                                <p>{accountRequests.filter((item) => item.request_status === 'pending').length} รายการรอตรวจสอบ</p>
+                    {activePanel === 'requests' && <div className={styles.requestCard}>
+                        <div className={styles.requestCardHeader}>
+                            <div className={styles.faqTitleGroup}>
+                                <Activity size={24} />
+                                <div>
+                                    <h2>คำร้องหยุดใช้งานบัญชี</h2>
+                                    <p>{pendingRequestCount} รายการรอตรวจสอบ</p>
+                                </div>
                             </div>
+                            <button type="button" className={styles.backToFaqButton} onClick={() => setActivePanel('faq')}>
+                                กลับไปหน้าคำถาม
+                            </button>
                         </div>
                         <div className={styles.requestList}>
                             {accountRequests.length === 0 ? (
                                 <p className={styles.requestEmpty}>ยังไม่มีคำร้อง</p>
                             ) : accountRequests.map((item) => (
                                 <article key={item.help_id}>
-                                    <div>
-                                        <strong>{item.email || 'ไม่พบอีเมล'}</strong>
+                                    <div className={styles.requestIdentity}>
+                                        <div className={styles.requestIdentityHeading}>
+                                            <strong>{item.account_name || item.email || 'ไม่พบชื่อบัญชี'}</strong>
+                                            {item.registration_source === 'line' && (
+                                                <span className={styles.lineAccountBadge}>LINE</span>
+                                            )}
+                                        </div>
+                                        {item.account_name && item.email && <span>{item.email}</span>}
+                                        {item.registration_source === 'line' && !item.email && (
+                                            <span>บัญชี LINE · ไม่มีอีเมลที่เชื่อมต่อ</span>
+                                        )}
                                         <p>{item.description || '-'}</p>
                                         <small>สถานะ: {item.request_status || 'pending'}{item.review_note ? ` · ${item.review_note}` : ''}</small>
                                     </div>
                                     {item.request_status === 'pending' && (
                                         <div className={styles.requestActions}>
-                                            <button type="button" onClick={() => handleAccountRequest(item, 'rejected')}>ปฏิเสธ</button>
-                                            <button type="button" onClick={() => handleAccountRequest(item, 'approved')}>ตรวจสอบแล้วและอนุมัติ</button>
+                                            <button type="button" onClick={() => openAccountRequestModal(item, 'rejected')}>ปฏิเสธ</button>
+                                            <button type="button" onClick={() => openAccountRequestModal(item, 'approved')}>ตรวจสอบแล้วและอนุมัติ</button>
+                                        </div>
+                                    )}
+                                    {['super_admin', 'superadmin'].includes(String(admin.role || '').toLowerCase())
+                                        && item.request_status === 'approved'
+                                        && item.account_status === 'deactivated' && (
+                                        <div className={styles.requestActions}>
+                                            <button type="button" className={styles.reactivateButton} onClick={() => reactivateAccount(item)}>
+                                                <RotateCcw size={16} /> คืนการใช้งานบัญชี
+                                            </button>
                                         </div>
                                     )}
                                 </article>
                             ))}
                         </div>
-                    </div>
-                    <div className={styles.faqCard}>
+                    </div>}
+                    {activePanel === 'faq' && <div className={styles.faqCard}>
                         <div className={styles.faqHeader}>
                             <div className={styles.faqTitleGroup}>
                                 <HelpCircle size={24} strokeWidth={2.2} />
@@ -334,14 +457,32 @@ export default function HelpDashboard() {
                                     />
                                 </div>
 
-                                <button
-                                    type="button"
-                                    className={styles.faqAddBtn}
-                                    onClick={() => setShowPopup(true)}
-                                >
-                                    <Plus size={18} strokeWidth={2.4} />
-                                    เพิ่มคำถาม
-                                </button>
+                                <div className={styles.helpMenuWrap}>
+                                    <button
+                                        type="button"
+                                        className={styles.helpMenuButton}
+                                        onClick={() => setShowHelpMenu((current) => !current)}
+                                        aria-label="เปิดเมนูจัดการความช่วยเหลือ"
+                                        aria-expanded={showHelpMenu}
+                                    >
+                                        <Menu size={25} />
+                                        {pendingRequestCount > 0 && <span>{pendingRequestCount > 99 ? '99+' : pendingRequestCount}</span>}
+                                    </button>
+                                    {showHelpMenu && (
+                                        <div className={styles.helpMenuPopover}>
+                                            <button type="button" onClick={() => { setShowPopup(true); setShowHelpMenu(false); }}>
+                                                <Plus size={19} />
+                                                <span><strong>เพิ่มคำถาม</strong><small>สร้างคำถามและคำตอบใหม่</small></span>
+                                            </button>
+                                            <button type="button" onClick={() => { setActivePanel('requests'); setShowHelpMenu(false); }}>
+                                                <Activity size={19} />
+                                                <span><strong>คำร้องหยุดใช้งานบัญชี</strong><small>{pendingRequestCount} รายการรอตรวจสอบ</small></span>
+                                                {pendingRequestCount > 0 && <b>{pendingRequestCount}</b>}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
                             </div>
                         </div>
 
@@ -510,7 +651,113 @@ export default function HelpDashboard() {
                                 แสดง {filteredHelps.length} จาก {faqItems.length} คำถาม
                             </p>
                         </div>
-                    </div>
+                    </div>}
+
+                    {requestDecision && (
+                        <div
+                            className={styles.requestModalOverlay}
+                            onMouseDown={closeAccountRequestModal}
+                        >
+                            <section
+                                className={styles.requestModal}
+                                role="dialog"
+                                aria-modal="true"
+                                aria-labelledby="request-decision-title"
+                                onMouseDown={(event) => event.stopPropagation()}
+                            >
+                                <header className={styles.requestModalHeader}>
+                                    <div className={requestDecision.status === 'approved'
+                                        ? styles.requestModalApproveIcon
+                                        : styles.requestModalRejectIcon}
+                                    >
+                                        {requestDecision.status === 'approved'
+                                            ? <ShieldCheck size={25} />
+                                            : <Ban size={25} />}
+                                    </div>
+                                    <div>
+                                        <span>{requestDecision.status === 'approved' ? 'อนุมัติคำร้อง' : 'ปฏิเสธคำร้อง'}</span>
+                                        <h3 id="request-decision-title">คำร้องหยุดใช้งานบัญชี</h3>
+                                    </div>
+                                    <button type="button" onClick={closeAccountRequestModal} aria-label="ปิดหน้าต่าง">
+                                        <X size={19} />
+                                    </button>
+                                </header>
+
+                                <div className={styles.requestModalBody}>
+                                    <div className={styles.requestAccountSummary}>
+                                        <div>
+                                            <small>บัญชีผู้ใช้</small>
+                                            <strong>
+                                                {requestDecision.item.account_name || requestDecision.item.email || 'ไม่พบชื่อบัญชี'}
+                                            </strong>
+                                        </div>
+                                        {requestDecision.item.registration_source === 'line' && (
+                                            <span className={styles.lineAccountBadge}>LINE</span>
+                                        )}
+                                        {requestDecision.item.email && <p>{requestDecision.item.email}</p>}
+                                        <blockquote>{requestDecision.item.description || 'ไม่ได้ระบุเหตุผล'}</blockquote>
+                                    </div>
+
+                                    <label className={styles.requestModalField}>
+                                        <span>{requestDecision.status === 'approved' ? 'ผลการตรวจสอบและเหตุผลที่อนุมัติ' : 'เหตุผลที่ปฏิเสธ'}</span>
+                                        <textarea
+                                            rows={3}
+                                            value={requestReviewNote}
+                                            onChange={(event) => setRequestReviewNote(event.target.value)}
+                                            placeholder={requestDecision.status === 'approved'
+                                                ? 'เช่น ตรวจสอบข้อมูลถูกต้องและเป็นคำขอจากเจ้าของบัญชี'
+                                                : 'ระบุเหตุผลที่ไม่สามารถดำเนินการตามคำร้องได้'}
+                                            autoFocus
+                                        />
+                                    </label>
+
+                                    {requestDecision.status === 'approved' && (
+                                        <label className={styles.requestModalField}>
+                                            <span>วิธีตรวจสอบตัวตน</span>
+                                            <input
+                                                value={requestVerificationMethod}
+                                                onChange={(event) => setRequestVerificationMethod(event.target.value)}
+                                                placeholder="เช่น ตรวจบัตรประชาชนและวันเกิด"
+                                            />
+                                        </label>
+                                    )}
+
+                                    <div className={requestDecision.status === 'approved'
+                                        ? styles.requestModalWarning
+                                        : styles.requestModalNotice}
+                                    >
+                                        {requestDecision.status === 'approved'
+                                            ? 'เมื่ออนุมัติ บัญชีจะถูกปิดใช้งาน นัดหมายในอนาคตจะถูกยกเลิก และ session เดิมจะสิ้นสุดทันที'
+                                            : 'คำร้องจะถูกบันทึกเป็นปฏิเสธ โดยบัญชีผู้ใช้ยังคงใช้งานได้ตามปกติ'}
+                                    </div>
+
+                                    {requestDecisionError && (
+                                        <p className={styles.requestModalError}>{requestDecisionError}</p>
+                                    )}
+                                </div>
+
+                                <footer className={styles.requestModalFooter}>
+                                    <button type="button" onClick={closeAccountRequestModal} disabled={requestDecisionSaving}>
+                                        ยกเลิก
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={requestDecision.status === 'approved'
+                                            ? styles.requestModalApproveButton
+                                            : styles.requestModalRejectButton}
+                                        onClick={submitAccountRequestDecision}
+                                        disabled={requestDecisionSaving}
+                                    >
+                                        {requestDecisionSaving
+                                            ? 'กำลังบันทึก...'
+                                            : requestDecision.status === 'approved'
+                                                ? 'ยืนยันการอนุมัติ'
+                                                : 'ยืนยันการปฏิเสธ'}
+                                    </button>
+                                </footer>
+                            </section>
+                        </div>
+                    )}
 
                     {showPopup && (
                         <div

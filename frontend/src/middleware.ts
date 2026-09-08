@@ -39,8 +39,13 @@ async function getSession(token: string) {
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const requiresAdmin = pathname.startsWith("/admin");
-  const isGoogleProfileCompletion = pathname === "/google/complete-profile";
-  const requiresUser = pathname.startsWith("/users") || isGoogleProfileCompletion;
+  const profileProvider = pathname === "/google/complete-profile"
+    ? "google"
+    : pathname === "/line/complete-profile"
+      ? "line"
+      : null;
+  const isOAuthProfileCompletion = Boolean(profileProvider);
+  const requiresUser = pathname.startsWith("/users") || isOAuthProfileCompletion;
   const requiresSuperAdmin = pathname === "/admin/audit-logs" || pathname.startsWith("/admin/audit-logs/");
   const requiresMedicalRecordRole = pathname === "/admin/medicalrecords" || pathname.startsWith("/admin/medicalrecords/");
   const cookieName = requiresAdmin ? "adminToken" : "userToken";
@@ -71,7 +76,7 @@ export async function middleware(request: NextRequest) {
     validSession &&
     !session?.profileCompleted &&
     session?.registrationSource === "google" &&
-    !isGoogleProfileCompletion
+    !isOAuthProfileCompletion
   ) {
     return NextResponse.redirect(new URL("/google/complete-profile", request.url));
   }
@@ -80,18 +85,18 @@ export async function middleware(request: NextRequest) {
     requiresUser &&
     validSession &&
     !session?.profileCompleted &&
-    !isGoogleProfileCompletion &&
+    !isOAuthProfileCompletion &&
     pathname !== "/users/userprofile" &&
     !pathname.startsWith("/users/userprofile/")
   ) {
     return NextResponse.redirect(new URL("/users/userprofile?complete=1", request.url));
   }
 
-  if (isGoogleProfileCompletion && validSession) {
+  if (isOAuthProfileCompletion && validSession) {
     if (session?.profileCompleted) {
       return NextResponse.redirect(new URL("/users/userHome", request.url));
     }
-    if (session?.registrationSource !== "google") {
+    if (session?.registrationSource !== profileProvider) {
       return NextResponse.redirect(new URL("/users/userprofile?complete=1", request.url));
     }
   }
@@ -106,5 +111,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/users/:path*", "/google/complete-profile"],
+  matcher: [
+    "/admin/:path*",
+    "/users/:path*",
+    "/google/complete-profile",
+    "/line/complete-profile",
+  ],
 };

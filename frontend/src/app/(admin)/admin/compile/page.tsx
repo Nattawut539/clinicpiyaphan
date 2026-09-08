@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any */
 
 import Link from 'next/link';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import { useEffect, useMemo, useState } from 'react';
 import styles from './compile.module.css';
 import { API_BASE } from '@/lib/api';

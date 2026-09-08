@@ -99,7 +99,7 @@ router.get("/line/login", (req, res) => {
 });
 
 // Callback
-router.get("/line/callback", async (req, res, next) => {
+router.get("/line/callback", async (req, res) => {
   const { code, state } = req.query;
   const stateCookie = req.cookies?.line_state;
   const nonceCookie = req.cookies?.line_nonce;
@@ -155,16 +155,17 @@ router.get("/line/callback", async (req, res, next) => {
     const client = await pool.connect();
     let user_id, role;
     let sessionVersion = 1;
+    let profileCompleted = false;
     try {
       await client.query("BEGIN");
       let found = await client.query(
-        "SELECT user_id, role, account_status, session_version FROM clinic.users WHERE line_id=$1",
+        "SELECT user_id, role, account_status, session_version, profile_completed_at, email, password_hash FROM clinic.users WHERE line_id=$1",
         [lineUserId],
       );
 
       if (!found.rowCount && email) {
         found = await client.query(
-          `SELECT u.user_id, u.role, u.account_status, u.session_version
+          `SELECT u.user_id, u.role, u.account_status, u.session_version, u.profile_completed_at, u.email, u.password_hash
            FROM clinic.users u
            LEFT JOIN clinic.user_details d ON d.user_id = u.user_id
            WHERE LOWER(u.email) = $1
@@ -181,9 +182,15 @@ router.get("/line/callback", async (req, res, next) => {
       if (found.rowCount) {
         ({ user_id, role } = found.rows[0]);
         sessionVersion = Number(found.rows[0].session_version || 1);
-        if (String(found.rows[0].account_status || "active") !== "active") {
+        profileCompleted = Boolean(
+          found.rows[0].profile_completed_at && found.rows[0].email && found.rows[0].password_hash,
+        );
+        const accountStatus = String(found.rows[0].account_status || "active").toLowerCase();
+        if (accountStatus !== "active") {
           const error = new Error("Account is not active");
           error.status = 403;
+          error.code = "ACCOUNT_INACTIVE";
+          error.accountStatus = accountStatus;
           throw error;
         }
         await client.query(
@@ -198,7 +205,7 @@ router.get("/line/callback", async (req, res, next) => {
         await client.query(
           `UPDATE clinic.user_details
            SET email = COALESCE(email, $1),
-               first_name = COALESCE(first_name, $2),
+               first_name = COALESCE(NULLIF(BTRIM(first_name), ''), $2),
                profile_image = COALESCE(NULLIF(profile_image, ''), $3)
            WHERE user_id = $4`,
           [email, displayName, pictureUrl, user_id],
@@ -208,11 +215,12 @@ router.get("/line/callback", async (req, res, next) => {
           `INSERT INTO clinic.users
            (line_id, email, role, account_status, registration_source)
            VALUES ($1, $2, $3, 'active', 'line')
-           RETURNING user_id, role, session_version`,
+           RETURNING user_id, role, session_version, profile_completed_at`,
           [lineUserId, email, "user"],
         );
         ({ user_id, role } = ins.rows[0]);
         sessionVersion = Number(ins.rows[0].session_version || 1);
+        profileCompleted = Boolean(ins.rows[0].profile_completed_at);
         await client.query(
           "INSERT INTO clinic.user_details (user_id, first_name, profile_image, email) VALUES ($1,$2,$3,$4)",
           [user_id, displayName, pictureUrl, email],
@@ -240,12 +248,19 @@ router.get("/line/callback", async (req, res, next) => {
       cookieOptions({ httpOnly: false, maxAge: authCookieMaxAge }));
 
     const dest = new URL(
-      ROLE_HOME[normalizedRole] || "/",
+      isUserRole && !profileCompleted ? "/line/complete-profile" : ROLE_HOME[normalizedRole] || "/",
       FRONTEND_URL,
     ).toString();
     return res.redirect(dest);
   } catch (err) {
-    next(err);
+    res.clearCookie("line_state", clearCookieOptions({ httpOnly: true }));
+    res.clearCookie("line_nonce", clearCookieOptions({ httpOnly: true }));
+    console.error("LINE OAuth callback failed:", err.response?.data || err.message);
+    const loginUrl = new URL("/userlogin", FRONTEND_URL);
+    loginUrl.searchParams.set("oauth_error", err.code === "ACCOUNT_INACTIVE" ? "account_inactive" : "provider_error");
+    loginUrl.searchParams.set("provider", "line");
+    if (err.accountStatus) loginUrl.searchParams.set("account_status", err.accountStatus);
+    return res.redirect(loginUrl.toString());
   }
 });
 

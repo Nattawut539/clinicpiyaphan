@@ -16,6 +16,7 @@ const {
 const notificationsRouter = require("./routes/notifications");
 const { ensureAuditSchema, requestAudit } = require("./tools/audit");
 const pool = require("./tools/db");
+const ensureProfileImageSchema = require("./tools/ensureProfileImageSchema");
 const securityRateLimit = require("./tools/rateLimit");
 const { uploadRoot } = require("./tools/profileImageUpload");
 const { startMqttBridge, stopMqttBridge } = require("./tools/mqttBridge");
@@ -52,7 +53,8 @@ app.use(requestAudit);
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(securityRateLimit);
-app.use("/uploads", express.static(uploadRoot, {
+// Legacy local files remain available during migration. Disable after migration.
+if (process.env.SERVE_LEGACY_UPLOADS !== "false") app.use("/uploads", express.static(uploadRoot, {
   fallthrough: false,
   maxAge: 0,
   setHeaders(res) {
@@ -73,6 +75,7 @@ app.use("/api/provinces", require("./routes/provinces"));
 // === Core APIs ===
 app.use("/api", require("./routes/help"));
 app.use("/api", require("./routes/users"));
+app.use("/api", require("./routes/profileImages"));
 app.use("/api", require("./routes/queue"));
 app.use("/api", require("./routes/medical"));
 app.use("/api", notificationsRouter);
@@ -130,6 +133,7 @@ async function startServer() {
       await ensureQueueSchema();
       await ensureAdvisorRequirementsSchema();
       await ensureAuditSchema();
+      await ensureProfileImageSchema();
     }
     const runtimeRole = await pool.query(
       `SELECT current_user,

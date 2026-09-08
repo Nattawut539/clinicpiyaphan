@@ -1,5 +1,8 @@
 # Deployment Notes
 
+Google Drive image storage setup, migration and cleanup:
+[คู่มือภาษาไทย](GOOGLE_DRIVE_STORAGE_TH.md).
+
 ## Frontend
 
 - Root directory: `frontend`
@@ -27,7 +30,9 @@ private URL for reaching the backend. Build the frontend again whenever
 - Migration/release command: `npm run migrate`
 - Preflight command: `npm run check:deploy`
 - Start command: `npm run start`
-- Required env: `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL`, `CORS_ORIGINS`, `UPLOAD_DIR`
+- Required env: `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL`, `CORS_ORIGINS`
+- Image storage: `STORAGE_PROVIDER=local` requires persistent `UPLOAD_DIR`;
+  `STORAGE_PROVIDER=google_drive` requires the four `GOOGLE_DRIVE_*` variables below.
 
 For the hardware scale, set `MQTT_ENABLED=true` and configure `MQTT_URL`,
 `MQTT_CLIENT_ID`, `MQTT_USERNAME`, `MQTT_PASSWORD`, and (for a private CA)
@@ -90,7 +95,8 @@ not a PostgreSQL superuser and has no cluster/database creation privileges.
 - Run `npm run migrate` with a backed-up database before starting the new release.
 - Set SMTP variables before testing forgot-password or appointment email.
 - Use a dedicated non-superuser database role; production startup rejects a superuser.
-- Mount a persistent disk and set its absolute path in `UPLOAD_DIR`.
+- For local image storage, mount a persistent disk and set its absolute path in `UPLOAD_DIR`.
+- For Google Drive storage, run `npm run check:storage` and test image upload/read/delete.
 - Confirm `clinic.audit_logs` is created and Super Admin can read `/api/audit-logs`.
 - Run `AUDIT_TEST_ALLOW_MUTATION=true npm run test:audit` against a staging database.
 - Add the same Google and LINE callback URLs in each provider console.

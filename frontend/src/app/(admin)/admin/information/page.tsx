@@ -3,7 +3,7 @@
 import { ChangeEvent, Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import styles from './information.module.css';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import Link from 'next/link';
 import Image from 'next/image';
 import dayjs from 'dayjs';
@@ -335,7 +335,7 @@ function PatientProfileContent() {
         <div className={styles.container}>
             <header className={styles.header}>
                 <div className={styles.leftHeader}>
-                    <Link href="/dashboard">
+                    <Link href="/admin/dashboard">
                         <Image src="/img/profileclinic.png" alt="logo" className={styles.logoIcon} width={40} height={40} />
                     </Link>
                     <span className={styles.brand}>ข้อมูลผู้ป่วย</span>

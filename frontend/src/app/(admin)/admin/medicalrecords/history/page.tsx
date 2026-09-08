@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Cookies from "js-cookie";
+import Cookies from "@/lib/cookies";
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/th";
 import {

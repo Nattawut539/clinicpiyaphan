@@ -7,7 +7,7 @@ import { FcGoogle } from 'react-icons/fc';
 import { FaLine, FaEye, FaEyeSlash } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import Link from 'next/link';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import { useRouter } from 'next/navigation';
 import { API_BASE } from '@/lib/api';
 import ThaiDatePicker from '@/components/date/ThaiDatePicker';
@@ -73,6 +73,52 @@ export default function LoginPage() {
             .then(r => r.json())
             .then((rows: ProvinceRow[]) => setProvincesList(rows.map(it => it.name_th)))
             .catch(() => setProvincesList([]));
+    }, []);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const oauthError = params.get('oauth_error');
+        if (!oauthError) return;
+
+        const providerParam = params.get('provider')?.toLowerCase();
+        const provider = providerParam === 'line' ? 'LINE' : providerParam === 'google' ? 'Google' : 'บัญชีภายนอก';
+        const accountStatus = params.get('account_status')?.toLowerCase();
+
+        window.history.replaceState({}, '', window.location.pathname);
+
+        if (oauthError === 'account_inactive') {
+            const content = accountStatus === 'deactivated'
+                ? {
+                    title: 'บัญชีนี้ถูกหยุดใช้งานแล้ว',
+                    text: `บัญชี ${provider} นี้ถูกปิดตามคำร้องของผู้ใช้ หากต้องการกลับมาใช้บัญชีเดิม กรุณาติดต่อคลินิกเพื่อขอคืนการใช้งาน`,
+                }
+                : accountStatus === 'suspended'
+                    ? {
+                        title: 'บัญชีถูกระงับการใช้งาน',
+                        text: `ยังไม่สามารถเข้าสู่ระบบด้วย ${provider} ได้ กรุณาติดต่อคลินิกเพื่อตรวจสอบและขอเปิดใช้งานบัญชี`,
+                    }
+                    : {
+                        title: 'บัญชีนี้ยังไม่พร้อมใช้งาน',
+                        text: `ไม่สามารถเข้าสู่ระบบด้วย ${provider} ได้ กรุณาติดต่อคลินิกเพื่อตรวจสอบสถานะบัญชี`,
+                    };
+
+            void Swal.fire({
+                icon: 'warning',
+                title: content.title,
+                html: `<p style="margin:0 0 14px;line-height:1.7;color:#526176">${content.text}</p><div style="padding:12px 14px;border-radius:12px;background:#f0fdfa;color:#0f766e;font-size:14px"><strong>ติดต่อคลินิก</strong><br>โทร 086-856-8646<br>อีเมล clinic.piyaphan@gmail.com</div>`,
+                confirmButtonText: 'รับทราบ',
+                confirmButtonColor: '#0f9f8f',
+            });
+            return;
+        }
+
+        void Swal.fire({
+            icon: 'error',
+            title: `เข้าสู่ระบบด้วย ${provider} ไม่สำเร็จ`,
+            text: 'การยืนยันตัวตนอาจหมดอายุหรือถูกยกเลิก กรุณาลองเข้าสู่ระบบอีกครั้ง หากยังพบปัญหาให้ติดต่อคลินิก',
+            confirmButtonText: 'รับทราบ',
+            confirmButtonColor: '#2563eb',
+        });
     }, []);
 
     if (!hasMounted) return null;
@@ -176,6 +222,23 @@ export default function LoginPage() {
             if (!res.ok) {
                 if (result?.code === 'EMAIL_VERIFICATION_REQUIRED' && result?.email) {
                     router.push(`/verify-email?email=${encodeURIComponent(result.email)}`);
+                }
+                if (result?.code === 'ACCOUNT_INACTIVE') {
+                    const status = String(result?.account_status || '').toLowerCase();
+                    const title = status === 'deactivated'
+                        ? 'บัญชีนี้ถูกหยุดใช้งานแล้ว'
+                        : status === 'suspended'
+                            ? 'บัญชีถูกระงับการใช้งาน'
+                            : 'บัญชีนี้ยังไม่พร้อมใช้งาน';
+                    await Swal.fire({
+                        icon: 'warning',
+                        title,
+                        text: result?.error || 'กรุณาติดต่อคลินิกเพื่อตรวจสอบสถานะบัญชี',
+                        footer: 'ติดต่อคลินิก: 086-856-8646 · clinic.piyaphan@gmail.com',
+                        confirmButtonText: 'รับทราบ',
+                        confirmButtonColor: '#0f9f8f',
+                    });
+                    return;
                 }
                 throw new Error(result?.error || result?.message || 'เข้าสู่ระบบไม่สำเร็จ');
             }

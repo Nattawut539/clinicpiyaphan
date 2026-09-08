@@ -4,9 +4,10 @@ import styles from './UserShell.module.css';
 import { appBrand, userNavigationItems } from '@/config/navigation';
 import { API_BASE } from '@/lib/api';
 import { resolveBackendImage } from '@/lib/images';
+import { PROFILE_UPDATED_EVENT, ProfileUpdateDetail, withImageVersion } from '@/lib/profileUpdates';
 import dayjs from 'dayjs';
 import 'dayjs/locale/th';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import { Bell, CalendarClock, Check, History, Inbox, UserRound, X } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -47,6 +48,7 @@ export default function Header() {
   const pathname = usePathname();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
+  const [imageVersion, setImageVersion] = useState<string>();
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationTab, setNotificationTab] = useState<'active' | 'history'>('active');
   const [notificationLoading, setNotificationLoading] = useState(false);
@@ -68,6 +70,19 @@ export default function Header() {
       .then((response) => (response.ok ? response.json() : null))
       .then((data: UserProfile | null) => setProfile(data))
       .catch(() => setProfile(null));
+  }, []);
+
+  useEffect(() => {
+    const updateProfile = (event: Event) => {
+      const detail = (event as CustomEvent<ProfileUpdateDetail>).detail;
+      if (!detail?.profile) return;
+      setProfile((current) => ({ ...current, ...detail.profile }));
+      if (detail.imageVersion) setImageVersion(detail.imageVersion);
+      setImageFailed(false);
+    };
+
+    window.addEventListener(PROFILE_UPDATED_EVENT, updateProfile);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, updateProfile);
   }, []);
 
   const loadNotifications = async () => {
@@ -142,7 +157,7 @@ export default function Header() {
     return name || 'ผู้ใช้งาน';
   }, [profile]);
   const initial = fullName.charAt(0).toUpperCase();
-  const imageSrc = resolveBackendImage(profile?.profile_image);
+  const imageSrc = withImageVersion(resolveBackendImage(profile?.profile_image), imageVersion);
   const currentPage = useMemo(() => {
     return userNavigationItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
   }, [pathname]);
@@ -271,7 +286,6 @@ export default function Header() {
           </span>
           <span className={styles.profileText}>
             <strong>{fullName}</strong>
-            <small>บัญชีผู้ป่วย</small>
           </span>
         </button>
       </div>

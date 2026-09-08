@@ -5,7 +5,7 @@ import { LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import { API_BASE } from '@/lib/api';
 import styles from './AdminSidebar.module.css';
 

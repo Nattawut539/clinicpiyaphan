@@ -2,7 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const router = express.Router();
 const pool = require("../tools/db");
-const { requireAuth, requireStaff, withContext } = require("../tools/_utils");
+const { requireStaff, withContext } = require("../tools/_utils");
 const { JWT_SECRET } = require("../tools/config");
 
 const ACCESS_CODE_ENCRYPTION_KEY = crypto

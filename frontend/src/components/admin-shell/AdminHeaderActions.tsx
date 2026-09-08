@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import dayjs from 'dayjs';
 import { Bell, CalendarClock, X } from 'lucide-react';
 import { API_BASE } from '@/lib/api';
 import { resolveBackendImage } from '@/lib/images';
+import { PROFILE_UPDATED_EVENT, ProfileUpdateDetail, withImageVersion } from '@/lib/profileUpdates';
 import styles from './AdminHeaderActions.module.css';
 
 const API = API_BASE.endsWith('/api') ? API_BASE : `${API_BASE}/api`;
@@ -51,6 +52,7 @@ export default function AdminHeaderActions() {
     });
     const [importantEvents, setImportantEvents] = useState<ImportantEvent[]>([]);
     const [avatarFailed, setAvatarFailed] = useState(false);
+    const [imageVersion, setImageVersion] = useState<string>();
     const [notificationOpen, setNotificationOpen] = useState(false);
 
     useEffect(() => {
@@ -94,11 +96,29 @@ export default function AdminHeaderActions() {
             .catch((error) => console.error('โหลดข้อมูลส่วนหัว Admin ไม่สำเร็จ:', error));
     }, []);
 
+    useEffect(() => {
+        const updateProfile = (event: Event) => {
+            const detail = (event as CustomEvent<ProfileUpdateDetail>).detail;
+            if (!detail?.profile) return;
+            setProfile((current) => ({
+                ...current,
+                ...detail.profile,
+                first_name: detail.profile.first_name ?? current.first_name,
+                last_name: detail.profile.last_name ?? current.last_name,
+            }));
+            if (detail.imageVersion) setImageVersion(detail.imageVersion);
+            setAvatarFailed(false);
+        };
+
+        window.addEventListener(PROFILE_UPDATED_EVENT, updateProfile);
+        return () => window.removeEventListener(PROFILE_UPDATED_EVENT, updateProfile);
+    }, []);
+
     const todayPendingCount = importantEvents.filter((event) => event.due === 'today').length;
     const tomorrowPendingCount = importantEvents.filter((event) => event.due === 'tomorrow').length;
     const notificationCount = importantEvents.length;
     const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Admin';
-    const imageSrc = resolveBackendImage(profile.profile_image);
+    const imageSrc = withImageVersion(resolveBackendImage(profile.profile_image), imageVersion);
 
     return (
         <div className={styles.actions}>

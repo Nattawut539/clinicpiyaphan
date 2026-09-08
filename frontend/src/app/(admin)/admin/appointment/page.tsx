@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import styles from './Appointment.module.css';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import Swal from 'sweetalert2';
 import { API_BASE } from '@/lib/api';
 import Sidebar from '@/components/admin-shell/AdminSidebar';

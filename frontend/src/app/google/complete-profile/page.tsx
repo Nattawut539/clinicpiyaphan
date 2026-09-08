@@ -1,7 +1,7 @@
 'use client';
 
 import { API_BASE } from '@/lib/api';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import { ArrowRight, CalendarDays, CreditCard, Mail, Phone, ShieldCheck, UserRound } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';

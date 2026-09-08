@@ -136,6 +136,8 @@ router.get("/google/callback", async (req, res) => {
         if (!["active", "pending_verification"].includes(existingStatus)) {
           const error = new Error("Account is not active");
           error.status = 403;
+          error.code = "ACCOUNT_INACTIVE";
+          error.accountStatus = existingStatus.toLowerCase();
           throw error;
         }
         await client.query(
@@ -227,7 +229,9 @@ router.get("/google/callback", async (req, res) => {
       error.response?.data || error.message,
     );
     const loginUrl = new URL("/userlogin", FRONTEND_URL);
-    loginUrl.searchParams.set("oauth_error", "google");
+    loginUrl.searchParams.set("oauth_error", error.code === "ACCOUNT_INACTIVE" ? "account_inactive" : "provider_error");
+    loginUrl.searchParams.set("provider", "google");
+    if (error.accountStatus) loginUrl.searchParams.set("account_status", error.accountStatus);
     return res.redirect(loginUrl.toString());
   }
 });

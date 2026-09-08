@@ -55,7 +55,6 @@ export default function UserSidebar() {
           {isOpen && (
             <div className={styles.brandText}>
               <strong>{appBrand.name}</strong>
-              <span>{appBrand.portalName}</span>
             </div>
           )}
         </div>

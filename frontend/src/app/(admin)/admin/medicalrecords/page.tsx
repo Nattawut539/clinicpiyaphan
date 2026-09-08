@@ -5,7 +5,7 @@ import Link from "next/link";
 import Sidebar from "@/components/admin-shell/AdminSidebar";
 import AdminHeaderActions from "@/components/admin-shell/AdminHeaderActions";
 import styles from "./Medicalrecords.module.css";
-import Cookies from "js-cookie";
+import Cookies from "@/lib/cookies";
 import dayjs from "dayjs";
 import "dayjs/locale/th";
 import { API_BASE } from "@/lib/api";

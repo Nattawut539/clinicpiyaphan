@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import { useRouter } from 'next/navigation';
 import styles from './logout.module.css';
 import { API_BASE, USER_API } from '@/lib/api';

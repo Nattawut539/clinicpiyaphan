@@ -36,6 +36,21 @@
   box-shadow: 0 7px 20px rgba(31, 41, 55, 0.08);
 }
 
+.lineIcon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 1px solid #bdeecf;
+  border-radius: 16px;
+  background: #f0fff5;
+  color: #06c755;
+  box-shadow: 0 7px 20px rgba(6, 199, 85, 0.12);
+}
+
+.header .lineText { color: #079843; }
+
 .header span {
   color: #1a73e8;
   font-size: 13px;
@@ -67,6 +82,23 @@
   background: #f0faf3;
   color: #188038;
 }
+
+.lineNotice {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 24px 0;
+  padding: 14px 16px;
+  border: 1px solid #bdeecf;
+  border-radius: 14px;
+  background: #f0fff5;
+  color: #079843;
+}
+
+.lineNotice strong,
+.lineNotice span { display: block; }
+.lineNotice strong { font-size: 13px; }
+.lineNotice span { margin-top: 2px; color: #4b6352; font-size: 12px; }
 
 .verifiedEmail strong,
 .verifiedEmail span {
@@ -122,6 +154,12 @@
   cursor: not-allowed;
 }
 
+.passwordField {
+  position: relative;
+}
+
+.passwordField input { padding-right: 48px; }
+
 .form small {
   color: #77808d;
   font-size: 11px;
@@ -151,6 +189,32 @@
 
 .form button:hover:not(:disabled) { background: #155fc0; }
 .form button:disabled { cursor: wait; opacity: 0.65; }
+
+.form .passwordField button {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  grid-column: auto;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline-offset: 2px;
+  background: transparent;
+  color: #64748b;
+  box-shadow: none;
+  transform: translateY(-50%);
+}
+
+.form .passwordField button:hover:not(:disabled),
+.form .passwordField button:focus-visible {
+  background: transparent;
+  color: #079843;
+  box-shadow: none;
+}
 
 .error,
 .loading {

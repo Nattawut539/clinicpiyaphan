@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import { RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import AdminSidebar from '@/components/admin-shell/AdminSidebar';
 import AdminHeaderActions from '@/components/admin-shell/AdminHeaderActions';

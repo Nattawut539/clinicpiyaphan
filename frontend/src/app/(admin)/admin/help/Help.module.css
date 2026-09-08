@@ -207,12 +207,145 @@
    Help FAQ UI from Figma + real database
 ========================================================= */
 
+.helpMenuWrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.helpMenuButton {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  border: 1px solid #cfe4e8;
+  border-radius: 18px;
+  background: #fff;
+  color: #176d7b;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.06);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.helpMenuButton:hover {
+  transform: translateY(-1px);
+  border-color: #7dd3cf;
+  box-shadow: 0 8px 20px rgba(15, 118, 110, 0.12);
+}
+
+.helpMenuButton > span {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 23px;
+  height: 23px;
+  padding: 0 6px;
+  border: 2px solid #f8fafc;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.helpMenuPopover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(350px, calc(100vw - 110px));
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+}
+
+.helpMenuPopover button {
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: #1e293b;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.helpMenuPopover button:hover {
+  background: #f0fdfa;
+  color: #0f766e;
+}
+
+.helpMenuPopover button > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.helpMenuPopover strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.helpMenuPopover small {
+  margin-top: 2px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.helpMenuPopover b {
+  min-width: 25px;
+  height: 25px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+
+.backToFaqButton {
+  height: 40px;
+  padding: 0 15px;
+  border: 1px solid #dbe5ef;
+  border-radius: 12px;
+  background: #fff;
+  color: #526176;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.backToFaqButton:hover {
+  border-color: #99d7d1;
+  color: #0f766e;
+}
+
+.requestCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .faqCard {
   width: 100%;
   background: #ffffff;
   border: 1px solid #eef2f7;
   border-radius: 22px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
 }
 
@@ -735,11 +868,13 @@
 
   .faqHeaderActions {
     align-items: stretch;
-    flex-direction: column;
+    flex-direction: row;
   }
 
   .faqSearchBox {
-    width: 100%;
+    width: auto;
+    min-width: 0;
+    flex: 1;
   }
 
   .faqAddBtn {
@@ -815,4 +950,350 @@
   border-color: #16a34a;
   background: #16a34a;
   color: #fff;
+}
+
+.requestActions .reactivateButton,
+.requestActions .reactivateButton:last-child {
+  border-color: #99f6e4;
+  background: #ecfdf5;
+  color: #0f766e;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.requestActions .reactivateButton:hover {
+  background: #ccfbf1;
+}
+
+.requestIdentity {
+  min-width: 0;
+}
+
+.requestIdentityHeading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.requestIdentity > span {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lineAccountBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #06c755;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.requestModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(7px);
+}
+
+.requestModal {
+  width: min(580px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.32);
+}
+
+.requestModalHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 20px 22px;
+  border-bottom: 1px solid #edf2f7;
+  background: linear-gradient(135deg, #f8fafc, #fff);
+}
+
+.requestModalHeader h3,
+.requestModalHeader span {
+  margin: 0;
+}
+
+.requestModalHeader span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.requestModalHeader h3 {
+  margin-top: 2px;
+  color: #172033;
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.requestModalHeader > button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 12px;
+  background: #eef2f7;
+  color: #475569;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.requestModalApproveIcon,
+.requestModalRejectIcon {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+}
+
+.requestModalApproveIcon {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.requestModalRejectIcon {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.requestModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+  padding: 22px;
+}
+
+.requestAccountSummary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  padding: 15px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #f8fafc;
+}
+
+.requestAccountSummary small,
+.requestAccountSummary strong,
+.requestAccountSummary p,
+.requestAccountSummary blockquote {
+  margin: 0;
+}
+
+.requestAccountSummary small {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.requestAccountSummary strong {
+  display: block;
+  margin-top: 2px;
+  color: #1e293b;
+  font-size: 15px;
+}
+
+.requestAccountSummary p,
+.requestAccountSummary blockquote {
+  grid-column: 1 / -1;
+}
+
+.requestAccountSummary p {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.requestAccountSummary blockquote {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed #cbd5e1;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.requestModalField {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.requestModalField > span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.requestModalField textarea,
+.requestModalField input {
+  width: 100%;
+  border: 1px solid #dbe3ee;
+  border-radius: 13px;
+  outline: none;
+  background: #fbfdff;
+  color: #1e293b;
+  font: inherit;
+  font-size: 14px;
+  transition: 0.2s ease;
+}
+
+.requestModalField textarea {
+  min-height: 96px;
+  padding: 11px 13px;
+  resize: vertical;
+}
+
+.requestModalField input {
+  height: 44px;
+  padding: 0 13px;
+}
+
+.requestModalField textarea:focus,
+.requestModalField input:focus {
+  border-color: #3b82f6;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.requestModalWarning,
+.requestModalNotice {
+  padding: 12px 14px;
+  border-radius: 13px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.requestModalWarning {
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.requestModalNotice {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.requestModalError {
+  margin: -5px 0 0;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.requestModalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 22px 20px;
+  border-top: 1px solid #edf2f7;
+  background: #fbfdff;
+}
+
+.requestModalFooter button {
+  min-width: 120px;
+  height: 43px;
+  padding: 0 16px;
+  border-radius: 13px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.requestModalFooter button:first-child {
+  border: 1px solid #dbe3ee;
+  background: #fff;
+  color: #64748b;
+}
+
+.requestModalApproveButton,
+.requestModalRejectButton {
+  border: 0;
+  color: #fff;
+}
+
+.requestModalApproveButton {
+  background: #16a34a;
+  box-shadow: 0 8px 18px rgba(22, 163, 74, 0.2);
+}
+
+.requestModalRejectButton {
+  background: #dc2626;
+  box-shadow: 0 8px 18px rgba(220, 38, 38, 0.2);
+}
+
+.requestModalFooter button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@media (max-width: 640px) {
+  .requestCardHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .requestCardHeader .backToFaqButton {
+    width: 100%;
+  }
+
+  .requestList article {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .requestActions,
+  .requestActions button {
+    width: 100%;
+  }
+
+  .requestModalOverlay {
+    padding: 12px;
+  }
+
+  .requestModalHeader,
+  .requestModalBody {
+    padding: 16px;
+  }
+
+  .requestModalHeader h3 {
+    font-size: 16px;
+  }
+
+  .requestModalFooter {
+    align-items: stretch;
+    flex-direction: column-reverse;
+    padding: 14px 16px 16px;
+  }
+
+  .requestModalFooter button {
+    width: 100%;
+  }
 }

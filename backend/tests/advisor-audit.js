@@ -283,7 +283,6 @@ async function testAuthorization(staff, raceUsers) {
     appointments_no_token: () => request(`/appointments/user/${raceUsers.userA.user_id}`),
     approved_week_user: () => request("/appointments/approved-week?start=2026-01-01&end=2026-12-31", { token: userToken }),
     approved_week_staff: () => request("/appointments/approved-week?start=2026-01-01&end=2026-12-31", { token: staffToken }),
-    patients_debug_no_token: () => request("/patients-debug"),
     slots_seed_no_token: () => request("/slots/seed", { method: "POST", body: {} }),
     slots_seed_user: () => request("/slots/seed", { method: "POST", token: userToken, body: {} }),
     audit_logs_no_token: () => request("/audit-logs?limit=5"),

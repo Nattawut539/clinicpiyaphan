@@ -3,6 +3,7 @@ const pool = require("./db");
 
 const SENSITIVE_READ_PREFIXES = [
   "/api/patients",
+  "/api/profile-images",
   "/api/medical",
   "/api/appointments",
   "/api/measurements",

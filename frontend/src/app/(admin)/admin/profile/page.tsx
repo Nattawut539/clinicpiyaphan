@@ -3,7 +3,7 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import {
     ArrowLeft,
     Camera,
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { API_BASE } from '@/lib/api';
 import { resolveBackendImage } from '@/lib/images';
+import { publishProfileUpdate, withImageVersion } from '@/lib/profileUpdates';
 import Sidebar from '@/components/admin-shell/AdminSidebar';
 import AdminHeaderActions from '@/components/admin-shell/AdminHeaderActions';
 import styles from './Profile.module.css';
@@ -80,6 +81,7 @@ export default function AdminProfilePage() {
     const [error, setError] = useState('');
     const [notice, setNotice] = useState('');
     const [imageFailed, setImageFailed] = useState(false);
+    const [imageVersion, setImageVersion] = useState<string>();
 
     const token = Cookies.get('adminToken') || '';
     const isSuperAdmin = ['super_admin', 'superadmin'].includes(String(profile?.role || '').toLowerCase());
@@ -161,7 +163,12 @@ export default function AdminProfilePage() {
                 body,
             }));
 
+            const nextImageVersion = publishProfileUpdate(data, Boolean(imageFile));
             setProfile(data);
+            if (nextImageVersion) {
+                setImageVersion(nextImageVersion);
+                setImageFailed(false);
+            }
             setProfileForm({ first_name: data.first_name, last_name: data.last_name, email: data.email || '' });
             setImageFile(null);
             setEditing(false);
@@ -209,7 +216,7 @@ export default function AdminProfilePage() {
     };
 
     const fullName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Admin' : 'Admin';
-    const imageSrc = previewUrl || resolveBackendImage(profile?.profile_image);
+    const imageSrc = previewUrl || withImageVersion(resolveBackendImage(profile?.profile_image), imageVersion);
 
     return (
         <div className={styles.container}>

@@ -1,4 +1,6 @@
 const path = require("path");
+const { STORAGE_PROVIDER, validateStorageConfig } = require("./storageConfig");
+validateStorageConfig();
 
 const PORT = Number(process.env.PORT || 5000);
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
@@ -69,7 +71,7 @@ if (IS_PRODUCTION) {
   }
 
   const uploadDir = String(process.env.UPLOAD_DIR || "").trim();
-  if (!uploadDir && process.env.ALLOW_EPHEMERAL_UPLOADS !== "true") {
+  if (STORAGE_PROVIDER === "local" && !uploadDir && process.env.ALLOW_EPHEMERAL_UPLOADS !== "true") {
     throw new Error("UPLOAD_DIR must point to persistent storage in production");
   }
   if (uploadDir && !path.isAbsolute(uploadDir)) {

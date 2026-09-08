@@ -2,7 +2,8 @@
 
 import { API_BASE } from '@/lib/api';
 import { resolveBackendImage } from '@/lib/images';
-import Cookies from 'js-cookie';
+import { publishProfileUpdate, withImageVersion } from '@/lib/profileUpdates';
+import Cookies from '@/lib/cookies';
 import { Camera, Pencil, Save, UserRound, X } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -122,6 +123,7 @@ export default function UserprofilePage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [imageFailed, setImageFailed] = useState(false);
+  const [imageVersion, setImageVersion] = useState<string>();
 
   const token = Cookies.get('userToken') || '';
   const previewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile]);
@@ -156,7 +158,7 @@ export default function UserprofilePage() {
   }, [router, token]);
 
   const fullName = `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || 'ผู้ใช้งาน';
-  const imageSrc = previewUrl || resolveBackendImage(profile?.profile_image);
+  const imageSrc = previewUrl || withImageVersion(resolveBackendImage(profile?.profile_image), imageVersion);
 
   const updateField = (field: keyof Profile, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -203,8 +205,13 @@ export default function UserprofilePage() {
       }));
 
       const nextProfile = normalizeProfile(data);
+      const nextImageVersion = publishProfileUpdate(nextProfile, Boolean(imageFile));
       setProfile(nextProfile);
       setForm(nextProfile);
+      if (nextImageVersion) {
+        setImageVersion(nextImageVersion);
+        setImageFailed(false);
+      }
       setImageFile(null);
       setEditing(false);
       setNotice('บันทึกข้อมูลผู้ป่วยเรียบร้อยแล้ว');

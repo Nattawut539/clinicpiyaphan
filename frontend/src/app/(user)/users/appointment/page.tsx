@@ -7,7 +7,7 @@ import { CalendarCheck, CalendarDays, Clock, Eye, EyeOff, KeyRound, List, Plus, 
 import dayjs from 'dayjs';
 import 'dayjs/locale/th';
 import { useRouter } from 'next/navigation';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import { jwtDecode } from 'jwt-decode';
 import { API_BASE } from '@/lib/api';
 

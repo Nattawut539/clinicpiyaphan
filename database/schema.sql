@@ -65,6 +65,7 @@ CREATE TABLE clinic.user_details (
   last_name varchar(100),
   birth_date date,
   profile_image text,
+  profile_image_drive_id text,
   gender varchar(20),
   blood_type varchar(2),
   address text,
@@ -87,6 +88,18 @@ CREATE TABLE clinic.user_details (
   CONSTRAINT user_details_email_format_chk CHECK
     (email IS NULL OR email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$')
 );
+
+CREATE INDEX user_details_profile_image_drive_idx
+  ON clinic.user_details(profile_image_drive_id)
+  WHERE profile_image_drive_id IS NOT NULL;
+
+CREATE TABLE clinic.profile_image_cleanup (
+  drive_file_id text PRIMARY KEY,
+  folder_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  attempts integer NOT NULL DEFAULT 0
+);
+REVOKE ALL ON clinic.profile_image_cleanup FROM PUBLIC;
 
 CREATE UNIQUE INDEX user_details_national_id_unique_idx
   ON clinic.user_details (national_id)

@@ -10,6 +10,8 @@ import {
     Mail,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import Swal from 'sweetalert2';
 import styles from './userHome.module.css';
 
 type UserPageId = 'appointment' | 'services';
@@ -31,6 +33,21 @@ const googleMapsAppUrl = `https://www.google.com/maps/search/?api=1&query=${clin
 
 export default function UserHomePage() {
     const router = useRouter();
+
+    useEffect(() => {
+        const completion = sessionStorage.getItem('lineProfileCompleted');
+        if (!completion) return;
+        sessionStorage.removeItem('lineProfileCompleted');
+        void Swal.fire({
+            icon: 'success',
+            title: 'ตั้งค่าบัญชีสำเร็จ',
+            text: completion === 'email-sent'
+                ? 'เข้าสู่ระบบเรียบร้อย และส่งอีเมลแจ้งเตือนการเพิ่มช่องทางเข้าสู่ระบบแล้ว'
+                : 'เข้าสู่ระบบเรียบร้อย คุณสามารถใช้ LINE หรืออีเมลพร้อมรหัสผ่านได้ในครั้งถัดไป',
+            confirmButtonText: 'เริ่มใช้งาน',
+            confirmButtonColor: '#0f9f8f',
+        });
+    }, []);
 
     const onNavigate = (page: UserPageId) => {
         if (page === 'appointment') {

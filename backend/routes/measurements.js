@@ -202,7 +202,6 @@ async function saveManualMeasurement(req, res, next) {
   }
 }
 
-router.post("/", requireStaff, saveManualMeasurement);
 router.post("/measurements", requireStaff, saveManualMeasurement);
 
 router.get("/measurements/queue/:queue_id", requireStaff, async (req, res, next) => {

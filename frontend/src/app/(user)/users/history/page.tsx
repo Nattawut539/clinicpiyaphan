@@ -1,7 +1,7 @@
 'use client';
 
 import { API_BASE } from '@/lib/api';
-import Cookies from 'js-cookie';
+import Cookies from '@/lib/cookies';
 import dayjs from 'dayjs';
 import 'dayjs/locale/th';
 import {
