@@ -818,23 +818,7 @@ function RecordFormPage({
                                         placeholder={placeholder}
                                     />
                                 </div>
-                            ))}
-                            {[
-                                { label: "แพ้ยา", value: patient.drug_allergy },
-                                { label: "แพ้อาหาร", value: patient.food_allergy },
-                                { label: "โรคประจำตัว", value: patient.congenital_disease },
-                            ].map(({ label, value }) => (
-                                <div key={label} className={styles.formGroup}>
-                                    <label>{label}</label>
-                                    <input
-                                        className={styles.patientMedicalReadonly}
-                                        type="text"
-                                        value={String(value || "ไม่มี")}
-                                        readOnly
-                                        aria-label={`${label}ของผู้ป่วย`}
-                                    />
-                                </div>
-                            ))}
+                            ))}                          
                         </div>
 
                         <div className={styles.drawingSummary}>

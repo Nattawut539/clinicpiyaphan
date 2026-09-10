@@ -471,6 +471,15 @@ function formatMeasurement(value?: number | null, unit?: string) {
     return unit ? `${value} ${unit}` : String(value);
 }
 
+function hasSameQueueSnapshot(current: QueueTicket[], next: QueueTicket[]) {
+    if (current.length !== next.length) return false;
+    return current.every((queue, index) => JSON.stringify(queue) === JSON.stringify(next[index]));
+}
+
+function hasSameQueueTicket(current: QueueTicket, next: QueueTicket) {
+    return JSON.stringify(current) === JSON.stringify(next);
+}
+
 export default function DashboardPage() {
     const [, setLoading] = useState(true);
     const [now, setNow] = useState(() => dayjs());
@@ -912,6 +921,11 @@ export default function DashboardPage() {
     };
 
     const selectQueue = (queue: QueueTicket) => {
+        if (selectedQueue?.queue_id === queue.queue_id && !selectedAppointment) {
+            setPatientPanelOpen(true);
+            return;
+        }
+
         patientSelectionVersion.current += 1;
         selectedUserIdRef.current = queue.user_id;
         selectedQueueIdRef.current = queue.queue_id;
@@ -926,6 +940,11 @@ export default function DashboardPage() {
     };
 
     const selectAppointment = (appointment: ApprovedAppointment) => {
+        if (selectedAppointment?.appointment_id === appointment.appointment_id && !selectedQueue) {
+            setPatientPanelOpen(true);
+            return;
+        }
+
         patientSelectionVersion.current += 1;
         selectedUserIdRef.current = appointment.user_id;
         selectedQueueIdRef.current = appointment.queue_id ?? null;
@@ -1534,10 +1553,12 @@ export default function DashboardPage() {
                 if (!response.ok || !active) return;
                 const data: QueueTicket[] = await response.json();
                 if (!active) return;
-                setQueues(data);
+                setQueues((current) => hasSameQueueSnapshot(current, data) ? current : data);
                 setSelectedQueue((current) => {
                     if (!current) return current;
-                    return data.find((queue) => queue.queue_id === current.queue_id) || null;
+                    const refreshed = data.find((queue) => queue.queue_id === current.queue_id) || null;
+                    if (!refreshed) return null;
+                    return hasSameQueueTicket(current, refreshed) ? current : refreshed;
                 });
             } catch (error) {
                 console.error('refreshHardwareQueues:', error);
@@ -1603,12 +1624,18 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [calendarMonth]);
 
+    const activeSelectionKey = selectedQueue
+        ? `queue:${selectedQueue.queue_id}`
+        : selectedAppointment
+            ? `appointment:${selectedAppointment.appointment_id}`
+            : '';
+    const activeSelectedUserId = selectedQueue?.user_id ?? selectedAppointment?.user_id ?? null;
+    const activeSelectedQueueId = selectedQueue?.queue_id ?? selectedAppointment?.queue_id ?? null;
+
     useEffect(() => {
         const selectionVersion = ++patientSelectionVersion.current;
-        const selectedUserId = selectedQueue?.user_id ?? selectedAppointment?.user_id ?? null;
-        const selectedQueueId = selectedQueue?.queue_id ?? selectedAppointment?.queue_id ?? null;
-        selectedUserIdRef.current = selectedUserId;
-        selectedQueueIdRef.current = selectedQueueId;
+        selectedUserIdRef.current = activeSelectedUserId;
+        selectedQueueIdRef.current = activeSelectedQueueId;
 
         setPatient(null);
         setLatestMeasurement(null);
@@ -1619,12 +1646,14 @@ export default function DashboardPage() {
         setPatientDraftDirty(false);
         setSyncedMeasurementId(null);
 
-        if (selectedQueue || selectedAppointment) {
-            fetchPatientDetail(selectedUserId, selectionVersion);
+        if (activeSelectionKey) {
+            fetchPatientDetail(activeSelectedUserId, selectionVersion);
 
-            if (selectedQueueId) fetchLatestMeasurement(selectedQueueId, selectionVersion);
+            if (activeSelectedQueueId) fetchLatestMeasurement(activeSelectedQueueId, selectionVersion);
         }
-    }, [selectedQueue, selectedAppointment]);
+    // A background refresh may replace the selected queue object with fresh server data.
+    // Reset drafts only when the selected queue/appointment identity actually changes.
+    }, [activeSelectionKey, activeSelectedUserId, activeSelectedQueueId]);
 
     useEffect(() => {
         if (!patient) {
