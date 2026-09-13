@@ -37,11 +37,86 @@ GRANT USAGE ON SCHEMA clinic TO cliniccare_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE
   ON clinic.clinic_open_days,
      clinic.advance_booking_weeks,
-     clinic.user_feedbacks
+     clinic.user_feedbacks,
+     clinic.clinic_holidays,
+     clinic.appointment_slots,
+     clinic.appointments
   TO cliniccare_runtime;
 
 GRANT USAGE, SELECT, UPDATE
   ON ALL SEQUENCES IN SCHEMA clinic
   TO cliniccare_runtime;
 
+GRANT EXECUTE
+  ON ALL FUNCTIONS IN SCHEMA clinic
+  TO cliniccare_runtime;
+
+DO $policies$
+DECLARE
+  target_table text;
+BEGIN
+  FOREACH target_table IN ARRAY ARRAY[
+    'advance_booking_weeks',
+    'appointment_slots',
+    'appointments',
+    'clinic_holidays',
+    'clinic_open_days',
+    'user_feedbacks'
+  ]
+  LOOP
+    EXECUTE format('ALTER TABLE clinic.%I ENABLE ROW LEVEL SECURITY', target_table);
+
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_policies
+      WHERE schemaname = 'clinic'
+        AND tablename = target_table
+        AND policyname = 'cliniccare_runtime_backend_full_access'
+    ) THEN
+      EXECUTE format(
+        'CREATE POLICY cliniccare_runtime_backend_full_access
+         ON clinic.%I
+         FOR ALL
+         TO cliniccare_runtime
+         USING (true)
+         WITH CHECK (true)',
+        target_table
+      );
+    END IF;
+  END LOOP;
+END
+$policies$;
+
 COMMIT;
+
+SELECT
+  table_name,
+  has_table_privilege(
+    'cliniccare_runtime',
+    format('clinic.%I', table_name),
+    'SELECT'
+  ) AS can_select,
+  has_table_privilege(
+    'cliniccare_runtime',
+    format('clinic.%I', table_name),
+    'INSERT'
+  ) AS can_insert,
+  has_table_privilege(
+    'cliniccare_runtime',
+    format('clinic.%I', table_name),
+    'UPDATE'
+  ) AS can_update,
+  has_table_privilege(
+    'cliniccare_runtime',
+    format('clinic.%I', table_name),
+    'DELETE'
+  ) AS can_delete
+FROM (VALUES
+  ('advance_booking_weeks'),
+  ('appointment_slots'),
+  ('appointments'),
+  ('clinic_holidays'),
+  ('clinic_open_days'),
+  ('user_feedbacks')
+) AS required_tables(table_name)
+ORDER BY table_name;

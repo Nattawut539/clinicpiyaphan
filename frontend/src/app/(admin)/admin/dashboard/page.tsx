@@ -847,19 +847,28 @@ export default function DashboardPage() {
             setAdvanceBookingWeeks((current) => [...current, data]);
             await fetchCalendarMonth();
             setAdvanceBookingOpen(false);
-            Swal.fire({
+            await Swal.fire({
                 icon: 'success',
                 title: 'เปิดจองล่วงหน้าแล้ว',
                 text: `ผู้ใช้สามารถจองวันที่ ${dayjs(data.week_start).locale('th').format('D MMMM')} - ${dayjs(data.week_end).locale('th').format('D MMMM')} ได้แล้ว`,
                 timer: 1800,
                 showConfirmButton: false,
+                customClass: {
+                    container: styles.advanceBookingConfirmLayer,
+                },
             });
         } catch (error) {
-            Swal.fire({
+            if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+            }
+            await Swal.fire({
                 icon: 'error',
                 title: 'เปิดจองล่วงหน้าไม่สำเร็จ',
                 text: getErrorMessage(error, 'เกิดข้อผิดพลาด'),
                 confirmButtonColor: '#167d8d',
+                customClass: {
+                    container: styles.advanceBookingConfirmLayer,
+                },
             });
         } finally {
             setAdvanceBookingSaving(false);
