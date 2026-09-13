@@ -55,10 +55,13 @@ function createDriveStorage(drive, folderId) {
     try {
       const { data } = await drive.files.get({
         fileId: id,
-        fields: "id,mimeType,size,parents,trashed",
+        fields: "id,mimeType,size,trashed",
       }, options);
-      if (data.trashed || !data.parents?.includes(folderId)) {
-        throw Object.assign(new Error("Asset is outside the managed folder"), { code: 404 });
+      // This is a single, explicitly configured public asset. Unlike uploaded
+      // patient profile images, it does not need to live in the managed upload
+      // folder; the OAuth account only needs read access to the pinned file ID.
+      if (data.trashed) {
+        throw Object.assign(new Error("Asset is trashed"), { code: 404 });
       }
       meta = data;
     } catch (error) { throw storageError(error); }

@@ -54,8 +54,8 @@ test("streams managed image bytes and refuses oversized or non-image content", a
   await assert.rejects(storage.read("file"), { status: 404 });
 });
 
-test("streams a curated public asset only when it is inside the configured folder", async () => {
-  let meta = { parents: ["folder"], mimeType: "image/jpeg", size: "3" };
+test("streams a pinned public asset outside the managed upload folder", async () => {
+  let meta = { parents: ["another-folder"], mimeType: "image/jpeg", size: "3" };
   const storage = createDriveStorage({ files: {
     get: async (request) => ({
       data: request.alt ? Readable.from([Buffer.from("jpg")]) : meta,
@@ -67,6 +67,6 @@ test("streams a curated public asset only when it is inside the configured folde
   for await (const chunk of image.stream) chunks.push(chunk);
   assert.equal(Buffer.concat(chunks).toString(), "jpg");
 
-  meta = { ...meta, parents: ["another-folder"] };
+  meta = { ...meta, trashed: true };
   await assert.rejects(storage.readPublicAsset("doctor-file"), { status: 404 });
 });

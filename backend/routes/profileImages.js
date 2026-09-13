@@ -18,6 +18,10 @@ router.get("/clinic-assets/doctor-image", async (_req, res) => {
     if (Number.isFinite(image.size)) res.setHeader("Content-Length", image.size);
     await pipeline(image.stream, res);
   } catch (error) {
+    console.error("GET /clinic-assets/doctor-image failed", {
+      code: error.code || "DRIVE_UNAVAILABLE",
+      status: error.status || 503,
+    });
     if (res.headersSent || res.destroyed) { res.destroy(); return; }
     res.removeHeader("Content-Length");
     res.status(error.status === 404 ? 404 : 503).json({ message: "Unable to load doctor image" });
