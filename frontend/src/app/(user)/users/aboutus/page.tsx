@@ -2,11 +2,8 @@
 
 import styles from './aboutus.module.css';
 import { Building2, Clock, GraduationCap } from 'lucide-react';
-import { resolveBackendImage } from '@/lib/images';
 
 export default function AboutusPage() {
-  const doctorImage = resolveBackendImage('/uploads/profiles/doctor.jpg?v=20260902');
-
   return (
     <div className={styles.aboutPage}>
       <div className={styles.profileIntro}>
@@ -24,7 +21,7 @@ export default function AboutusPage() {
             <div className={styles.staffAvatarGroup}>
               <img
                 className={styles.doctorImage}
-                src={doctorImage || '/uploads/profiles/doctor.jpg?v=20260902'}
+                src="/img/profileclinic.png"
                 alt="นายแพทย์ปิยะพันธ์ ตรงสุจิตร"
               />
             </div>

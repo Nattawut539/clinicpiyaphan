@@ -8,18 +8,27 @@ let feedbackSchemaReady = false;
 async function ensureFeedbackSchema() {
   if (feedbackSchemaReady) return;
 
-  await pool.query(`
-    ALTER TABLE clinic.user_feedbacks
-      ADD COLUMN IF NOT EXISTS record_id bigint,
-      ADD COLUMN IF NOT EXISTS visit_date date,
-      ADD COLUMN IF NOT EXISTS service_type text
+  const { rows } = await pool.query(`
+    SELECT
+      COUNT(*) FILTER (
+        WHERE column_name IN ('record_id', 'visit_date', 'service_type')
+      )::int AS required_column_count,
+      to_regclass('clinic.user_feedbacks_user_record_unique') IS NOT NULL AS has_unique_index
+    FROM information_schema.columns
+    WHERE table_schema = 'clinic'
+      AND table_name = 'user_feedbacks'
   `);
 
-  await pool.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS user_feedbacks_user_record_unique
-    ON clinic.user_feedbacks (user_id, record_id)
-    WHERE record_id IS NOT NULL
-  `);
+  if (
+    Number(rows[0]?.required_column_count || 0) !== 3 ||
+    !rows[0]?.has_unique_index
+  ) {
+    const error = new Error(
+      'Feedback schema is not ready; run database/production_runtime_migration.sql as the database owner',
+    );
+    error.code = 'FEEDBACK_SCHEMA_NOT_READY';
+    throw error;
+  }
 
   feedbackSchemaReady = true;
 }

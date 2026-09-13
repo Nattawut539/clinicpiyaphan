@@ -1,25 +1,4 @@
-const OPEN_DAYS_TABLE_SQL = `
-  CREATE TABLE IF NOT EXISTS clinic.clinic_open_days (
-    service_date date PRIMARY KEY,
-    reason text,
-    created_by integer,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
-  )
-`;
-
-const ADVANCE_BOOKING_WEEKS_TABLE_SQL = `
-  CREATE TABLE IF NOT EXISTS clinic.advance_booking_weeks (
-    week_start date PRIMARY KEY,
-    week_end date NOT NULL,
-    created_by integer,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT advance_booking_weeks_valid_range CHECK (week_end >= week_start),
-    CONSTRAINT advance_booking_weeks_same_month CHECK (
-      date_trunc('month', week_start::timestamp) = date_trunc('month', week_end::timestamp)
-    )
-  )
-`;
+let calendarRulesSchemaReady = false;
 
 const DEFAULT_SUNDAY_REASON = "วันหยุดประจำสัปดาห์ของคลินิก";
 
@@ -28,8 +7,23 @@ function validDate(value) {
 }
 
 async function ensureCalendarRulesSchema(db) {
-  await db.query(OPEN_DAYS_TABLE_SQL);
-  await db.query(ADVANCE_BOOKING_WEEKS_TABLE_SQL);
+  if (calendarRulesSchemaReady) return;
+
+  const { rows } = await db.query(`
+    SELECT
+      to_regclass('clinic.clinic_open_days') IS NOT NULL AS has_open_days,
+      to_regclass('clinic.advance_booking_weeks') IS NOT NULL AS has_advance_weeks
+  `);
+
+  if (!rows[0]?.has_open_days || !rows[0]?.has_advance_weeks) {
+    const error = new Error(
+      'Calendar schema is not ready; run database/production_runtime_migration.sql as the database owner',
+    );
+    error.code = 'CALENDAR_SCHEMA_NOT_READY';
+    throw error;
+  }
+
+  calendarRulesSchemaReady = true;
 }
 
 async function isAdvanceBookingDate(db, date) {
