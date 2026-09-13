@@ -11,6 +11,8 @@ function storageError(error) {
 
 function createDriveStorage(drive, folderId) {
   const options = { timeout: 30000, retry: false };
+  const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+  const maxImageBytes = 3 * 1024 * 1024;
   async function checkFolder() {
     try {
       const { data } = await drive.files.get({ fileId: folderId, fields: "id,mimeType,trashed,capabilities(canAddChildren)" }, options);
@@ -51,24 +53,49 @@ function createDriveStorage(drive, folderId) {
     return readImage(id, meta);
   }
   async function readPublicAsset(id) {
+    if (!/^[A-Za-z0-9_-]{10,200}$/.test(id)) {
+      throw Object.assign(new Error("Invalid public asset ID"), { status: 404 });
+    }
     let meta;
     try {
       const { data } = await drive.files.get({
         fileId: id,
         fields: "id,mimeType,size,trashed",
       }, options);
-      // This is a single, explicitly configured public asset. Unlike uploaded
-      // patient profile images, it does not need to live in the managed upload
-      // folder; the OAuth account only needs read access to the pinned file ID.
-      if (data.trashed) {
-        throw Object.assign(new Error("Asset is trashed"), { code: 404 });
-      }
       meta = data;
-    } catch (error) { throw storageError(error); }
+    } catch (_error) {
+      // Clinic branding is intentionally public. This fallback keeps the
+      // website working when the OAuth account differs from the file owner.
+      return readSharedPublicImage(id);
+    }
+    // This is a single, explicitly configured public asset. Unlike uploaded
+    // patient profile images, it does not need to live in the managed upload
+    // folder; the OAuth account only needs read access to the pinned file ID.
+    if (meta.trashed) {
+      throw Object.assign(new Error("Asset is trashed"), { status: 404 });
+    }
     return readImage(id, meta);
   }
+  async function readSharedPublicImage(id) {
+    let response;
+    try {
+      response = await fetch(`https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download`, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(30000),
+      });
+    } catch (_error) {
+      throw Object.assign(new Error("Public Drive asset is unavailable"), { status: 503, code: "DRIVE_UNAVAILABLE" });
+    }
+    const mimetype = String(response.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
+    const size = Number(response.headers.get("content-length"));
+    if (!response.ok || !response.body || !allowedImageTypes.has(mimetype) || !Number.isFinite(size) || size > maxImageBytes) {
+      response.body?.cancel().catch(() => {});
+      throw Object.assign(new Error("Invalid public Drive image"), { status: response.status === 404 ? 404 : 503 });
+    }
+    return { stream: Readable.fromWeb(response.body), mimetype, size };
+  }
   async function readImage(id, meta) {
-    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(meta.mimeType) || Number(meta.size) > 3 * 1024 * 1024) {
+    if (!allowedImageTypes.has(meta.mimeType) || Number(meta.size) > maxImageBytes) {
       throw Object.assign(new Error("Invalid stored image"), { status: 404 });
     }
     try {

@@ -70,3 +70,20 @@ test("streams a pinned public asset outside the managed upload folder", async ()
   meta = { ...meta, trashed: true };
   await assert.rejects(storage.readPublicAsset("doctor-file"), { status: 404 });
 });
+
+test("falls back to a public Drive download when OAuth cannot see the pinned asset", async (t) => {
+  const originalFetch = global.fetch;
+  t.after(() => { global.fetch = originalFetch; });
+  global.fetch = async () => new Response(Buffer.from("jpg"), {
+    status: 200,
+    headers: { "content-type": "image/jpeg", "content-length": "3" },
+  });
+  const storage = createDriveStorage({ files: { get: async () => {
+    throw Object.assign(new Error("not found"), { response: { status: 404 } });
+  } } }, "folder");
+
+  const image = await storage.readPublicAsset("1-2uvuDroqDlFwZmZEaJDaNYzx6jcIrFV");
+  const chunks = [];
+  for await (const chunk of image.stream) chunks.push(chunk);
+  assert.equal(Buffer.concat(chunks).toString(), "jpg");
+});
