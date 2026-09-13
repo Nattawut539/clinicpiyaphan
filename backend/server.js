@@ -34,7 +34,10 @@ app.set("trust proxy", trustProxy);
 app.use(cors({
   origin(origin, callback) {
     if (!origin || CORS_ORIGINS.includes(origin)) return callback(null, true);
-    return callback(new Error(`CORS blocked origin: ${origin}`));
+    const error = new Error(`CORS blocked origin: ${origin}`);
+    error.status = 403;
+    error.code = "CORS_ORIGIN_DENIED";
+    return callback(error);
   },
   credentials: true,
 }));

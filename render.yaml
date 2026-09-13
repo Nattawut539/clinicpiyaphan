@@ -1,0 +1,117 @@
+services:
+  - type: web
+    name: cliniccare-api
+    runtime: node
+    region: singapore
+    plan: free
+    branch: deployment/production-preparation
+    rootDir: backend
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: npm run start:render
+    healthCheckPath: /readyz
+    autoDeployTrigger: off
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_NAME
+        value: postgres
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: PGSSL
+        value: "true"
+      - key: PG_CONNECT_TIMEOUT
+        value: "10000"
+      - key: PG_IDLE
+        value: "10000"
+      - key: PG_MAX
+        value: "5"
+      - key: PG_APP
+        value: cliniccare-api
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: https://cliniccare-frontend-umdi.onrender.com
+      - key: CORS_ORIGINS
+        value: https://cliniccare-frontend-umdi.onrender.com,https://clinicpiyaphan.online
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAME_SITE
+        value: lax
+      - key: TRUST_PROXY
+        value: "1"
+      - key: DISABLE_EMAIL
+        value: "false"
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "2525"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: DISABLE_GOOGLE_OAUTH
+        value: "false"
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        value: https://cliniccare-frontend-umdi.onrender.com/api/google/callback
+      - key: DISABLE_LINE_OAUTH
+        value: "false"
+      - key: LINE_CHANNEL_ID
+        sync: false
+      - key: LINE_CHANNEL_SECRET
+        sync: false
+      - key: LINE_REDIRECT_URI
+        value: https://cliniccare-frontend-umdi.onrender.com/api/line/callback
+      - key: LINE_SCOPES
+        value: openid profile email
+      - key: RECAPTCHA_ENABLED
+        value: "true"
+      - key: RECAPTCHA_SECRET_KEY
+        sync: false
+      - key: RECAPTCHA_ALLOWED_HOSTNAMES
+        value: cliniccare-frontend-umdi.onrender.com
+      - key: MQTT_ENABLED
+        value: "true"
+      - key: MQTT_URL
+        sync: false
+      - key: MQTT_CLIENT_ID
+        value: clinic-backend-production
+      - key: MQTT_USERNAME
+        sync: false
+      - key: MQTT_PASSWORD
+        sync: false
+      - key: MQTT_TOPIC_PREFIX
+        value: clinic/v1
+      - key: MQTT_QOS
+        value: "1"
+      - key: MQTT_REJECT_UNAUTHORIZED
+        value: "true"
+      - key: STORAGE_PROVIDER
+        value: google_drive
+      - key: GOOGLE_DRIVE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_DRIVE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_DRIVE_REFRESH_TOKEN
+        sync: false
+      - key: GOOGLE_DRIVE_FOLDER_ID
+        sync: false
+      - key: ALLOW_EPHEMERAL_UPLOADS
+        value: "false"
+      - key: SERVE_LEGACY_UPLOADS
+        value: "true"
+      - key: RUN_MIGRATIONS_ON_START
+        value: "false"

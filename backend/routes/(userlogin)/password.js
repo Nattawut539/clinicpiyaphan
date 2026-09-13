@@ -4,19 +4,12 @@ const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { JWT_SECRET } = require("../../tools/config");
-const nodemailer = require("nodemailer"); //นำเข้า Nodemailer สำหรับส่ง OTP
+const { sendClinicMail } = require("../../tools/mailer");
 const pool = require("../../tools/db");
 
 const router = express.Router();
 
 const EXPIRE_MIN = Number(process.env.RESET_TOKEN_EXPIRE_MIN || 10); // กำหนดเวลาหมดอายุของ OTP 10 นาที
-
-// อ่านค่าจาก .env (รองรับทั้ง SMTP_* และ MAIL_*)
-const SMTP_HOST = process.env.SMTP_HOST || process.env.MAIL_HOST;
-const SMTP_PORT = Number(process.env.SMTP_PORT || process.env.MAIL_PORT || 587);
-const SMTP_USER = process.env.SMTP_USER || process.env.MAIL_USER;
-const SMTP_PASS = process.env.SMTP_PASS || process.env.MAIL_PASS;
-const MAIL_FROM = process.env.MAIL_FROM || SMTP_USER;
 
 // ฟังก์ชันสร้าง OTP ตัวเลข 6 หลักด้วยตัวสุ่มแบบเข้ารหัสของ Node.js
 // crypto.randomInt สุ่มค่าตั้งแต่ 0 ถึง 999999 และ padStart เติมเลข 0 ด้านหน้าให้ครบ 6 หลัก
@@ -31,18 +24,11 @@ function hashOTP(email, otp) {
     .digest("hex");
 }
 
-//ฟังก์ชันสร้าง Nodemailer transporter สำหรับเชื่อม SMTP และส่งอีเมล
-function makeTransport() {
-  return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_PORT === 465, // Port 465 เชื่อมต่อแบบ SSL โดยตรง
-    auth: { user: SMTP_USER, pass: SMTP_PASS }, //auth ข้อมูลสำหรับเข้าสู่ระบบบัญชีอีเมล
-  });
-}
-
 //ขั้นตอน 1 การขอรหัส OTP
 router.post("/forgot-password/request", async (req, res) => {
+  if (process.env.DISABLE_EMAIL === "true") {
+    return res.status(503).json({ message: "ระบบส่งอีเมลยังไม่เปิดใช้งาน", code: "EMAIL_DISABLED" });
+  }
   const raw = (req.body?.email || "").trim(); //อ่านอีเมลจาก Request Body
   const email = raw.toLowerCase();
   if (!email) return res.status(400).json({ message: "ป้อนอีเมลของคุณ" }); //ตรวจสอบว่าผู้ใช้กรอกอีเมลหรือไม่
@@ -95,10 +81,8 @@ router.post("/forgot-password/request", async (req, res) => {
     await client.query("COMMIT");
 
     //สร้าง Nodemailer พร้อมส่ง OTP ให้ผู้ใช้
-    const t = makeTransport();
-    await t.sendMail({
+    await sendClinicMail({
       to: email,
-      from: MAIL_FROM,
       subject: "รหัส OTP สำหรับรีเซ็ตรหัสผ่านของคุณ",
       html: `<p>รหัส OTP ของคุณคือ <b style ="font-size:20px">${otp}</b></p>
         <p>รหัสมีอายุ ${EXPIRE_MIN} นาที</p>`,

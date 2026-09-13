@@ -5,6 +5,9 @@ const { hashOtp, issueEmailVerification } = require("../../tools/emailVerificati
 const router = express.Router();
 
 router.post("/email-verification/resend", async (req, res, next) => {
+  if (process.env.DISABLE_EMAIL === "true") {
+    return res.status(503).json({ message: "ระบบส่งอีเมลยังไม่เปิดใช้งาน", code: "EMAIL_DISABLED" });
+  }
   const email = String(req.body?.email || "").trim().toLowerCase();
   if (!email) return res.status(400).json({ message: "กรุณาระบุอีเมล" });
   try {

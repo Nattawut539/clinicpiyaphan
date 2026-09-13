@@ -5,9 +5,14 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "start:render": "npm run check:deploy && node server.js",
     "dev": "nodemon server.js",
     "migrate": "node tools/migrate.js",
     "check:deploy": "node tools/preflight.js",
+    "check:integrations": "node tools/checkIntegrations.js",
+    "check:integrations:smtp": "node tools/checkIntegrations.js --verify-smtp",
+    "check:integrations:strict": "node tools/checkIntegrations.js --require-all",
+    "check:integrations:live": "node tools/checkIntegrations.js --require-all --verify-smtp --verify-storage --verify-mqtt",
     "test:audit": "node tests/advisor-audit.js",
     "test:requirements-schema": "node tests/requirements-schema.js",
     "test:requirements-api": "node tests/requirements-api-smoke.js",
@@ -22,6 +27,7 @@
     "check:profile-images:drive": "node tools/checkProfileImageMigration.js",
     "cleanup:profile-images": "node tools/cleanupProfileImages.js",
     "test:profile-images": "node --test tests/profile-images.test.js",
+    "test:recaptcha": "node --test tests/recaptcha.test.js",
     "test:profile-images-workflow": "node tests/profile-images-workflow.js"
   },
   "keywords": [],

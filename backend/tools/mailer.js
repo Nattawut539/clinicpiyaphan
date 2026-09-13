@@ -31,6 +31,11 @@ function escapeHtml(value) {
 }
 
 async function sendClinicMail({ to, subject, html }) {
+  if (process.env.DISABLE_EMAIL === "true") {
+    const error = new Error("Email delivery is disabled");
+    error.code = "EMAIL_DISABLED";
+    throw error;
+  }
   if (!to) throw new Error("ไม่พบอีเมลผู้รับ");
 
   return getTransporter().sendMail({
@@ -41,4 +46,11 @@ async function sendClinicMail({ to, subject, html }) {
   });
 }
 
-module.exports = { escapeHtml, sendClinicMail };
+async function verifyMailTransport() {
+  if (process.env.DISABLE_EMAIL === "true") {
+    throw new Error("Email delivery is disabled");
+  }
+  return getTransporter().verify();
+}
+
+module.exports = { escapeHtml, sendClinicMail, verifyMailTransport };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styles from './login.module.css';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { FcGoogle } from 'react-icons/fc';
@@ -44,6 +44,7 @@ export default function LoginPage() {
 
     // recaptcha
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+    const captchaRef = useRef<ReCAPTCHA>(null);
 
     // loading
     const [loadingLogin, setLoadingLogin] = useState(false);
@@ -191,6 +192,8 @@ export default function LoginPage() {
             });
             router.push(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`);
         } catch (err: unknown) {
+            captchaRef.current?.reset();
+            setCaptchaToken(null);
             Swal.fire({ icon: 'error', title: 'สมัครสมาชิกไม่สำเร็จ', text: getErrorMessage(err, 'เกิดข้อผิดพลาด') });
         } finally {
             setLoadingReg(false);
@@ -398,7 +401,13 @@ export default function LoginPage() {
 
             {RECAPTCHA_KEY ? (
                 <div className={styles.recaptchaWrapper}>
-                    <ReCAPTCHA sitekey={RECAPTCHA_KEY} onChange={(token) => setCaptchaToken(token)} />
+                    <ReCAPTCHA
+                        ref={captchaRef}
+                        sitekey={RECAPTCHA_KEY}
+                        onChange={(token) => setCaptchaToken(token)}
+                        onExpired={() => setCaptchaToken(null)}
+                        onErrored={() => setCaptchaToken(null)}
+                    />
                 </div>
             ) : (
                 <small style={{ color: '#666' }}>

@@ -2,10 +2,19 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const pool = require("../../tools/db");
 const { issueEmailVerification } = require("../../tools/emailVerification");
+const { verifyRecaptchaToken } = require("../../tools/recaptcha");
 const router = express.Router();
 
 //Router สมัครสมาชิก
 router.post("/register", async (req, res) => {
+  try {
+    await verifyRecaptchaToken(req.body?.captcha, { remoteIp: req.ip });
+  } catch (error) {
+    return res.status(Number(error.status || 500)).json({
+      error: error.message,
+      code: error.code || "RECAPTCHA_ERROR",
+    });
+  }
   //สมัครสมาชิกจะเป็น role user เท่านั้น
   const client = await pool.connect(); //ขอเชื่อมต่อกับฐานข้อมูล
   try {

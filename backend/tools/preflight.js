@@ -27,10 +27,14 @@ async function preflight() {
 
   const role = await pool.query(
     `SELECT current_user,
-            (SELECT rolsuper FROM pg_roles WHERE rolname=current_user) AS is_superuser`,
+            (SELECT rolsuper FROM pg_roles WHERE rolname=current_user) AS is_superuser,
+            (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user) AS bypasses_rls`,
   );
   if (role.rows[0]?.is_superuser) {
     throw new Error("DATABASE_URL uses a PostgreSQL superuser");
+  }
+  if (role.rows[0]?.bypasses_rls) {
+    throw new Error("The runtime database role must not bypass row-level security");
   }
 
   const requiredTables = [
@@ -54,6 +58,42 @@ async function preflight() {
   const foundTables = new Set(tables.rows.map((row) => row.table_name));
   const missingTables = requiredTables.filter((name) => !foundTables.has(name));
   if (missingTables.length) throw new Error(`Missing database tables: ${missingTables.join(", ")}`);
+
+  const rlsTables = [
+    "appointments",
+    "clinic_holidays",
+    "help_requests",
+    "medical_records",
+    "queue_tickets",
+    "user_details",
+    "users",
+  ];
+  const rls = await pool.query(
+    `SELECT c.relname AS table_name,
+            c.relrowsecurity AS rls_enabled,
+            EXISTS (
+              SELECT 1
+              FROM pg_policies p
+              WHERE p.schemaname = 'clinic'
+                AND p.tablename = c.relname
+                AND p.policyname = 'cliniccare_runtime_backend_full_access'
+                AND current_user = ANY (p.roles)
+                AND p.cmd = 'ALL'
+            ) AS runtime_policy
+     FROM pg_class c
+     JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'clinic'
+       AND c.relname = ANY($1::text[])`,
+    [rlsTables],
+  );
+  const rlsByTable = new Map(rls.rows.map((row) => [row.table_name, row]));
+  const invalidRls = rlsTables.filter((name) => {
+    const table = rlsByTable.get(name);
+    return !table || !table.rls_enabled || !table.runtime_policy;
+  });
+  if (invalidRls.length) {
+    throw new Error(`Missing enabled RLS or runtime policy on: ${invalidRls.join(", ")}`);
+  }
   const column = await pool.query(`SELECT 1 FROM information_schema.columns
     WHERE table_schema='clinic' AND table_name='user_details' AND column_name='profile_image_drive_id'`);
   if (!column.rowCount) throw new Error("Missing profile_image_drive_id; run npm run migrate");
@@ -78,9 +118,11 @@ async function preflight() {
     ok: true,
     database_role: role.rows[0].current_user,
     database_superuser: false,
+    database_bypasses_rls: false,
     storage_provider: STORAGE_PROVIDER,
     ...storageCheck,
     required_tables: requiredTables.length,
+    rls_tables: rlsTables.length,
     calendar_functions: functions.rowCount,
   }, null, 2));
 }

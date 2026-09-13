@@ -32,8 +32,17 @@ function oauthCookieOptions() {
 }
 
 router.get("/google/login", (_req, res) => {
+  if (process.env.DISABLE_GOOGLE_OAUTH === "true") {
+    return res.status(503).json({
+      error: "Google OAuth is disabled",
+      code: "GOOGLE_OAUTH_DISABLED",
+    });
+  }
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI) {
-    return res.status(500).json({ error: "Google OAuth is not configured" });
+    return res.status(503).json({
+      error: "Google OAuth is not configured",
+      code: "GOOGLE_OAUTH_NOT_CONFIGURED",
+    });
   }
 
   const state = randomValue();

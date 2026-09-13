@@ -23,7 +23,7 @@ const {
   LINE_CHANNEL_ID,
   LINE_CHANNEL_SECRET,
   LINE_REDIRECT_URI,
-  LINE_SCOPES = "openid profile",
+  LINE_SCOPES = "openid profile email",
 } = process.env;
 
 const rand = () => crypto.randomBytes(16).toString("hex");
@@ -71,16 +71,25 @@ function verifyOAuthState(value) {
 
 // เริ่ม LINE Login
 router.get("/line/login", (req, res) => {
+  if (process.env.DISABLE_LINE_OAUTH === "true") {
+    return res.status(503).json({
+      error: "LINE OAuth is disabled",
+      code: "LINE_OAUTH_DISABLED",
+    });
+  }
   if (
     !LINE_CHANNEL_ID ||
     /YOUR_LINE_CHANNEL_ID/i.test(String(LINE_CHANNEL_ID))
   ) {
     return res
-      .status(500)
+      .status(503)
       .json({ error: "LINE_CHANNEL_ID is not set properly" });
   }
+  if (!LINE_CHANNEL_SECRET) {
+    return res.status(503).json({ error: "LINE_CHANNEL_SECRET is not set" });
+  }
   if (!LINE_REDIRECT_URI)
-    return res.status(500).json({ error: "LINE_REDIRECT_URI is not set" });
+    return res.status(503).json({ error: "LINE_REDIRECT_URI is not set" });
 
   const nonce = rand();
   const state = createOAuthState(nonce);

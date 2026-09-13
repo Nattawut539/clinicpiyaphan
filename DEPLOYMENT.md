@@ -3,6 +3,9 @@
 Google Drive image storage setup, migration and cleanup:
 [คู่มือภาษาไทย](GOOGLE_DRIVE_STORAGE_TH.md).
 
+Email, Google OAuth and LINE Login production setup:
+[คู่มือเตรียม Integrations](INTEGRATIONS_SETUP_TH.md).
+
 ## Frontend
 
 - Root directory: `frontend`
@@ -29,8 +32,11 @@ private URL for reaching the backend. Build the frontend again whenever
 - Install command: `npm install`
 - Migration/release command: `npm run migrate`
 - Preflight command: `npm run check:deploy`
-- Start command: `npm run start`
-- Required env: `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL`, `CORS_ORIGINS`
+- Build command: `npm ci --omit=dev --ignore-scripts`
+- Start command: `npm run start:render`
+- Health check: `/readyz`
+- Required env: either `DATABASE_URL` or all `DB_USER`, `DB_HOST`, `DB_NAME`,
+  `DB_PASSWORD`; plus `JWT_SECRET`, `FRONTEND_URL`, and `CORS_ORIGINS`
 - Image storage: `STORAGE_PROVIDER=local` requires persistent `UPLOAD_DIR`;
   `STORAGE_PROVIDER=google_drive` requires the four `GOOGLE_DRIVE_*` variables below.
 
@@ -67,33 +73,58 @@ changing application data.
 Do not run the API with the PostgreSQL `postgres` superuser. Create a dedicated
 login role for this database and put that role in `DATABASE_URL` or `DB_USER`.
 The API refuses to start in production when the configured role is a superuser.
+For a Supabase shared pooler, copy the exact host from the project's Connect
+dialog and use `cliniccare_runtime.<project-ref>` as the username. Do not infer
+the pooler cluster number or reuse values from another Supabase project.
 
 Example (run once as the database owner and replace the password securely):
 
 ```sql
-CREATE ROLE clinic_app LOGIN PASSWORD '<long-random-password>'
-  NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION BYPASSRLS;
-GRANT CONNECT ON DATABASE projectfinal TO clinic_app;
-GRANT USAGE ON SCHEMA clinic TO clinic_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA clinic TO clinic_app;
-GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA clinic TO clinic_app;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA clinic TO clinic_app;
+CREATE ROLE cliniccare_runtime LOGIN PASSWORD '<long-random-password>'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+GRANT CONNECT ON DATABASE postgres TO cliniccare_runtime;
+GRANT USAGE ON SCHEMA clinic TO cliniccare_runtime;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA clinic TO cliniccare_runtime;
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA clinic TO cliniccare_runtime;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA clinic TO cliniccare_runtime;
 ALTER DEFAULT PRIVILEGES FOR ROLE <schema-owner> IN SCHEMA clinic
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO clinic_app;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO cliniccare_runtime;
 ALTER DEFAULT PRIVILEGES FOR ROLE <schema-owner> IN SCHEMA clinic
-  GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO clinic_app;
+  GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO cliniccare_runtime;
 ```
 
-`BYPASSRLS` is required by the current login and migration architecture; API
-authorization remains mandatory on every private route. The role is deliberately
-not a PostgreSQL superuser and has no cluster/database creation privileges.
+For every table with RLS enabled, add an explicit policy for the runtime role.
+The deployment preflight currently requires the policy
+`cliniccare_runtime_backend_full_access` on these seven tables: `appointments`,
+`clinic_holidays`, `help_requests`, `medical_records`, `queue_tickets`,
+`user_details`, and `users`. The role must remain `NOBYPASSRLS`; API
+authorization is still mandatory on every private route.
+
+After creating the role and setting its password privately, run
+[`database/supabase_render_grants.sql`](database/supabase_render_grants.sql)
+in the Supabase SQL Editor. Its final query must return seven policy rows.
+
+### Render Blueprint
+
+The repository-root `render.yaml` contains the backend service settings for
+Singapore and the `deployment/production-preparation` branch. Create a Render Blueprint
+from that file, or copy the same values into an existing Web Service. Render
+will generate `JWT_SECRET` and prompt for `DB_PASSWORD`; never commit either
+value. Automatic deploys are disabled to match the manual deployment workflow.
+
+For an existing service, add or update `DB_PASSWORD` directly in the Render
+Dashboard because Blueprint variables marked `sync: false` are prompted only
+during initial Blueprint creation.
 
 ## Production Checklist
 
 - Set a long random `JWT_SECRET`; do not use the example value.
-- Set `DATABASE_URL` and `PGSSL=true` if the database provider requires SSL.
+- Set either `DATABASE_URL` or the separate `DB_*` values, and set `PGSSL=true`
+  for Supabase. Do not set `DATABASE_URL` when using `DB_*`.
 - Run `npm run migrate` with a backed-up database before starting the new release.
 - Set SMTP variables before testing forgot-password or appointment email.
+- On Render Free, use an email provider endpoint on port 2525; Gmail SMTP port 587 is blocked.
+- Run `npm run check:integrations:live` after all Email, OAuth, Drive and MQTT values are set.
 - Use a dedicated non-superuser database role; production startup rejects a superuser.
 - For local image storage, mount a persistent disk and set its absolute path in `UPLOAD_DIR`.
 - For Google Drive storage, run `npm run check:storage` and test image upload/read/delete.

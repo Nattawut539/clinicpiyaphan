@@ -108,7 +108,7 @@ user_agent, error_code, duration_ms, created_at
 - `set_config` ของ RLS context เปลี่ยนเป็น transaction-local ป้องกัน context รั่วข้าม pooled connection
 - เพิ่ม global JSON error handler พร้อม request ID โดยไม่ส่ง stack trace ให้ client
 
-ข้อกำหนดก่อน deploy: ต้องสร้าง PostgreSQL role `clinic_app` แบบ non-superuser และเปลี่ยนค่าใน environment ตาม `DEPLOYMENT.md` ระบบตั้งใจไม่เปลี่ยน credential ฐานข้อมูลจริงให้อัตโนมัติเพื่อป้องกันระบบหยุดทำงาน
+ข้อกำหนดก่อน deploy: ต้องสร้าง PostgreSQL role `cliniccare_runtime` แบบ non-superuser และเปลี่ยนค่าใน environment ตาม `DEPLOYMENT.md` ระบบตั้งใจไม่เปลี่ยน credential ฐานข้อมูลจริงให้อัตโนมัติเพื่อป้องกันระบบหยุดทำงาน
 
 ## 5. โครงสร้างและโค้ดสำหรับนำเสนอ
 
