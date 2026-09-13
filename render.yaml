@@ -109,6 +109,8 @@ services:
         sync: false
       - key: GOOGLE_DRIVE_FOLDER_ID
         sync: false
+      - key: DOCTOR_IMAGE_DRIVE_ID
+        sync: false
       - key: ALLOW_EPHEMERAL_UPLOADS
         value: "false"
       - key: SERVE_LEGACY_UPLOADS

@@ -53,3 +53,20 @@ test("streams managed image bytes and refuses oversized or non-image content", a
   meta = { ...meta, mimeType: "image/png", size: String(4 * 1024 * 1024) };
   await assert.rejects(storage.read("file"), { status: 404 });
 });
+
+test("streams a curated public asset only when it is inside the configured folder", async () => {
+  let meta = { parents: ["folder"], mimeType: "image/jpeg", size: "3" };
+  const storage = createDriveStorage({ files: {
+    get: async (request) => ({
+      data: request.alt ? Readable.from([Buffer.from("jpg")]) : meta,
+    }),
+  } }, "folder");
+
+  const image = await storage.readPublicAsset("doctor-file");
+  const chunks = [];
+  for await (const chunk of image.stream) chunks.push(chunk);
+  assert.equal(Buffer.concat(chunks).toString(), "jpg");
+
+  meta = { ...meta, parents: ["another-folder"] };
+  await assert.rejects(storage.readPublicAsset("doctor-file"), { status: 404 });
+});

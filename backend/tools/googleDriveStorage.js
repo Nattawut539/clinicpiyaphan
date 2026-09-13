@@ -48,6 +48,23 @@ function createDriveStorage(drive, folderId) {
   }
   async function read(id) {
     const meta = await metadata(id);
+    return readImage(id, meta);
+  }
+  async function readPublicAsset(id) {
+    let meta;
+    try {
+      const { data } = await drive.files.get({
+        fileId: id,
+        fields: "id,mimeType,size,parents,trashed",
+      }, options);
+      if (data.trashed || !data.parents?.includes(folderId)) {
+        throw Object.assign(new Error("Asset is outside the managed folder"), { code: 404 });
+      }
+      meta = data;
+    } catch (error) { throw storageError(error); }
+    return readImage(id, meta);
+  }
+  async function readImage(id, meta) {
     if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(meta.mimeType) || Number(meta.size) > 3 * 1024 * 1024) {
       throw Object.assign(new Error("Invalid stored image"), { status: 404 });
     }
@@ -61,7 +78,7 @@ function createDriveStorage(drive, folderId) {
     try { await drive.files.delete({ fileId: id }, options); }
     catch (error) { throw storageError(error); }
   }
-  return { folderId, checkFolder, allocateId, upload, read, remove };
+  return { folderId, checkFolder, allocateId, upload, read, readPublicAsset, remove };
 }
 
 let storage;

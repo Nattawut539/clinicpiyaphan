@@ -21,7 +21,11 @@ export default function AboutusPage() {
             <div className={styles.staffAvatarGroup}>
               <img
                 className={styles.doctorImage}
-                src="/img/profileclinic.png"
+                src="/api/clinic-assets/doctor-image"
+                onError={(event) => {
+                  event.currentTarget.onerror = null;
+                  event.currentTarget.src = '/img/profileclinic.png';
+                }}
                 alt="นายแพทย์ปิยะพันธ์ ตรงสุจิตร"
               />
             </div>
