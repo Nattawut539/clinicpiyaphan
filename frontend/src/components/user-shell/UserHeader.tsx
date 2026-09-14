@@ -46,6 +46,7 @@ type UserNotificationResponse = {
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
+  const [currentDateLabel, setCurrentDateLabel] = useState('วันที่ —');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
   const [imageVersion, setImageVersion] = useState<string>();
@@ -57,6 +58,19 @@ export default function Header() {
     history: [],
     unread_count: 0,
   });
+
+  useEffect(() => {
+    // Dates rendered during SSR can differ from the browser around midnight when
+    // the deployment server uses another timezone. Keep the first render stable,
+    // then format the clinic's local date after hydration.
+    const formattedDate = new Intl.DateTimeFormat('th-TH', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'Asia/Bangkok',
+    }).format(new Date());
+    setCurrentDateLabel(`วันที่ ${formattedDate}`);
+  }, []);
 
   useEffect(() => {
     const token = Cookies.get('userToken');
@@ -161,15 +175,13 @@ export default function Header() {
   const currentPage = useMemo(() => {
     return userNavigationItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
   }, [pathname]);
-  const todayText = dayjs().locale('th').format('D MMMM');
-  const buddhistYear = dayjs().year() + 543;
   const visibleNotifications = notificationTab === 'active' ? notifications.active : notifications.history;
 
   return (
     <header className={styles.header}>
       <div className={styles.headerTitle}>
         <strong>{currentPage?.label || appBrand.name}</strong>
-        <span>วันที่ {todayText} {buddhistYear}</span>
+        <span>{currentDateLabel}</span>
       </div>
 
       <div className={styles.headerActions}>

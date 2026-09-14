@@ -339,6 +339,10 @@ export default function LoginPage() {
             <button type="submit" className={styles.formButton} disabled={loadingLogin}>
                 {loadingLogin ? 'กำลังเข้าสู่ระบบ…' : 'Login'}
             </button>
+
+            <Link href="/privacy-policy" className={styles.privacyLink}>
+                นโยบายความเป็นส่วนตัว
+            </Link>
         </form>
     );
 
@@ -427,6 +431,10 @@ export default function LoginPage() {
             <button type="submit" className={`${styles.formButton} ${styles.btnOval}`} disabled={loadingReg}>
                 {loadingReg ? 'กำลังสมัคร…' : 'สมัครสมาชิก'}
             </button>
+
+            <Link href="/privacy-policy" className={styles.privacyLink}>
+                นโยบายความเป็นส่วนตัว
+            </Link>
         </form>
     );
 

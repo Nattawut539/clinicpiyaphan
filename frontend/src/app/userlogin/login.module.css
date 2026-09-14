@@ -59,6 +59,15 @@
   text-decoration: none; white-space: nowrap;
 }
 .forgotPasswordLink:hover { text-decoration: underline; }
+.privacyLink {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: .82rem;
+  text-decoration: underline;
+  text-decoration-color: #cbd5e1;
+  text-underline-offset: 3px;
+}
+.privacyLink:hover, .privacyLink:focus-visible { color: #000066; text-decoration-color: currentColor; }
 .rememberMeContainer { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
 .rememberMeCheckbox { width: 17px; height: 17px; margin: 0; accent-color: #000066; cursor: pointer; }
 .rememberMeLabel { color: #475569; font-size: .92rem; cursor: pointer; }
