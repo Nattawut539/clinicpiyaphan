@@ -28,6 +28,7 @@
     "cleanup:profile-images": "node tools/cleanupProfileImages.js",
     "test:profile-images": "node --test tests/profile-images.test.js",
     "test:recaptcha": "node --test tests/recaptcha.test.js",
+    "test:mqtt-bridge": "node --test tests/mqtt-bridge.test.js",
     "test:profile-images-workflow": "node tests/profile-images-workflow.js"
   },
   "keywords": [],

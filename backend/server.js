@@ -17,6 +17,7 @@ const notificationsRouter = require("./routes/notifications");
 const { ensureAuditSchema, requestAudit } = require("./tools/audit");
 const pool = require("./tools/db");
 const ensureProfileImageSchema = require("./tools/ensureProfileImageSchema");
+const ensureMeasurementAckOutbox = require("./tools/ensureMeasurementAckOutbox");
 const securityRateLimit = require("./tools/rateLimit");
 const { uploadRoot } = require("./tools/profileImageUpload");
 const { startMqttBridge, stopMqttBridge } = require("./tools/mqttBridge");
@@ -137,6 +138,7 @@ async function startServer() {
       await ensureAdvisorRequirementsSchema();
       await ensureAuditSchema();
       await ensureProfileImageSchema();
+      await ensureMeasurementAckOutbox();
     }
     const runtimeRole = await pool.query(
       `SELECT current_user,
@@ -146,6 +148,11 @@ async function startServer() {
       const message = `Unsafe database role: ${runtimeRole.rows[0].current_user} is a PostgreSQL superuser`;
       if (process.env.NODE_ENV === "production") throw new Error(message);
       console.warn(`WARNING: ${message}. Use a dedicated non-superuser role before deployment.`);
+    }
+    if (process.env.MQTT_ENABLED === "true") {
+      // Fail before subscribing: without the outbox, accepted measurements
+      // would roll back and could not produce a durable ACK.
+      await pool.query("SELECT 1 FROM clinic.hardware_measurement_ack_outbox LIMIT 0");
     }
     startMqttBridge();
     await new Promise((resolve, reject) => {

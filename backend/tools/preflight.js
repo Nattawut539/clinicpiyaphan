@@ -48,6 +48,7 @@ async function preflight() {
     "password_reset_otps",
     "hardware_otp_sessions",
     "hardware_measurement_events",
+    "hardware_measurement_ack_outbox",
     "profile_image_cleanup",
   ];
   const tables = await pool.query(
@@ -58,6 +59,15 @@ async function preflight() {
   const foundTables = new Set(tables.rows.map((row) => row.table_name));
   const missingTables = requiredTables.filter((name) => !foundTables.has(name));
   if (missingTables.length) throw new Error(`Missing database tables: ${missingTables.join(", ")}`);
+
+  const outboxPrivileges = await pool.query(
+    `SELECT has_table_privilege(current_user, 'clinic.hardware_measurement_ack_outbox', 'SELECT') AS can_select,
+            has_table_privilege(current_user, 'clinic.hardware_measurement_ack_outbox', 'INSERT') AS can_insert,
+            has_table_privilege(current_user, 'clinic.hardware_measurement_ack_outbox', 'UPDATE') AS can_update`,
+  );
+  if (Object.values(outboxPrivileges.rows[0]).some((allowed) => !allowed)) {
+    throw new Error("Runtime database role lacks measurement ACK outbox privileges");
+  }
 
   const rlsTables = [
     "appointments",

@@ -140,13 +140,20 @@ async function insertMeasurement(client, { queue, messageId, deviceId, measuredA
     [messageId, deviceId, mode, queue.queue_id, measurement.rows[0].measurement_id],
   );
 
-  return {
+  const ack = {
     message_id: messageId,
     status: "accepted",
     measurement_id: measurement.rows[0].measurement_id,
     queue_number: queue.queue_number,
     print_pending: true,
   };
+  await client.query(
+    `INSERT INTO clinic.hardware_measurement_ack_outbox
+       (message_id, device_id, ack_payload)
+     VALUES ($1,$2,$3::jsonb)`,
+    [messageId, deviceId, JSON.stringify(ack)],
+  );
+  return ack;
 }
 
 async function processOnlineMeasurement(client, values, payload) {
