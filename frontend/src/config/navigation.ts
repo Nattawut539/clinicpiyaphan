@@ -1,4 +1,5 @@
 import {
+  Activity,
   BarChart3,
   CalendarCheck,
   CalendarDays,
@@ -45,6 +46,7 @@ export const adminNavigationItems: NavigationItem[] = [
     allowedRoles: ['doctor', 'super_admin', 'superadmin'],
   },
   { href: '/admin/compile', label: 'คะแนนการบริการ', icon: BarChart3 },
+  { href: '/admin/hardware', label: 'ระบบเครื่องชั่งและงานพิมพ์', icon: Activity, superAdminOnly: true },
   { href: '/admin/audit-logs', label: 'บันทึกการใช้งานระบบ', icon: ScrollText, superAdminOnly: true },
   { href: '/admin/help', label: 'ช่วยเหลือ', icon: HelpCircle },
 ];

@@ -35,6 +35,7 @@
     "test:hardware-reliability": "node --test tests/hardware-software-reliability.test.js tests/print-outbox.test.js tests/print-retry-policy.test.js tests/hardware-observability.test.js",
     "test:hardware-schema": "node tests/hardware-reliability-schema.js",
     "test:hardware-sql": "node tests/hardware-reliability-sql-smoke.js",
+    "test:hardware-admin": "node tests/hardware-admin-dashboard-smoke.js",
     "test:profile-images-workflow": "node tests/profile-images-workflow.js"
   },
   "keywords": [],

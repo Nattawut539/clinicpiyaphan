@@ -46,7 +46,10 @@ export async function middleware(request: NextRequest) {
       : null;
   const isOAuthProfileCompletion = Boolean(profileProvider);
   const requiresUser = pathname.startsWith("/users") || isOAuthProfileCompletion;
-  const requiresSuperAdmin = pathname === "/admin/audit-logs" || pathname.startsWith("/admin/audit-logs/");
+  const requiresSuperAdmin = pathname === "/admin/audit-logs"
+    || pathname.startsWith("/admin/audit-logs/")
+    || pathname === "/admin/hardware"
+    || pathname.startsWith("/admin/hardware/");
   const requiresMedicalRecordRole = pathname === "/admin/medicalrecords" || pathname.startsWith("/admin/medicalrecords/");
   const cookieName = requiresAdmin ? "adminToken" : "userToken";
   const token = request.cookies.get(cookieName)?.value || "";
@@ -62,7 +65,9 @@ export async function middleware(request: NextRequest) {
 
   if ((requiresAdmin || requiresUser) && !validSession) {
     if ((requiresSuperAdmin || requiresMedicalRecordRole) && role && STAFF_ROLES.has(role)) {
-      const deniedFeature = requiresSuperAdmin ? "audit_logs" : "medicalrecords";
+      const deniedFeature = requiresSuperAdmin
+        ? pathname.startsWith("/admin/hardware") ? "hardware" : "audit_logs"
+        : "medicalrecords";
       return NextResponse.redirect(new URL(`/admin/dashboard?access_denied=${deniedFeature}`, request.url));
     }
     const loginUrl = new URL("/userlogin", request.url);

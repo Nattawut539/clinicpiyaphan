@@ -68,16 +68,6 @@ type Measurement = {
     created_at: string;
 };
 
-type PendingHardwarePrint = {
-    message_id: string;
-    device_id: string;
-    mode: 'online' | 'walk_in';
-    measurement_id: number;
-    queue_number: string;
-    weight: number;
-    height: number;
-};
-
 type VitalDraft = {
     cc: string;
     bw: string;
@@ -510,8 +500,6 @@ export default function DashboardPage() {
     const patientSelectionVersion = useRef(0);
     const selectedUserIdRef = useRef<number | null>(null);
     const selectedQueueIdRef = useRef<number | null>(null);
-    const hardwarePrintsInFlight = useRef<Set<string>>(new Set());
-
     const [, setSymptoms] = useState('');
     const [vitalDraft, setVitalDraft] = useState<VitalDraft>(emptyVitalDraft);
     const [vitalTouched, setVitalTouched] = useState(false);
@@ -1574,43 +1562,11 @@ export default function DashboardPage() {
             }
         };
 
-        const processHardwarePrints = async () => {
-            try {
-                const response = await fetch(`${API}/hardware/pending-print`, {
-                    headers: authHeaders(),
-                });
-                if (!response.ok || !active) return;
-                const jobs: PendingHardwarePrint[] = await response.json();
-
-                await Promise.all(jobs.map(async (job) => {
-                    if (hardwarePrintsInFlight.current.has(job.message_id)) return;
-                    const bmi = calcBmiText(String(job.weight), String(job.height));
-                    if (!bmi) return;
-
-                    hardwarePrintsInFlight.current.add(job.message_id);
-                    try {
-                        await fetch(`${API}/hardware/print`, {
-                            method: 'POST',
-                            headers: jsonHeaders(),
-                            body: JSON.stringify({ message_id: job.message_id, bmi: Number(bmi) }),
-                        });
-                    } finally {
-                        hardwarePrintsInFlight.current.delete(job.message_id);
-                    }
-                }));
-            } catch (error) {
-                console.error('processHardwarePrints:', error);
-            }
-        };
-
         const queueTimer = window.setInterval(refreshHardwareQueues, 5000);
-        const printTimer = window.setInterval(processHardwarePrints, 2000);
-        processHardwarePrints();
 
         return () => {
             active = false;
             window.clearInterval(queueTimer);
-            window.clearInterval(printTimer);
         };
     }, []);
 
@@ -1718,7 +1674,6 @@ export default function DashboardPage() {
     }, [selectedAppointment?.queue_id, selectedQueue?.queue_id]);
 
     const selectedPatientName = `${patientDraft.first_name || ''} ${patientDraft.last_name || ''}`.trim();
-    const liveBmiText = calcBmiText(vitalDraft.bw, vitalDraft.ht);
     const patientAgeText = calcAgeYearsText(patientDraft.birth_date);
 
     const selectedQueueMeta = selectedQueue
@@ -2547,7 +2502,7 @@ export default function DashboardPage() {
 
                                     <div>
                                         <span>BMI</span>
-                                        <strong>{liveBmiText || formatMeasurement(latestMeasurement?.bmi)}</strong>
+                                        <strong>{formatMeasurement(latestMeasurement?.bmi)}</strong>
                                     </div>
 
                                     <div>
