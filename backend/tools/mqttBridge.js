@@ -1,5 +1,7 @@
 const fs = require("fs");
 const mqtt = require("mqtt");
+const ackOutbox = require("./measurementAckOutbox");
+const printOutbox = require("./printOutbox");
 const {
   HardwareMessageError,
   processHardwareMeasurement,
@@ -13,7 +15,61 @@ const topicPrefix = String(process.env.MQTT_TOPIC_PREFIX || "clinic/v1")
 const qos = Number(process.env.MQTT_QOS || 1) === 0 ? 0 : 1;
 let client = null;
 let connected = false;
+let subscribed = false;
+let drainTimer = null;
+let draining = false;
+let drainingPrints = false;
 const otpAttempts = new Map();
+
+function log(event, details = {}) {
+  console.log(event, { at: new Date().toISOString(), ...details });
+}
+
+async function drainMeasurementAcks() {
+  if (!connected || !subscribed || draining) return;
+  draining = true;
+  try {
+    for (const row of await ackOutbox.pending()) {
+      if (!connected) break;
+      const ackTopic = topic(row.device_id, "measurement-ack");
+      try {
+        await publishJson(ackTopic, row.ack_payload);
+        log("MQTT measurement ACK replay published", {
+          message_id: row.message_id, topic: ackTopic,
+        });
+        await ackOutbox.markPublished(row.message_id);
+      } catch (error) {
+        console.error("MQTT measurement ACK replay failed", {
+          at: new Date().toISOString(), message_id: row.message_id,
+          topic: ackTopic, error: error.message,
+        });
+        await ackOutbox.recordFailure(row.message_id, error, row.attempts);
+        if (!connected) break;
+      }
+    }
+  } catch (error) {
+    console.error("MQTT measurement ACK outbox failed", {
+      at: new Date().toISOString(), error: error.message,
+    });
+  } finally {
+    draining = false;
+  }
+}
+
+async function drainPrintJobs() {
+  if (!connected || !subscribed || drainingPrints) return;
+  drainingPrints = true;
+  try {
+    const count = await printOutbox.drain(publishJson, topic);
+    if (count > 0) log("MQTT print outbox drained", { published: count });
+  } catch (error) {
+    console.error("MQTT print outbox failed", {
+      at: new Date().toISOString(), error: error.message,
+    });
+  } finally {
+    drainingPrints = false;
+  }
+}
 
 function topic(deviceId, suffix) {
   return `${topicPrefix}/devices/${deviceId}/${suffix}`;
@@ -84,8 +140,38 @@ async function handleMessage(receivedTopic, buffer, packet) {
       return;
     }
     if (route.action === "measurements") {
+      log("MQTT measurement received", {
+        topic: receivedTopic, device_id: route.deviceId,
+        message_id: payload?.message_id || null,
+      });
       const result = await processHardwareMeasurement(payload, route.deviceId);
-      await publishJson(topic(route.deviceId, "measurement-ack"), result);
+      log("MQTT measurement processed", {
+        message_id: result.message_id, status: result.status,
+        measurement_id: result.measurement_id,
+        queue_number: result.queue_number,
+      });
+      const ackTopic = topic(route.deviceId, "measurement-ack");
+      try {
+        await publishJson(ackTopic, result);
+      } catch (error) {
+        console.error("MQTT measurement ACK publish failed", {
+          at: new Date().toISOString(), message_id: result.message_id,
+          topic: ackTopic, error: error.message,
+        });
+        await ackOutbox.recordFailure(result.message_id, error).catch((outboxError) => {
+          console.error("MQTT measurement ACK outbox update failed", outboxError.message);
+        });
+        return;
+      }
+      log("MQTT measurement ACK published", {
+        message_id: result.message_id, status: result.status, topic: ackTopic,
+      });
+      await ackOutbox.markPublished(result.message_id).catch((error) => {
+        console.error("MQTT measurement ACK outbox update failed", {
+          at: new Date().toISOString(), message_id: result.message_id,
+          error: error.message,
+        });
+      });
       return;
     }
     if (route.action === "print-ack") {
@@ -94,8 +180,10 @@ async function handleMessage(receivedTopic, buffer, packet) {
   } catch (error) {
     const code = error?.code || "INTERNAL_ERROR";
     console.error("MQTT hardware message rejected", {
+      at: new Date().toISOString(),
       topic: receivedTopic,
       device_id: route.deviceId,
+      message_id: payload?.message_id || null,
       code,
       message: error?.message,
     });
@@ -106,11 +194,19 @@ async function handleMessage(receivedTopic, buffer, packet) {
         error_code: code,
       }).catch(() => {});
     } else if (route.action === "measurements") {
-      await publishJson(topic(route.deviceId, "measurement-ack"), {
+      const ackTopic = topic(route.deviceId, "measurement-ack");
+      await publishJson(ackTopic, {
         message_id: payload?.message_id || null,
         status: "rejected",
         error_code: code,
-      }).catch(() => {});
+      }).then(() => log("MQTT measurement ACK published", {
+        message_id: payload?.message_id || null, status: "rejected", topic: ackTopic,
+      })).catch((publishError) => {
+        console.error("MQTT measurement ACK publish failed", {
+          at: new Date().toISOString(), message_id: payload?.message_id || null,
+          topic: ackTopic, error: publishError.message,
+        });
+      });
     }
   }
 }
@@ -153,36 +249,67 @@ function startMqttBridge() {
   client = mqtt.connect(url, options);
   client.on("connect", () => {
     connected = true;
+    subscribed = false;
+    log("MQTT hardware bridge connected", { client_id: options.clientId });
     const subscriptions = [
       `${topicPrefix}/devices/+/otp-verify`,
       `${topicPrefix}/devices/+/measurements`,
       `${topicPrefix}/devices/+/print-ack`,
     ];
-    client.subscribe(subscriptions, { qos }, (error) => {
-      if (error) console.error("MQTT subscription failed", error.message);
-      else console.log(`MQTT hardware bridge subscribed to ${topicPrefix}/devices/+`);
+    client.subscribe(subscriptions, { qos }, (error, granted) => {
+      if (error || granted?.some((entry) => entry.qos !== qos)) {
+        console.error("MQTT subscription failed", error?.message || "Broker did not grant requested QoS");
+      } else {
+        subscribed = true;
+        console.log(`MQTT hardware bridge subscribed to ${topicPrefix}/devices/+`);
+        log("MQTT hardware bridge subscriptions ready", {
+          topics: granted?.map((entry) => ({ topic: entry.topic, qos: entry.qos })) || subscriptions,
+        });
+        void drainMeasurementAcks();
+        void drainPrintJobs();
+      }
     });
   });
-  client.on("reconnect", () => { connected = false; });
-  client.on("close", () => { connected = false; });
-  client.on("offline", () => { connected = false; });
+  client.on("reconnect", () => {
+    connected = false;
+    subscribed = false;
+    log("MQTT hardware bridge reconnecting", { client_id: options.clientId });
+  });
+  client.on("close", () => {
+    connected = false;
+    subscribed = false;
+    log("MQTT hardware bridge disconnected", { client_id: options.clientId });
+  });
+  client.on("offline", () => {
+    connected = false;
+    subscribed = false;
+    log("MQTT hardware bridge offline", { client_id: options.clientId });
+  });
   client.on("error", (error) => console.error("MQTT broker error", error.message));
   client.on("message", (receivedTopic, buffer, packet) => {
     handleMessage(receivedTopic, buffer, packet).catch((error) => {
       console.error("MQTT message handler failed", error.message);
     });
   });
+  drainTimer = setInterval(() => {
+    void drainMeasurementAcks();
+    void drainPrintJobs();
+  }, 5000);
+  drainTimer.unref?.();
 }
 
 async function stopMqttBridge() {
+  if (drainTimer) clearInterval(drainTimer);
+  drainTimer = null;
   if (!client) return;
   await new Promise((resolve) => client.end(false, {}, resolve));
   client = null;
   connected = false;
+  subscribed = false;
 }
 
 function mqttStatus() {
-  return { enabled, connected };
+  return { enabled, connected, subscribed };
 }
 
 module.exports = {

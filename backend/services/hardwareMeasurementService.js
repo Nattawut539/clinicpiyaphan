@@ -1,6 +1,13 @@
 const crypto = require("crypto");
 const pool = require("../tools/db");
 const { JWT_SECRET } = require("../tools/config");
+const {
+  MAX_PRINT_ATTEMPTS,
+  PRINT_RETRY_BASE_SECONDS,
+  PRINT_RETRY_MAX_SECONDS,
+  isRetryablePrintError,
+  normalizePrintErrorCode,
+} = require("./printRetryPolicy");
 
 class HardwareMessageError extends Error {
   constructor(code, message) {
@@ -70,30 +77,46 @@ async function verifyOnlineOtp(payload, topicDeviceId) {
   if (deviceId !== topicDeviceId || !/^\d{6}$/.test(otp)) {
     throw new HardwareMessageError("INVALID_OTP", "OTP is invalid or expired");
   }
+  // The reusable local test code must never be accepted by the clinic backend.
+  if (otp === "999999") {
+    throw new HardwareMessageError("INVALID_OTP", "Test OTP is not valid on the clinic backend");
+  }
 
   return withTransaction(async (client) => {
     const access = await client.query(
-      `SELECT ac.access_code_id, ac.queue_id, ac.expires_at, q.queue_number
+      `SELECT ac.access_code_id, ac.queue_id, ac.expires_at, ac.used_at,
+              q.queue_number, q.prefix, q.status AS queue_status,
+              a.status AS appointment_status,
+              (ac.expires_at <= now()) AS is_expired,
+              (q.service_date < (now() AT TIME ZONE 'Asia/Bangkok')::date) AS service_date_passed,
+              (q.service_date > (now() AT TIME ZONE 'Asia/Bangkok')::date) AS not_active_yet
        FROM clinic.appointment_access_codes ac
        JOIN clinic.queue_tickets q ON q.queue_id = ac.queue_id
        JOIN clinic.appointments a ON a.appointment_id = ac.appointment_id
        WHERE ac.code_hash = $1
-         AND ac.used_at IS NULL
-         AND ac.expires_at > now()
-         AND a.status = 'approved'
-         AND q.prefix = 'A'
-         AND q.service_date = (now() AT TIME ZONE 'Asia/Bangkok')::date
-         AND q.status <> 'cancelled'
        LIMIT 1`,
       [hashAccessCode(otp)],
     );
 
     if (!access.rowCount) {
-      throw new HardwareMessageError("INVALID_OTP", "OTP is invalid or expired");
+      throw new HardwareMessageError("INVALID_OTP", "OTP is invalid");
+    }
+
+    const row = access.rows[0];
+    if (row.used_at) {
+      throw new HardwareMessageError("OTP_USED", "OTP has already been used");
+    }
+    if (row.not_active_yet) {
+      throw new HardwareMessageError("OTP_NOT_ACTIVE_YET", "OTP is not active for today's appointment");
+    }
+    if (row.is_expired || row.service_date_passed) {
+      throw new HardwareMessageError("OTP_EXPIRED", "OTP has expired");
+    }
+    if (row.appointment_status !== "approved" || row.prefix !== "A" || row.queue_status === "cancelled") {
+      throw new HardwareMessageError("INVALID_OTP", "OTP is not active");
     }
 
     const sessionId = crypto.randomUUID();
-    const row = access.rows[0];
     const inserted = await client.query(
       `INSERT INTO clinic.hardware_otp_sessions
          (session_id, device_id, access_code_id, queue_id, expires_at)
@@ -140,13 +163,20 @@ async function insertMeasurement(client, { queue, messageId, deviceId, measuredA
     [messageId, deviceId, mode, queue.queue_id, measurement.rows[0].measurement_id],
   );
 
-  return {
+  const ack = {
     message_id: messageId,
     status: "accepted",
     measurement_id: measurement.rows[0].measurement_id,
     queue_number: queue.queue_number,
     print_pending: true,
   };
+  await client.query(
+    `INSERT INTO clinic.hardware_measurement_ack_outbox
+       (message_id, device_id, ack_payload)
+     VALUES ($1,$2,$3::jsonb)`,
+    [messageId, deviceId, JSON.stringify(ack)],
+  );
+  return ack;
 }
 
 async function processOnlineMeasurement(client, values, payload) {
@@ -274,24 +304,51 @@ async function processPrintAck(payload, topicDeviceId) {
   if (deviceId !== topicDeviceId || !["printed", "failed"].includes(status)) {
     throw new HardwareMessageError("INVALID_PRINT_ACK", "Print acknowledgement is invalid");
   }
-  const errorCode = status === "failed"
-    ? String(payload?.error_code || "UNKNOWN_ERROR").trim().slice(0, 80)
-    : null;
+  const errorCode = status === "failed" ? normalizePrintErrorCode(payload?.error_code) : null;
+  const retryableFailure = status === "failed" && isRetryablePrintError(errorCode);
 
   const result = await pool.query(
     `UPDATE clinic.hardware_measurement_events
-     SET print_status = $1,
+     SET print_status = $1::varchar,
          print_error_code = $2,
-         printed_at = CASE WHEN $1 = 'printed' THEN now() ELSE printed_at END,
+         print_retryable = CASE
+           WHEN $1::varchar = 'printed' THEN false
+           ELSE ($3::boolean AND print_attempts < $4)
+         END,
+         print_next_attempt_at = CASE
+           WHEN $1::varchar = 'failed' AND $3::boolean AND print_attempts < $4
+             THEN now() + make_interval(secs => LEAST(
+               $5::double precision * POWER(2, GREATEST(print_attempts - 1, 0)),
+               $6::double precision
+             ))
+           ELSE NULL
+         END,
+         print_last_failed_at = CASE WHEN $1::varchar = 'failed' THEN now() ELSE print_last_failed_at END,
+         printed_at = CASE WHEN $1::varchar = 'printed' THEN now() ELSE printed_at END,
          updated_at = now()
-     WHERE print_job_id = $3 AND device_id = $4
-     RETURNING message_id`,
-    [status, errorCode, printJobId, deviceId],
+     WHERE print_job_id = $7 AND device_id = $8
+     RETURNING message_id, print_attempts, print_retryable, print_next_attempt_at`,
+    [
+      status,
+      errorCode,
+      retryableFailure,
+      MAX_PRINT_ATTEMPTS,
+      PRINT_RETRY_BASE_SECONDS,
+      PRINT_RETRY_MAX_SECONDS,
+      printJobId,
+      deviceId,
+    ],
   );
   if (!result.rowCount) {
     throw new HardwareMessageError("PRINT_JOB_NOT_FOUND", "Print job was not found");
   }
-  return { print_job_id: printJobId, status };
+  return {
+    print_job_id: printJobId,
+    status,
+    retryable: Boolean(result.rows[0].print_retryable),
+    attempts: Number(result.rows[0].print_attempts),
+    next_attempt_at: result.rows[0].print_next_attempt_at,
+  };
 }
 
 module.exports = {

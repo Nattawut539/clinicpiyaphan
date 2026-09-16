@@ -28,6 +28,13 @@
     "cleanup:profile-images": "node tools/cleanupProfileImages.js",
     "test:profile-images": "node --test tests/profile-images.test.js",
     "test:recaptcha": "node --test tests/recaptcha.test.js",
+    "test:mqtt-bridge": "node --test tests/mqtt-bridge.test.js",
+    "tool:hardware": "node tools/hardwareTestCli.js",
+    "tool:hardware:smoke": "node tools/hardwareTestSmoke.js",
+    "test:hardware-tool": "node --test tests/hardware-test-tool.test.js",
+    "test:hardware-reliability": "node --test tests/hardware-software-reliability.test.js tests/print-outbox.test.js tests/print-retry-policy.test.js",
+    "test:hardware-schema": "node tests/hardware-reliability-schema.js",
+    "test:hardware-sql": "node tests/hardware-reliability-sql-smoke.js",
     "test:profile-images-workflow": "node tests/profile-images-workflow.js"
   },
   "keywords": [],
@@ -52,6 +59,7 @@
     "pg": "^8.16.3"
   },
   "devDependencies": {
+    "aedes": "^1.1.2",
     "nodemon": "^3.1.9"
   },
   "overrides": {

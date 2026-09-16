@@ -39,7 +39,11 @@ function formatQueueNumber(prefix, n) {
 
 //ฟังก์ชันสร้างรหัสด้วยตัวเลขแบบสุ่ม 6 หลัก
 function generateAccessCode() {
-  return String(crypto.randomInt(0, 1000000)).padStart(6, "0"); //padStart รหัสครบ 6 หลักแม้ขึ้นต้นด้วย 0
+  let code;
+  do {
+    code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+  } while (code === "999999"); // Reserved for the isolated local hardware test tool.
+  return code;
 }
 
 //ฟังก์ชันการนำรหัส 6 หลักไป Hash ด้วย SHA256 ก่อนบันทึกลงฐานข้อมูล

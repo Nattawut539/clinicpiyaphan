@@ -6,6 +6,7 @@
 /backend/node_modules
 /frontend/.npm-cache/
 /backend/.npm-cache/
+/backend/.hardware-test/
 /.local-backups/
 /frontend/.next
 /.pnp

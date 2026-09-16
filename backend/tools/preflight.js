@@ -48,6 +48,7 @@ async function preflight() {
     "password_reset_otps",
     "hardware_otp_sessions",
     "hardware_measurement_events",
+    "hardware_measurement_ack_outbox",
     "profile_image_cleanup",
   ];
   const tables = await pool.query(
@@ -58,6 +59,52 @@ async function preflight() {
   const foundTables = new Set(tables.rows.map((row) => row.table_name));
   const missingTables = requiredTables.filter((name) => !foundTables.has(name));
   if (missingTables.length) throw new Error(`Missing database tables: ${missingTables.join(", ")}`);
+
+  const outboxPrivileges = await pool.query(
+    `SELECT has_table_privilege(current_user, 'clinic.hardware_measurement_ack_outbox', 'SELECT') AS can_select,
+            has_table_privilege(current_user, 'clinic.hardware_measurement_ack_outbox', 'INSERT') AS can_insert,
+            has_table_privilege(current_user, 'clinic.hardware_measurement_ack_outbox', 'UPDATE') AS can_update`,
+  );
+  if (Object.values(outboxPrivileges.rows[0]).some((allowed) => !allowed)) {
+    throw new Error("Runtime database role lacks measurement ACK outbox privileges");
+  }
+
+  const requiredHardwareColumns = [
+    "print_retryable",
+    "print_next_attempt_at",
+    "print_last_failed_at",
+  ];
+  const hardwareColumns = await pool.query(
+    `SELECT column_name
+     FROM information_schema.columns
+     WHERE table_schema = 'clinic'
+       AND table_name = 'hardware_measurement_events'
+       AND column_name = ANY($1::text[])`,
+    [requiredHardwareColumns],
+  );
+  const foundHardwareColumns = new Set(hardwareColumns.rows.map((row) => row.column_name));
+  const missingHardwareColumns = requiredHardwareColumns.filter((name) => !foundHardwareColumns.has(name));
+  if (missingHardwareColumns.length) {
+    throw new Error(`Missing hardware reliability columns: ${missingHardwareColumns.join(", ")}; run database/hardware_reliability_migration.sql`);
+  }
+
+  const requiredHardwareIndexes = [
+    "hardware_measurement_events_device_message_key",
+    "hardware_measurement_events_print_retry_idx",
+    "measurements_device_hardware_message_key",
+  ];
+  const hardwareIndexes = await pool.query(
+    `SELECT indexname
+     FROM pg_indexes
+     WHERE schemaname = 'clinic'
+       AND indexname = ANY($1::text[])`,
+    [requiredHardwareIndexes],
+  );
+  const foundHardwareIndexes = new Set(hardwareIndexes.rows.map((row) => row.indexname));
+  const missingHardwareIndexes = requiredHardwareIndexes.filter((name) => !foundHardwareIndexes.has(name));
+  if (missingHardwareIndexes.length) {
+    throw new Error(`Missing hardware reliability indexes: ${missingHardwareIndexes.join(", ")}; run database/hardware_reliability_migration.sql`);
+  }
 
   const rlsTables = [
     "appointments",

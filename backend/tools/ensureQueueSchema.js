@@ -210,6 +210,9 @@ async function ensureQueueSchema() {
           CHECK (print_status IN ('pending', 'requested', 'printed', 'failed')),
         print_attempts integer NOT NULL DEFAULT 0,
         print_error_code varchar(80),
+        print_retryable boolean NOT NULL DEFAULT true,
+        print_next_attempt_at timestamptz,
+        print_last_failed_at timestamptz,
         print_requested_at timestamptz,
         printed_at timestamptz,
         created_at timestamptz NOT NULL DEFAULT now(),
@@ -220,6 +223,54 @@ async function ensureQueueSchema() {
     await client.query(`
       ALTER TABLE clinic.hardware_measurement_events
       ADD COLUMN IF NOT EXISTS print_attempts integer NOT NULL DEFAULT 0
+    `);
+
+    await client.query(`
+      ALTER TABLE clinic.hardware_measurement_events
+        ADD COLUMN IF NOT EXISTS print_retryable boolean NOT NULL DEFAULT true,
+        ADD COLUMN IF NOT EXISTS print_next_attempt_at timestamptz,
+        ADD COLUMN IF NOT EXISTS print_last_failed_at timestamptz
+    `);
+
+    await client.query(`
+      UPDATE clinic.hardware_measurement_events
+      SET print_retryable = false,
+          print_next_attempt_at = NULL
+      WHERE print_status = 'printed'
+         OR print_attempts >= 3
+         OR UPPER(COALESCE(print_error_code, '')) IN
+            ('PRINTER_NOT_CONNECTED', 'UNSUPPORTED_SCHEMA', 'INVALID_PRINT_JOB', 'INVALID_PRINT_DATA')
+    `);
+
+    await client.query(`
+      UPDATE clinic.hardware_measurement_events
+      SET print_next_attempt_at = COALESCE(updated_at, now())
+        + make_interval(secs => LEAST(
+            30::double precision * POWER(2, GREATEST(print_attempts - 1, 0)),
+            300::double precision
+          ))
+      WHERE print_retryable = true
+        AND print_attempts < 3
+        AND print_status IN ('requested', 'failed')
+        AND print_next_attempt_at IS NULL
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS hardware_measurement_events_device_message_key
+      ON clinic.hardware_measurement_events (device_id, message_id)
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS measurements_device_hardware_message_key
+      ON clinic.measurements (device_id, hardware_message_id)
+      WHERE device_id IS NOT NULL AND hardware_message_id IS NOT NULL
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS hardware_measurement_events_print_retry_idx
+      ON clinic.hardware_measurement_events (print_next_attempt_at, created_at)
+      WHERE print_retryable = true
+        AND print_status IN ('requested', 'failed')
     `);
 
     await client.query(`

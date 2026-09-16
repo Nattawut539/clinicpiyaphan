@@ -59,6 +59,13 @@ clinic/v1/devices/{deviceId}/otp-result
 }
 ```
 
+OTP error ที่แยกสถานะแล้ว:
+
+- `INVALID_OTP` — รูปแบบ/รหัสไม่ถูกต้อง หรือรหัสไม่อยู่ในระบบ
+- `OTP_EXPIRED` — หมดอายุหรือเลยวันนัดแล้ว
+- `OTP_USED` — ใช้บันทึก Measurement สำเร็จไปแล้ว
+- `OTP_NOT_ACTIVE_YET` — เป็น OTP ของวันนัดในอนาคต
+
 ### 2. ส่งผลวัด
 
 Publish:
@@ -122,6 +129,9 @@ clinic/v1/devices/{deviceId}/measurement-ack
 Error code ที่ firmware ต้องรองรับ:
 
 - `INVALID_OTP`
+- `OTP_EXPIRED`
+- `OTP_USED`
+- `OTP_NOT_ACTIVE_YET`
 - `INVALID_SESSION`
 - `INVALID_MODE`
 - `DEVICE_MISMATCH`
@@ -156,6 +166,11 @@ clinic/v1/devices/{deviceId}/print
 ```
 
 Firmware ต้อง deduplicate ด้วย `print_job_id` และห้ามคำนวณ BMI ใหม่
+
+Backend ใช้ `print_job_id` เดิมเมื่อส่งซ้ำ และ retry แบบ backoff 30/60 วินาที
+รวมไม่เกิน 3 attempts หากได้ `PRINTER_NOT_CONNECTED`, `UNSUPPORTED_SCHEMA`,
+`INVALID_PRINT_JOB` หรือ `INVALID_PRINT_DATA` จะหยุดส่งซ้ำทันที ส่วน error ชั่วคราว
+เช่น `PAPER_OUT` จะรอตาม backoff ก่อนส่งงานเดิมอีกครั้ง
 
 หลังพิมพ์ให้ Publish:
 
