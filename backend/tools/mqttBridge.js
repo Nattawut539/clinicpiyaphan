@@ -2,6 +2,8 @@ const fs = require("fs");
 const mqtt = require("mqtt");
 const ackOutbox = require("./measurementAckOutbox");
 const printOutbox = require("./printOutbox");
+const { safeRecordHardwareAudit } = require("./hardwareAudit");
+const hardwareMetrics = require("./hardwareMetrics");
 const {
   HardwareMessageError,
   processHardwareMeasurement,
@@ -38,12 +40,14 @@ async function drainMeasurementAcks() {
           message_id: row.message_id, topic: ackTopic,
         });
         await ackOutbox.markPublished(row.message_id);
+        hardwareMetrics.increment("measurement_ack_replayed_total");
       } catch (error) {
         console.error("MQTT measurement ACK replay failed", {
           at: new Date().toISOString(), message_id: row.message_id,
           topic: ackTopic, error: error.message,
         });
         await ackOutbox.recordFailure(row.message_id, error, row.attempts);
+        hardwareMetrics.increment("measurement_ack_publish_failures_total");
         if (!connected) break;
       }
     }
@@ -61,7 +65,10 @@ async function drainPrintJobs() {
   drainingPrints = true;
   try {
     const count = await printOutbox.drain(publishJson, topic);
-    if (count > 0) log("MQTT print outbox drained", { published: count });
+    if (count > 0) {
+      hardwareMetrics.increment("print_jobs_published_total", count);
+      log("MQTT print outbox drained", { published: count });
+    }
   } catch (error) {
     console.error("MQTT print outbox failed", {
       at: new Date().toISOString(), error: error.message,
@@ -126,6 +133,7 @@ function enforceOtpRateLimit(deviceId) {
 async function handleMessage(receivedTopic, buffer, packet) {
   const route = parseTopic(receivedTopic);
   if (!route) return;
+  hardwareMetrics.markMessage();
   let payload = {};
   try {
     payload = parseJson(buffer);
@@ -137,6 +145,14 @@ async function handleMessage(receivedTopic, buffer, packet) {
       enforceOtpRateLimit(route.deviceId);
       const result = await verifyOnlineOtp(payload, route.deviceId);
       await publishJson(topic(route.deviceId, "otp-result"), result);
+      hardwareMetrics.increment("otp_accepted_total");
+      await safeRecordHardwareAudit("otp_verify", {
+        result: "accepted",
+        deviceId: route.deviceId,
+        requestId: result.request_id,
+        measurementSessionId: result.measurement_session_id,
+        details: { queue_number: result.queue_number },
+      });
       return;
     }
     if (route.action === "measurements") {
@@ -145,6 +161,20 @@ async function handleMessage(receivedTopic, buffer, packet) {
         message_id: payload?.message_id || null,
       });
       const result = await processHardwareMeasurement(payload, route.deviceId);
+      hardwareMetrics.increment(`measurement_${result.status}_total`);
+      if (result.status === "duplicate") {
+        await safeRecordHardwareAudit("measurement", {
+          result: "duplicate",
+          deviceId: route.deviceId,
+          measurementSessionId: payload?.measurement_session_id || null,
+          messageId: result.message_id,
+          details: {
+            measurement_id: result.measurement_id,
+            queue_number: result.queue_number,
+            print_pending: result.print_pending,
+          },
+        });
+      }
       log("MQTT measurement processed", {
         message_id: result.message_id, status: result.status,
         measurement_id: result.measurement_id,
@@ -161,6 +191,7 @@ async function handleMessage(receivedTopic, buffer, packet) {
         await ackOutbox.recordFailure(result.message_id, error).catch((outboxError) => {
           console.error("MQTT measurement ACK outbox update failed", outboxError.message);
         });
+        hardwareMetrics.increment("measurement_ack_publish_failures_total");
         return;
       }
       log("MQTT measurement ACK published", {
@@ -172,10 +203,24 @@ async function handleMessage(receivedTopic, buffer, packet) {
           error: error.message,
         });
       });
+      hardwareMetrics.increment("measurement_ack_published_total");
       return;
     }
     if (route.action === "print-ack") {
-      await processPrintAck(payload, route.deviceId);
+      const result = await processPrintAck(payload, route.deviceId);
+      hardwareMetrics.increment(`print_ack_${result.status}_total`);
+      await safeRecordHardwareAudit("print_ack", {
+        result: result.status === "printed" ? "accepted" : "failed",
+        deviceId: route.deviceId,
+        printJobId: result.print_job_id,
+        messageId: result.message_id,
+        errorCode: payload?.error_code || null,
+        details: {
+          attempts: result.attempts,
+          retryable: result.retryable,
+          next_attempt_at: result.next_attempt_at,
+        },
+      });
     }
   } catch (error) {
     const code = error?.code || "INTERNAL_ERROR";
@@ -186,6 +231,16 @@ async function handleMessage(receivedTopic, buffer, packet) {
       message_id: payload?.message_id || null,
       code,
       message: error?.message,
+    });
+    hardwareMetrics.increment("mqtt_messages_rejected_total");
+    await safeRecordHardwareAudit(`${route.action}_rejected`, {
+      result: "rejected",
+      deviceId: route.deviceId,
+      requestId: payload?.request_id || null,
+      measurementSessionId: payload?.measurement_session_id || null,
+      messageId: payload?.message_id || null,
+      printJobId: payload?.print_job_id || null,
+      errorCode: code,
     });
     if (route.action === "otp-verify") {
       await publishJson(topic(route.deviceId, "otp-result"), {
@@ -250,6 +305,7 @@ function startMqttBridge() {
   client.on("connect", () => {
     connected = true;
     subscribed = false;
+    hardwareMetrics.markConnected();
     log("MQTT hardware bridge connected", { client_id: options.clientId });
     const subscriptions = [
       `${topicPrefix}/devices/+/otp-verify`,
@@ -278,6 +334,7 @@ function startMqttBridge() {
   client.on("close", () => {
     connected = false;
     subscribed = false;
+    hardwareMetrics.markDisconnected();
     log("MQTT hardware bridge disconnected", { client_id: options.clientId });
   });
   client.on("offline", () => {
@@ -309,7 +366,15 @@ async function stopMqttBridge() {
 }
 
 function mqttStatus() {
-  return { enabled, connected, subscribed };
+  const runtime = hardwareMetrics.runtimeSnapshot();
+  return {
+    enabled,
+    connected,
+    subscribed,
+    connected_at: runtime.connectedAt,
+    disconnected_at: runtime.disconnectedAt,
+    last_message_at: runtime.lastMessageAt,
+  };
 }
 
 module.exports = {

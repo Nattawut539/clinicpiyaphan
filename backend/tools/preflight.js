@@ -49,6 +49,7 @@ async function preflight() {
     "hardware_otp_sessions",
     "hardware_measurement_events",
     "hardware_measurement_ack_outbox",
+    "hardware_event_audit",
     "profile_image_cleanup",
   ];
   const tables = await pool.query(
@@ -69,10 +70,23 @@ async function preflight() {
     throw new Error("Runtime database role lacks measurement ACK outbox privileges");
   }
 
+  const hardwareAuditPrivileges = await pool.query(
+    `SELECT has_table_privilege(current_user, 'clinic.hardware_event_audit', 'SELECT') AS can_select,
+            has_table_privilege(current_user, 'clinic.hardware_event_audit', 'INSERT') AS can_insert`,
+  );
+  if (Object.values(hardwareAuditPrivileges.rows[0]).some((allowed) => !allowed)) {
+    throw new Error("Runtime database role lacks hardware audit privileges");
+  }
+
   const requiredHardwareColumns = [
     "print_retryable",
     "print_next_attempt_at",
     "print_last_failed_at",
+    "payload_hash",
+    "measurement_session_id",
+    "print_requested_by_user_id",
+    "print_last_manual_reprint_at",
+    "print_manual_reprint_count",
   ];
   const hardwareColumns = await pool.query(
     `SELECT column_name
@@ -85,13 +99,17 @@ async function preflight() {
   const foundHardwareColumns = new Set(hardwareColumns.rows.map((row) => row.column_name));
   const missingHardwareColumns = requiredHardwareColumns.filter((name) => !foundHardwareColumns.has(name));
   if (missingHardwareColumns.length) {
-    throw new Error(`Missing hardware reliability columns: ${missingHardwareColumns.join(", ")}; run database/hardware_reliability_migration.sql`);
+    throw new Error(`Missing hardware backend columns: ${missingHardwareColumns.join(", ")}; run database/backend_action_items_migration.sql`);
   }
 
   const requiredHardwareIndexes = [
     "hardware_measurement_events_device_message_key",
     "hardware_measurement_events_print_retry_idx",
     "measurements_device_hardware_message_key",
+    "hardware_event_audit_request_idx",
+    "hardware_event_audit_session_idx",
+    "hardware_event_audit_message_idx",
+    "hardware_event_audit_print_job_idx",
   ];
   const hardwareIndexes = await pool.query(
     `SELECT indexname
@@ -103,7 +121,7 @@ async function preflight() {
   const foundHardwareIndexes = new Set(hardwareIndexes.rows.map((row) => row.indexname));
   const missingHardwareIndexes = requiredHardwareIndexes.filter((name) => !foundHardwareIndexes.has(name));
   if (missingHardwareIndexes.length) {
-    throw new Error(`Missing hardware reliability indexes: ${missingHardwareIndexes.join(", ")}; run database/hardware_reliability_migration.sql`);
+    throw new Error(`Missing hardware backend indexes: ${missingHardwareIndexes.join(", ")}; run database/backend_action_items_migration.sql`);
   }
 
   const rlsTables = [

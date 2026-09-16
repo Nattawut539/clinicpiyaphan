@@ -230,6 +230,7 @@ FROM (VALUES
   ('appointment_slot_templates'), ('appointment_slots'), ('appointments'),
   ('queue_tickets'), ('appointment_access_codes'), ('patient_checkins'),
   ('measurements'), ('hardware_otp_sessions'), ('hardware_measurement_events'),
+  ('hardware_measurement_ack_outbox'), ('hardware_event_audit'),
   ('medical_records'), ('user_feedbacks'), ('help_requests'),
   ('user_notifications'), ('clinic_holidays'), ('clinic_open_days'),
   ('weekly_closed_windows'), ('advance_booking_weeks'), ('audit_logs')

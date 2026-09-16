@@ -152,7 +152,19 @@ async function startServer() {
     if (process.env.MQTT_ENABLED === "true") {
       // Fail before subscribing: without the outbox, accepted measurements
       // would roll back and could not produce a durable ACK.
-      await pool.query("SELECT 1 FROM clinic.hardware_measurement_ack_outbox LIMIT 0");
+      try {
+        await pool.query("SELECT 1 FROM clinic.hardware_measurement_ack_outbox LIMIT 0");
+        await pool.query(
+          `SELECT payload_hash, measurement_session_id, print_requested_by_user_id,
+                  print_last_manual_reprint_at, print_manual_reprint_count
+           FROM clinic.hardware_measurement_events LIMIT 0`,
+        );
+        await pool.query("SELECT 1 FROM clinic.hardware_event_audit LIMIT 0");
+      } catch (error) {
+        throw new Error(
+          `Hardware backend schema is not ready; run database/backend_action_items_migration.sql (${error.message})`,
+        );
+      }
     }
     startMqttBridge();
     await new Promise((resolve, reject) => {

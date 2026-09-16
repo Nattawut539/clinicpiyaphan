@@ -4,6 +4,7 @@ const test = require("node:test");
 const queries = [];
 const poolQueries = [];
 let otpRow = null;
+let duplicateRow = null;
 
 const client = {
   async query(sql, params = []) {
@@ -15,17 +16,23 @@ const client = {
     if (String(sql).includes("FROM clinic.hardware_measurement_events e") &&
         String(sql).includes("WHERE e.message_id")) {
       return {
-        rowCount: 1,
-        rows: [{
-          message_id: "MSG-A-RETRY-001",
-          device_id: "SCALE-001",
-          measurement_id: 67,
-          queue_number: "A002",
-        }],
+        rowCount: duplicateRow ? 1 : 0,
+        rows: duplicateRow ? [duplicateRow] : [],
       };
     }
     if (String(sql).includes("INSERT INTO clinic.hardware_otp_sessions")) {
       return { rowCount: 1, rows: [{ expires_at: new Date(Date.now() + 5 * 60_000) }] };
+    }
+    if (String(sql).includes("FROM clinic.hardware_otp_sessions s")) {
+      return {
+        rowCount: 1,
+        rows: [{
+          session_id: params[0], access_code_id: 10, queue_id: 20, queue_number: "A002",
+        }],
+      };
+    }
+    if (String(sql).includes("INSERT INTO clinic.measurements")) {
+      return { rowCount: 1, rows: [{ measurement_id: 69 }] };
     }
     return { rowCount: 0, rows: [] };
   },
@@ -92,7 +99,7 @@ test("OTP errors distinguish used, future and expired codes", async () => {
   await expectOtpError({ ...base, not_active_yet: true }, "OTP_NOT_ACTIVE_YET");
   await expectOtpError({ ...base, is_expired: true }, "OTP_EXPIRED");
   await expectOtpError({ ...base, service_date_passed: true }, "OTP_EXPIRED");
-  await expectOtpError(null, "INVALID_OTP");
+  await expectOtpError(null, "OTP_NOT_FOUND");
 });
 
 test("active OTP still returns accepted A002 session", async () => {
@@ -122,16 +129,39 @@ test("active OTP still returns accepted A002 session", async () => {
 test("same device/message retry returns one duplicate measurement tied to A002", async () => {
   otpRow = null;
   queries.length = 0;
-  const result = await service.processHardwareMeasurement({
+  const measuredAt = new Date().toISOString();
+  const payload = {
     schema_version: "1.0",
     message_id: "MSG-A-RETRY-001",
     device_id: "SCALE-001",
     mode: "online",
     measurement_session_id: "00000000-0000-4000-8000-000000000000",
-    measured_at: new Date().toISOString(),
+    measured_at: measuredAt,
     weight: 60,
     height: 170,
-  }, "SCALE-001");
+  };
+  duplicateRow = {
+    message_id: payload.message_id,
+    device_id: payload.device_id,
+    mode: payload.mode,
+    measurement_id: 67,
+    measurement_session_id: payload.measurement_session_id,
+    payload_hash: service.measurementPayloadHash({
+      messageId: payload.message_id,
+      deviceId: payload.device_id,
+      mode: payload.mode,
+      measurementSessionId: payload.measurement_session_id,
+      measuredAt,
+      weight: payload.weight,
+      height: payload.height,
+    }),
+    print_status: "pending",
+    queue_number: "A002",
+    weight: "60.00",
+    height: "170.00",
+    measured_at: measuredAt,
+  };
+  const result = await service.processHardwareMeasurement(payload, "SCALE-001");
 
   assert.deepEqual(result, {
     message_id: "MSG-A-RETRY-001",
@@ -143,6 +173,71 @@ test("same device/message retry returns one duplicate measurement tied to A002",
   assert.equal(queries.filter((entry) => /INSERT INTO clinic\.measurements/i.test(entry.sql)).length, 0);
   assert.equal(queries.some((entry) =>
     entry.sql.includes("pg_advisory_xact_lock") && entry.params[0] === "hardware:MSG-A-RETRY-001"), true);
+});
+
+test("same message_id with changed payload is rejected as MESSAGE_ID_CONFLICT", async () => {
+  const measuredAt = new Date().toISOString();
+  const original = {
+    messageId: "MSG-CONFLICT-001",
+    deviceId: "SCALE-001",
+    mode: "walk_in",
+    measurementSessionId: null,
+    measuredAt,
+    weight: 60,
+    height: 170,
+  };
+  duplicateRow = {
+    message_id: original.messageId,
+    device_id: original.deviceId,
+    mode: original.mode,
+    measurement_id: 68,
+    measurement_session_id: null,
+    payload_hash: service.measurementPayloadHash(original),
+    print_status: "pending",
+    queue_number: "B003",
+    weight: "60.00",
+    height: "170.00",
+    measured_at: measuredAt,
+  };
+
+  await assert.rejects(
+    service.processHardwareMeasurement({
+      message_id: original.messageId,
+      device_id: original.deviceId,
+      mode: original.mode,
+      measured_at: measuredAt,
+      weight: 61,
+      height: 170,
+    }, original.deviceId),
+    (error) => error.code === "MESSAGE_ID_CONFLICT",
+  );
+});
+
+test("accepted measurement persists backend BMI and creates a due print job atomically", async () => {
+  duplicateRow = null;
+  queries.length = 0;
+  const measuredAt = new Date().toISOString();
+  const result = await service.processHardwareMeasurement({
+    message_id: "MSG-A-NEW-001",
+    device_id: "SCALE-001",
+    mode: "online",
+    measurement_session_id: "00000000-0000-4000-8000-000000000001",
+    measured_at: measuredAt,
+    weight: 60,
+    height: 170,
+  }, "SCALE-001");
+
+  assert.equal(result.status, "accepted");
+  assert.equal(result.print_pending, true);
+  const measurementInsert = queries.find((entry) => entry.sql.includes("INSERT INTO clinic.measurements"));
+  assert.equal(measurementInsert.params[4], 20.76);
+  const eventInsert = queries.find((entry) => entry.sql.includes("INSERT INTO clinic.hardware_measurement_events"));
+  assert.match(eventInsert.params[7], /^PRINT-[0-9a-f]{24}$/);
+  assert.match(eventInsert.params[5], /^[0-9a-f]{64}$/);
+  assert.match(eventInsert.sql, /print_next_attempt_at\)\s*VALUES[\s\S]*now\(\)/);
+  const auditInsert = queries.find((entry) => entry.sql.includes("INSERT INTO clinic.hardware_event_audit"));
+  assert.equal(auditInsert.params[2], "MSG-A-NEW-001");
+  assert.equal(auditInsert.params[3], eventInsert.params[7]);
 });
 
 test("print ACK stops terminal failure and schedules transient failure", async () => {

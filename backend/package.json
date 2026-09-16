@@ -32,7 +32,7 @@
     "tool:hardware": "node tools/hardwareTestCli.js",
     "tool:hardware:smoke": "node tools/hardwareTestSmoke.js",
     "test:hardware-tool": "node --test tests/hardware-test-tool.test.js",
-    "test:hardware-reliability": "node --test tests/hardware-software-reliability.test.js tests/print-outbox.test.js tests/print-retry-policy.test.js",
+    "test:hardware-reliability": "node --test tests/hardware-software-reliability.test.js tests/print-outbox.test.js tests/print-retry-policy.test.js tests/hardware-observability.test.js",
     "test:hardware-schema": "node tests/hardware-reliability-schema.js",
     "test:hardware-sql": "node tests/hardware-reliability-sql-smoke.js",
     "test:profile-images-workflow": "node tests/profile-images-workflow.js"

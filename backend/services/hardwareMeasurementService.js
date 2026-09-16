@@ -53,6 +53,22 @@ function parseMeasuredAt(value) {
   return date.toISOString();
 }
 
+function printJobIdFor(messageId) {
+  return `PRINT-${crypto.createHash("sha256").update(messageId).digest("hex").slice(0, 24)}`;
+}
+
+function measurementPayloadHash(values) {
+  const canonical = JSON.stringify({
+    device_id: values.deviceId,
+    mode: values.mode,
+    measurement_session_id: values.measurementSessionId || null,
+    measured_at: values.measuredAt,
+    weight: Number(values.weight),
+    height: Number(values.height),
+  });
+  return crypto.createHash("sha256").update(canonical).digest("hex");
+}
+
 async function withTransaction(callback) {
   const client = await pool.connect();
   try {
@@ -99,7 +115,7 @@ async function verifyOnlineOtp(payload, topicDeviceId) {
     );
 
     if (!access.rowCount) {
-      throw new HardwareMessageError("INVALID_OTP", "OTP is invalid");
+      throw new HardwareMessageError("OTP_NOT_FOUND", "OTP was not found");
     }
 
     const row = access.rows[0];
@@ -137,30 +153,77 @@ async function verifyOnlineOtp(payload, topicDeviceId) {
 
 async function findDuplicate(client, messageId) {
   const result = await client.query(
-    `SELECT e.message_id, e.device_id, e.measurement_id, q.queue_number
+    `SELECT e.message_id, e.device_id, e.mode, e.measurement_id,
+            e.measurement_session_id, e.payload_hash, e.print_status,
+            q.queue_number, m.weight, m.height, m.measured_at
      FROM clinic.hardware_measurement_events e
      JOIN clinic.queue_tickets q ON q.queue_id = e.queue_id
+     JOIN clinic.measurements m ON m.measurement_id = e.measurement_id
      WHERE e.message_id = $1`,
     [messageId],
   );
   return result.rows[0] || null;
 }
 
-async function insertMeasurement(client, { queue, messageId, deviceId, measuredAt, weight, height, mode }) {
+function duplicateMatchesPayload(duplicate, values) {
+  if (duplicate.payload_hash) return duplicate.payload_hash === values.payloadHash;
+  const existingMeasuredAt = new Date(duplicate.measured_at);
+  const sameMeasuredAt = !Number.isNaN(existingMeasuredAt.getTime())
+    && existingMeasuredAt.toISOString() === values.measuredAt;
+  const sameSession = values.mode !== "online"
+    || !duplicate.measurement_session_id
+    || String(duplicate.measurement_session_id) === values.measurementSessionId;
+  return duplicate.device_id === values.deviceId
+    && duplicate.mode === values.mode
+    && Number(duplicate.weight) === Number(values.weight)
+    && Number(duplicate.height) === Number(values.height)
+    && sameMeasuredAt
+    && sameSession;
+}
+
+async function insertMeasurement(client, {
+  queue, messageId, deviceId, measuredAt, weight, height, mode,
+  measurementSessionId, payloadHash,
+}) {
+  const bmi = Number((weight / ((height / 100) ** 2)).toFixed(2));
+  const printJobId = printJobIdFor(messageId);
   const measurement = await client.query(
     `INSERT INTO clinic.measurements
        (queue_id, queue_number, weight, height, bmi, source, device_id,
         hardware_message_id, measured_at)
-     VALUES ($1,$2,$3,$4,NULL,'mqtt',$5,$6,$7)
+     VALUES ($1,$2,$3,$4,$5,'mqtt',$6,$7,$8)
      RETURNING measurement_id`,
-    [queue.queue_id, queue.queue_number, weight, height, deviceId, messageId, measuredAt],
+    [queue.queue_id, queue.queue_number, weight, height, bmi, deviceId, messageId, measuredAt],
   );
 
   await client.query(
     `INSERT INTO clinic.hardware_measurement_events
-       (message_id, device_id, mode, queue_id, measurement_id)
-     VALUES ($1,$2,$3,$4,$5)`,
-    [messageId, deviceId, mode, queue.queue_id, measurement.rows[0].measurement_id],
+       (message_id, device_id, mode, queue_id, measurement_id,
+        payload_hash, measurement_session_id, print_job_id, print_status,
+        print_retryable, print_next_attempt_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7::uuid,$8,'pending',true,now())`,
+    [
+      messageId, deviceId, mode, queue.queue_id, measurement.rows[0].measurement_id,
+      payloadHash, measurementSessionId || null, printJobId,
+    ],
+  );
+
+  await client.query(
+    `INSERT INTO clinic.hardware_event_audit
+       (event_type, result, device_id, measurement_session_id,
+        message_id, print_job_id, details)
+     VALUES ('measurement','accepted',$1,$2::uuid,$3,$4,$5::jsonb)`,
+    [
+      deviceId,
+      measurementSessionId || null,
+      messageId,
+      printJobId,
+      JSON.stringify({
+        measurement_id: measurement.rows[0].measurement_id,
+        queue_number: queue.queue_number,
+        bmi,
+      }),
+    ],
   );
 
   const ack = {
@@ -179,12 +242,8 @@ async function insertMeasurement(client, { queue, messageId, deviceId, measuredA
   return ack;
 }
 
-async function processOnlineMeasurement(client, values, payload) {
-  const sessionId = String(payload?.measurement_session_id || "").trim();
-  if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(sessionId)) {
-    throw new HardwareMessageError("INVALID_SESSION", "measurement_session_id is invalid");
-  }
-
+async function processOnlineMeasurement(client, values) {
+  const sessionId = values.measurementSessionId;
   const session = await client.query(
     `SELECT s.session_id, s.access_code_id, s.queue_id, q.queue_number
      FROM clinic.hardware_otp_sessions s
@@ -271,28 +330,36 @@ async function processHardwareMeasurement(payload, topicDeviceId) {
   const values = {
     messageId,
     deviceId,
+    mode,
+    measurementSessionId: mode === "online"
+      ? String(payload?.measurement_session_id || "").trim()
+      : null,
     measuredAt: parseMeasuredAt(payload?.measured_at),
     weight: requireMeasurement(payload?.weight, "weight", 1, 300),
     height: requireMeasurement(payload?.height, "height", 30, 250),
   };
+  if (mode === "online" && !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(values.measurementSessionId)) {
+    throw new HardwareMessageError("INVALID_SESSION", "measurement_session_id is invalid");
+  }
+  values.payloadHash = measurementPayloadHash(values);
 
   return withTransaction(async (client) => {
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`hardware:${messageId}`]);
     const duplicate = await findDuplicate(client, messageId);
     if (duplicate) {
-      if (duplicate.device_id !== deviceId) {
-        throw new HardwareMessageError("MESSAGE_ID_CONFLICT", "message_id belongs to another device");
+      if (!duplicateMatchesPayload(duplicate, values)) {
+        throw new HardwareMessageError("MESSAGE_ID_CONFLICT", "message_id was already used with different payload");
       }
       return {
         message_id: messageId,
         status: "duplicate",
         measurement_id: duplicate.measurement_id,
         queue_number: duplicate.queue_number,
-        print_pending: true,
+        print_pending: duplicate.print_status !== "printed",
       };
     }
 
-    if (mode === "online") return processOnlineMeasurement(client, values, payload);
+    if (mode === "online") return processOnlineMeasurement(client, values);
     return processWalkinMeasurement(client, values);
   });
 }
@@ -344,6 +411,7 @@ async function processPrintAck(payload, topicDeviceId) {
   }
   return {
     print_job_id: printJobId,
+    message_id: result.rows[0].message_id,
     status,
     retryable: Boolean(result.rows[0].print_retryable),
     attempts: Number(result.rows[0].print_attempts),
@@ -353,6 +421,7 @@ async function processPrintAck(payload, topicDeviceId) {
 
 module.exports = {
   HardwareMessageError,
+  measurementPayloadHash,
   processHardwareMeasurement,
   processPrintAck,
   verifyOnlineOtp,

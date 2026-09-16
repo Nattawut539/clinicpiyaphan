@@ -1,5 +1,6 @@
 const crypto = require("node:crypto");
 const pool = require("./db");
+const { safeRecordHardwareAudit } = require("./hardwareAudit");
 const {
   MAX_PRINT_ATTEMPTS,
   PRINT_RETRY_BASE_SECONDS,
@@ -17,7 +18,7 @@ async function dueMessageIds(limit = 20) {
      WHERE print_job_id IS NOT NULL
        AND print_attempts < $1
        AND print_retryable = true
-       AND print_status IN ('requested', 'failed')
+       AND print_status IN ('pending', 'requested', 'failed')
        AND print_next_attempt_at IS NOT NULL
        AND print_next_attempt_at <= now()
      ORDER BY print_next_attempt_at, created_at
@@ -33,9 +34,9 @@ async function claim(messageId, { bmi = null, allowPending = false } = {}) {
     `WITH measurement_data AS (
        UPDATE clinic.measurements m
        SET bmi = COALESCE(
-         $6::numeric,
          m.bmi,
-         ROUND((m.weight / POWER(m.height / 100.0, 2))::numeric, 2)
+         ROUND((m.weight / POWER(m.height / 100.0, 2))::numeric, 2),
+         $6::numeric
        )
        FROM clinic.hardware_measurement_events source
        WHERE source.message_id = $1
@@ -116,8 +117,23 @@ async function markPublishFailed(messageId, error) {
 async function publishClaim(row, publishJson, makeTopic) {
   try {
     await publishJson(makeTopic(row.device_id, "print"), payloadFor(row));
+    await safeRecordHardwareAudit("print_publish", {
+      result: "published",
+      deviceId: row.device_id,
+      messageId: row.message_id,
+      printJobId: row.print_job_id,
+      details: { attempt: Number(row.print_attempts), queue_number: row.queue_number },
+    });
   } catch (error) {
     await markPublishFailed(row.message_id, error);
+    await safeRecordHardwareAudit("print_publish", {
+      result: "failed",
+      deviceId: row.device_id,
+      messageId: row.message_id,
+      printJobId: row.print_job_id,
+      errorCode: error?.code || "MQTT_PUBLISH_FAILED",
+      details: { attempt: Number(row.print_attempts) },
+    });
     throw error;
   }
 }
@@ -125,7 +141,7 @@ async function publishClaim(row, publishJson, makeTopic) {
 async function drain(publishJson, makeTopic) {
   let published = 0;
   for (const messageId of await dueMessageIds()) {
-    const row = await claim(messageId);
+    const row = await claim(messageId, { allowPending: true });
     if (!row) continue;
     try {
       await publishClaim(row, publishJson, makeTopic);
@@ -142,6 +158,41 @@ async function drain(publishJson, makeTopic) {
   return published;
 }
 
+async function createManualReprint(messageId, actorUserId) {
+  const printJobId = `PRINT-${crypto.randomUUID()}`;
+  const result = await pool.query(
+    `UPDATE clinic.hardware_measurement_events
+     SET print_job_id = $2,
+         print_status = 'pending',
+         print_attempts = 0,
+         print_error_code = NULL,
+         print_retryable = true,
+         print_next_attempt_at = now(),
+         print_last_failed_at = NULL,
+         print_requested_by_user_id = $3,
+         print_last_manual_reprint_at = now(),
+         print_manual_reprint_count = print_manual_reprint_count + 1,
+         updated_at = now()
+     WHERE message_id = $1
+       AND print_status IN ('printed', 'failed')
+     RETURNING message_id, device_id, print_job_id, print_status,
+               print_manual_reprint_count, print_last_manual_reprint_at`,
+    [messageId, printJobId, actorUserId],
+  );
+  const row = result.rows[0] || null;
+  if (row) {
+    await safeRecordHardwareAudit("manual_reprint", {
+      result: "requested",
+      deviceId: row.device_id,
+      messageId: row.message_id,
+      printJobId: row.print_job_id,
+      actorUserId,
+      details: { reprint_count: Number(row.print_manual_reprint_count) },
+    });
+  }
+  return row;
+}
+
 async function status(messageId) {
   const result = await pool.query(
     `SELECT print_job_id, print_status, print_attempts,
@@ -155,6 +206,7 @@ async function status(messageId) {
 
 module.exports = {
   claim,
+  createManualReprint,
   drain,
   dueMessageIds,
   markPublishFailed,

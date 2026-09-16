@@ -56,6 +56,16 @@ mockModule("../tools/measurementAckOutbox", {
   pending: async () => pendingRows.splice(0),
   recordFailure: async (id, error) => { failed.push({ id, error: error.message }); },
 });
+mockModule("../tools/hardwareAudit", {
+  safeRecordHardwareAudit: async () => {},
+});
+mockModule("../tools/hardwareMetrics", {
+  increment: () => {},
+  markConnected: () => {},
+  markDisconnected: () => {},
+  markMessage: () => {},
+  runtimeSnapshot: () => ({ connectedAt: null, disconnectedAt: null, lastMessageAt: null, counters: {} }),
+});
 mockModule("../tools/printOutbox", {
   drain: async () => 0,
 });
@@ -63,7 +73,14 @@ mockModule("../tools/printOutbox", {
 const bridge = require("../tools/mqttBridge");
 bridge.startMqttBridge();
 fakeClient.emit("connect");
-assert.deepEqual(bridge.mqttStatus(), { enabled: true, connected: true, subscribed: true });
+assert.deepEqual(bridge.mqttStatus(), {
+  enabled: true,
+  connected: true,
+  subscribed: true,
+  connected_at: null,
+  disconnected_at: null,
+  last_message_at: null,
+});
 
 async function waitFor(predicate) {
   for (let attempt = 0; attempt < 50; attempt += 1) {

@@ -19,7 +19,7 @@ async function main() {
       device_id: "SCALE-001",
       otp: "000000",
     }, "SCALE-001"),
-    (error) => error.code === "INVALID_OTP",
+    (error) => error.code === "OTP_NOT_FOUND",
   );
 
   await assert.rejects(

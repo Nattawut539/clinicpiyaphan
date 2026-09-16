@@ -61,7 +61,8 @@ clinic/v1/devices/{deviceId}/otp-result
 
 OTP error ที่แยกสถานะแล้ว:
 
-- `INVALID_OTP` — รูปแบบ/รหัสไม่ถูกต้อง หรือรหัสไม่อยู่ในระบบ
+- `INVALID_OTP` — รูปแบบรหัสไม่ถูกต้อง
+- `OTP_NOT_FOUND` — ไม่พบรหัสในระบบ
 - `OTP_EXPIRED` — หมดอายุหรือเลยวันนัดแล้ว
 - `OTP_USED` — ใช้บันทึก Measurement สำเร็จไปแล้ว
 - `OTP_NOT_ACTIVE_YET` — เป็น OTP ของวันนัดในอนาคต
@@ -129,6 +130,7 @@ clinic/v1/devices/{deviceId}/measurement-ack
 Error code ที่ firmware ต้องรองรับ:
 
 - `INVALID_OTP`
+- `OTP_NOT_FOUND`
 - `OTP_EXPIRED`
 - `OTP_USED`
 - `OTP_NOT_ACTIVE_YET`
@@ -139,14 +141,13 @@ Error code ที่ firmware ต้องรองรับ:
 - `HEIGHT_OUT_OF_RANGE`
 - `RETAIN_NOT_ALLOWED`
 - `RATE_LIMITED`
+- `MESSAGE_ID_CONFLICT`
 - `INTERNAL_ERROR`
 
 ## Print Job
 
-หลัง Admin Dashboard รับน้ำหนัก/ส่วนสูงและคำนวณ BMI แล้ว ฮาร์ดแวร์จะได้รับ:
-
-> ต้องเปิดและเข้าสู่ระบบหน้า Admin Dashboard ไว้ที่จุดบริการ เพราะ Browser เป็นผู้
-> คำนวณ BMI และขอให้ Backend ส่ง print job ตาม requirement ปัจจุบัน
+หลัง Backend บันทึก Measurement และคำนวณ BMI แล้ว Backend จะสร้าง Print Job
+ใน transaction เดียวกันและส่งผ่าน Outbox โดยไม่ต้องเปิดหน้า Admin Dashboard ค้างไว้
 
 ```text
 clinic/v1/devices/{deviceId}/print
@@ -205,3 +206,10 @@ clinic/v1/devices/{deviceId}/print-ack
 - OTP ใช้เฉพาะการขอ session ห้ามส่งซ้ำใน measurement
 - เก็บข้อความที่ยังไม่ได้ ACK และ reconnect อัตโนมัติ
 - ห้ามพิมพ์ `print_job_id` เดิมซ้ำ แม้ได้รับ MQTT ซ้ำ
+
+## Backend operations
+
+- Payload ที่ใช้ `device_id + message_id` เดิมแต่ข้อมูลต่างจากเดิมจะถูกปฏิเสธด้วย `MESSAGE_ID_CONFLICT`
+- Manual reprint เรียก `POST /api/hardware/reprint` และสร้าง `print_job_id` ใหม่เสมอ
+- ตรวจ Health/Metric ได้ที่ `GET /api/hardware/health`
+- ค้น Audit ตาม request/session/message/print job ID ได้ที่ `GET /api/hardware/events`
