@@ -29,6 +29,7 @@ async function getSession(token: string) {
     return {
       role: String(session?.role || "").toLowerCase() || null,
       profileCompleted: Boolean(session?.profile_completed),
+      medicalConsent: Boolean(session?.medical_consent),
       registrationSource: String(session?.registration_source || "local").toLowerCase(),
     };
   } catch {
@@ -45,7 +46,8 @@ export async function middleware(request: NextRequest) {
       ? "line"
       : null;
   const isOAuthProfileCompletion = Boolean(profileProvider);
-  const requiresUser = pathname.startsWith("/users") || isOAuthProfileCompletion;
+  const isConsentPage = pathname === "/medical-consent";
+  const requiresUser = pathname.startsWith("/users") || isOAuthProfileCompletion || isConsentPage;
   const requiresSuperAdmin = pathname === "/admin/audit-logs"
     || pathname.startsWith("/admin/audit-logs/")
     || pathname === "/admin/hardware"
@@ -73,6 +75,16 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL("/userlogin", request.url);
     const response = NextResponse.redirect(loginUrl);
     response.cookies.delete(cookieName);
+    return response;
+  }
+
+  if (requiresUser && validSession && !session?.medicalConsent && !isConsentPage) {
+    return NextResponse.redirect(new URL("/medical-consent", request.url));
+  }
+  if (isConsentPage && validSession) {
+    if (session?.medicalConsent) return NextResponse.redirect(new URL("/users/userHome", request.url));
+    const response = NextResponse.next();
+    response.headers.set("Cache-Control", "private, no-store");
     return response;
   }
 
@@ -119,6 +131,7 @@ export const config = {
   matcher: [
     "/admin/:path*",
     "/users/:path*",
+    "/medical-consent",
     "/google/complete-profile",
     "/line/complete-profile",
   ],

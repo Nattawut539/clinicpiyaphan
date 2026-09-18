@@ -73,7 +73,7 @@ async function validateSessionUser(user) {
     await setAppContext(client, user);
     const result = await client.query(
       `SELECT user_id, role::text AS role, email, account_status, session_version,
-              profile_completed_at, registration_source
+              profile_completed_at, registration_source, medical_consent_at, medical_consent_version
        FROM clinic.users
        WHERE user_id = $1
        LIMIT 1`,
@@ -112,6 +112,7 @@ async function validateSessionUser(user) {
       account_status: accountStatus,
       session_version: Number(result.rows[0].session_version || 1),
       profile_completed: Boolean(result.rows[0].profile_completed_at),
+      medical_consent: Boolean(result.rows[0].medical_consent_at) && result.rows[0].medical_consent_version === require("./medicalConsent").CONSENT_VERSION,
       registration_source: String(result.rows[0].registration_source || "local").toLowerCase(),
     };
   } catch (error) {
@@ -123,10 +124,14 @@ async function validateSessionUser(user) {
 }
 
 async function resolveVerifiedUser(req) {
-  if (req.authenticatedUserVerified && req.user) return req.user;
+  if (req.authenticatedUserVerified && req.user) {
+    require("./medicalConsent").assertConsentAccess(req.user, req);
+    return req.user;
+  }
   const verified = await validateSessionUser(parseUser(req));
   req.user = verified;
   req.authenticatedUserVerified = true;
+  require("./medicalConsent").assertConsentAccess(verified, req);
   return verified;
 }
 

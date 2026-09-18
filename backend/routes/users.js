@@ -73,6 +73,7 @@ router.get("/patients/lookup", requireStaff, async (req, res) => {
           d.blood_type,
           d.drug_allergy,
           d.food_allergy,
+          d.congenital_disease,
           m.weight,
           m.height,
           m.bmi

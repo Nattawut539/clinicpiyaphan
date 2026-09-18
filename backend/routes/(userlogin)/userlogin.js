@@ -120,6 +120,7 @@ router.get("/me", authRequired, (req, res) => {
     email: req.user.email,
     account_status: req.user.account_status,
     profile_completed: req.user.profile_completed,
+    medical_consent: req.user.medical_consent,
     registration_source: req.user.registration_source,
   });
 });

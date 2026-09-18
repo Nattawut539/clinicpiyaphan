@@ -10,6 +10,8 @@ async function ensureAdvisorRequirementsSchema() {
       ADD COLUMN IF NOT EXISTS account_status varchar(32) NOT NULL DEFAULT 'active',
       ADD COLUMN IF NOT EXISTS email_verified_at timestamptz,
       ADD COLUMN IF NOT EXISTS profile_completed_at timestamptz,
+      ADD COLUMN IF NOT EXISTS medical_consent_at timestamptz,
+      ADD COLUMN IF NOT EXISTS medical_consent_version text,
       ADD COLUMN IF NOT EXISTS registration_source varchar(32) NOT NULL DEFAULT 'local',
       ADD COLUMN IF NOT EXISTS status_reason text,
       ADD COLUMN IF NOT EXISTS status_changed_at timestamptz,
