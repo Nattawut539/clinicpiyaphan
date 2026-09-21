@@ -1,4 +1,5 @@
 const { Readable } = require("stream");
+const { driveCheckError } = require("./driveDiagnostics");
 
 // Never log Google SDK errors: they can contain Authorization headers and tokens.
 function storageError(error) {
@@ -14,13 +15,17 @@ function createDriveStorage(drive, folderId) {
   const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
   const maxImageBytes = 3 * 1024 * 1024;
   async function checkFolder() {
+    let data;
     try {
-      const { data } = await drive.files.get({ fileId: folderId, fields: "id,mimeType,trashed,capabilities(canAddChildren)" }, options);
-      if (data.trashed || data.mimeType !== "application/vnd.google-apps.folder" || !data.capabilities?.canAddChildren) {
-        throw new Error("Folder is not writable");
-      }
-      return { google_drive_folder_accessible: true, google_drive_folder_writable: true };
-    } catch (error) { throw storageError(error); }
+      ({ data } = await drive.files.get({ fileId: folderId, fields: "id,mimeType,trashed,capabilities(canAddChildren)" }, options));
+    } catch (error) { throw driveCheckError(error); }
+    if (data.trashed || data.mimeType !== "application/vnd.google-apps.folder") {
+      throw Object.assign(new Error('[DRIVE_INVALID_FOLDER] GOOGLE_DRIVE_FOLDER_ID must identify an existing folder that is not in the trash.'), { status: 503, code: 'DRIVE_INVALID_FOLDER' });
+    }
+    if (!data.capabilities?.canAddChildren) {
+      throw Object.assign(new Error('[DRIVE_FOLDER_READ_ONLY] The storage OAuth account needs permission to add files to the configured folder.'), { status: 503, code: 'DRIVE_FOLDER_READ_ONLY' });
+    }
+    return { google_drive_folder_accessible: true, google_drive_folder_writable: true };
   }
   async function allocateId() {
     try {
