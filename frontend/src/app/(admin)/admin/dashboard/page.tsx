@@ -1905,7 +1905,6 @@ export default function DashboardPage() {
                         <div className={styles.walkinBody}>
                             <section className={styles.walkinSection}>
                             <div className={styles.walkinSectionTitle}>ข้อมูลคิว</div>
-                            <p id="receipt-queue-hint">กรุณากรอกหมายเลขคิว B ให้ตรงกับใบคิวของผู้ป่วยทุกครั้ง จึงจะบันทึกได้ เช่น B001</p>
                             <div className={`${styles.walkinGrid} ${styles.walkinQueueGrid}`}>
                                 <label>
                                     <span>วัน เดือน ปี</span>
@@ -1951,7 +1950,6 @@ export default function DashboardPage() {
                                     <span>หมายเลขคิว B จากใบคิวผู้ป่วย (จำเป็น)</span>
                                     <input
                                         required
-                                        aria-describedby="receipt-queue-hint"
                                         value={walkinDraft.receipt_queue}
                                         onChange={(event) => {
                                             setWalkinValue('receipt_queue', event.target.value.toUpperCase());
