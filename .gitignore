@@ -31,8 +31,6 @@
 .DS_Store
 .vscode/
 /.codesight/
-# Editable Word export stays local; submit the HTML source and reviewed PDF.
-/reports/Hardware_Team_Handoff_Report_TH.docx
 *.pem
 
 # debug
@@ -58,3 +56,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local supporting documents; excluded from the submitted repository.
+/docs/
+/reports/

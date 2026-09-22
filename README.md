@@ -9,12 +9,10 @@
 | `frontend/` | Next.js 15, React 19, TypeScript: หน้าผู้ป่วยและเจ้าหน้าที่ |
 | `backend/` | Express API, authentication, สิทธิ์ผู้ใช้, จัดการคิวและ MQTT |
 | `database/` | PostgreSQL schema, migrations และพจนานุกรมข้อมูล |
-| `docs/` | คู่มือและผลตรวจความพร้อม |
-| `reports/` | รายงานส่งมอบฮาร์ดแวร์ HTML และ PDF |
 
 ฟังก์ชันหลัก: สมัคร/เข้าสู่ระบบ, consent ข้อมูลสุขภาพ, นัดหมาย, รับคิว walk-in, น้ำหนัก/ส่วนสูง/BMI, เวชระเบียน, จัดการผู้ใช้ และ audit logs ตามสิทธิ์ รองรับ Google/LINE OAuth, อีเมล, Google Drive และ MQTT เมื่อกำหนดค่าบริการเหล่านั้น
 
-ผลทดสอบซอฟต์แวร์ไม่ใช่การรับรองเครื่องชั่ง/เครื่องพิมพ์จริง ดูสถานะที่ยังรอทดสอบใน [รายงานฮาร์ดแวร์](reports/Hardware_Team_Handoff_Report_TH.pdf)
+ซอฟต์แวร์ผ่าน unit tests 45 ข้อ และได้ทดสอบสร้างฐานข้อมูลใหม่ รัน migrations และเข้าสู่ระบบด้วยบัญชี demo ทั้งสองแล้ว ส่วนการเชื่อมต่อเซนเซอร์ การ calibration และการพิมพ์กับอุปกรณ์จริงยังต้องทดสอบร่วมกับทีมฮาร์ดแวร์ก่อนรับรองการใช้งานจริง
 
 ## ติดตั้งเพื่อสาธิตในเครื่อง
 
@@ -23,13 +21,13 @@
 ### 1. ดาวน์โหลดและติดตั้ง
 
 ```powershell
-git clone --branch deployment/production-preparation https://github.com/Nattawut539/project2.git
+git clone --branch main https://github.com/Nattawut539/project2.git
 cd project2
 npm ci --prefix backend
 npm ci --prefix frontend
 ```
 
-ตอนส่งงานให้ระบุ commit SHA จาก `git rev-parse HEAD` ด้วย คู่มือและเครื่องมือใหม่ต้อง commit/push ก่อนผู้อื่นจะ clone ได้
+ใช้ `git rev-parse HEAD` เพื่อดู commit SHA ของเวอร์ชันที่ดาวน์โหลดและอ้างอิงผลทดสอบให้ตรงกัน
 
 ### 2. สร้างฐานข้อมูลว่าง
 
@@ -159,7 +157,5 @@ Workflow tests อื่นใน backend อาจสร้าง/แก้ข�
 - [Email / Google / LINE](INTEGRATIONS_SETUP_TH.md)
 - [Google Drive storage](GOOGLE_DRIVE_STORAGE_TH.md)
 - [MQTT contract](MQTT_HARDWARE_CONTRACT_TH.md)
-- [รายการรายงานส่งงาน](reports/README.md)
-- [ผลตรวจ Git และสถานะเตรียมส่ง](docs/GIT_SUBMISSION_REVIEW_TH.md)
 
 ห้าม commit `.env` จริง, credentials, database dump หรือข้อมูลผู้ป่วย ใช้ `.env.example` และข้อมูลจำลองแทน เปลี่ยน JWT secret แล้ว token เก่าจะใช้ไม่ได้หลัง backend เริ่มใช้ค่าใหม่
