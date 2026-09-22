@@ -101,8 +101,19 @@ The deployment preflight currently requires the policy
 authorization is still mandatory on every private route.
 
 After creating the role and setting its password privately, run
-[`database/supabase_render_grants.sql`](database/supabase_render_grants.sql)
-in the Supabase SQL Editor. Its final query must return seven policy rows.
+[`database/migrations.sql`](database/migrations.sql)
+in pgAdmin or the Supabase SQL Editor as the schema/migration owner, after the
+initial schema exists. This replaces the six former standalone migration/grant
+files. Execute the entire file; its transaction preserves existing application
+rows. The final query must include policies for all seven tables listed above
+(additional clinic tables are also covered).
+
+If `cliniccare_runtime` does not exist, production grants are skipped for local
+development. For production, create the role first and rerun this file. Grants
+target the connected database and default privileges target the executing owner,
+so use the same owner for future migrations. The backend's ACK initializer reads
+only the marked `measurement_ack_outbox` section; normal startup does not apply
+the entire consolidated file.
 
 ### Render Blueprint
 
