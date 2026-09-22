@@ -31,6 +31,8 @@
 |  | account_status | varchar(32) | active/pending_verification/deactivated/suspended/duplicate/unclaimed |
 |  | email_verified_at | timestamptz | เวลาที่ยืนยันอีเมลแล้ว |
 |  | profile_completed_at | timestamptz | เวลาที่กรอกประวัติครบ |
+|  | medical_consent_at | timestamptz | เวลาที่ผู้ใช้ยินยอมใช้ข้อมูลสุขภาพ; NULL หากยังไม่ยินยอม |
+|  | medical_consent_version | text | รุ่นข้อความยินยอมที่ผู้ใช้ยอมรับ |
 |  | registration_source | varchar(32) | แหล่งสมัคร เช่น local/google/line/walkin |
 |  | status_reason | text | เหตุผลที่เปลี่ยนสถานะบัญชี |
 |  | status_changed_at | timestamptz | เวลาเปลี่ยนสถานะ |
@@ -426,6 +428,8 @@ users ───< audit_logs (logical relation; ไม่บังคับ FK)
 9. ปฏิทิน: `weekly_closed_windows`, `clinic_holidays`, `clinic_open_days` และ `advance_booking_weeks` ควบคุมว่า slot ใดเปิดให้จอง.
 
 ## วิธีติดตั้ง
+
+`schema.sql` รวมโครงสร้างล่าสุด ฟังก์ชัน และสิทธิ์แล้ว ใช้กับฐานข้อมูลว่างเท่านั้น หากมีฐานข้อมูลอยู่แล้วให้ใช้ `npm --prefix backend run migrate` ด้วยบัญชีเจ้าของ schema ตาม README โดยไม่รันไฟล์สร้างตารางซ้ำ
 
 ```powershell
 # 1) สร้างฐานข้อมูล (ทำครั้งเดียว)

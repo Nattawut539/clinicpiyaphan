@@ -164,7 +164,7 @@ async function startServer() {
         await pool.query("SELECT 1 FROM clinic.hardware_event_audit LIMIT 0");
       } catch (error) {
         throw new Error(
-          `Hardware backend schema is not ready; run database/migrations.sql (${error.message})`,
+          `Hardware backend schema is not ready; run npm run migrate (${error.message})`,
         );
       }
     }

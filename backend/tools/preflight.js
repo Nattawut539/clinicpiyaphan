@@ -101,7 +101,7 @@ async function preflight() {
   const foundHardwareColumns = new Set(hardwareColumns.rows.map((row) => row.column_name));
   const missingHardwareColumns = requiredHardwareColumns.filter((name) => !foundHardwareColumns.has(name));
   if (missingHardwareColumns.length) {
-    throw new Error(`Missing hardware backend columns: ${missingHardwareColumns.join(", ")}; run database/migrations.sql`);
+    throw new Error(`Missing hardware backend columns: ${missingHardwareColumns.join(", ")}; run npm run migrate`);
   }
 
   const requiredHardwareIndexes = [
@@ -123,7 +123,7 @@ async function preflight() {
   const foundHardwareIndexes = new Set(hardwareIndexes.rows.map((row) => row.indexname));
   const missingHardwareIndexes = requiredHardwareIndexes.filter((name) => !foundHardwareIndexes.has(name));
   if (missingHardwareIndexes.length) {
-    throw new Error(`Missing hardware backend indexes: ${missingHardwareIndexes.join(", ")}; run database/migrations.sql`);
+    throw new Error(`Missing hardware backend indexes: ${missingHardwareIndexes.join(", ")}; run npm run migrate`);
   }
 
   const rlsTables = [

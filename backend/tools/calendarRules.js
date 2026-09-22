@@ -17,7 +17,7 @@ async function ensureCalendarRulesSchema(db) {
 
   if (!rows[0]?.has_open_days || !rows[0]?.has_advance_weeks) {
     const error = new Error(
-      'Calendar schema is not ready; run database/migrations.sql as the database owner',
+      'Calendar schema is not ready; run npm run migrate as the database owner',
     );
     error.code = 'CALENDAR_SCHEMA_NOT_READY';
     throw error;

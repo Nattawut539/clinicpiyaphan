@@ -7,7 +7,7 @@ require.cache[require.resolve('../tools/db')] = {
 };
 const ensureMeasurementAckOutbox = require('../tools/ensureMeasurementAckOutbox');
 
-test('startup initializes ACK outbox without running unrelated consolidated migrations', async () => {
+test('startup reads only ACK SQL from schema without running new-install DDL or global grants', async () => {
   await ensureMeasurementAckOutbox();
   assert.equal(queries.length, 1);
   const sql = queries[0];

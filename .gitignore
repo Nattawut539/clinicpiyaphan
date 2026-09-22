@@ -60,3 +60,5 @@ next-env.d.ts
 # Local supporting documents; excluded from the submitted repository.
 /docs/
 /reports/
+# Historical upgrade script retained locally; the repository uses schema.sql.
+/database/migrations.sql

@@ -100,20 +100,32 @@ The deployment preflight currently requires the policy
 `user_details`, and `users`. The role must remain `NOBYPASSRLS`; API
 authorization is still mandatory on every private route.
 
-After creating the role and setting its password privately, run
-[`database/migrations.sql`](database/migrations.sql)
-in pgAdmin or the Supabase SQL Editor as the schema/migration owner, after the
-initial schema exists. This replaces the six former standalone migration/grant
-files. Execute the entire file; its transaction preserves existing application
-rows. The final query must include policies for all seven tables listed above
-(additional clinic tables are also covered).
+For a NEW, EMPTY database, run [`database/schema.sql`](database/schema.sql)
+once as the schema/migration owner in pgAdmin or the Supabase SQL Editor.
+It includes the current tables, indexes, functions and optional runtime grants.
+Never execute the entire file against an existing database.
+
+For an EXISTING database, or after creating `cliniccare_runtime` and setting its
+password privately, run `npm run migrate` from `backend` using the schema owner
+(via `MIGRATION_DATABASE_URL` where appropriate). This applies the repeatable
+backend initializers and only the named function/grant sections from schema.sql.
+No separate migration SQL file is required.
 
 If `cliniccare_runtime` does not exist, production grants are skipped for local
-development. For production, create the role first and rerun this file. Grants
-target the connected database and default privileges target the executing owner,
-so use the same owner for future migrations. The backend's ACK initializer reads
-only the marked `measurement_ack_outbox` section; normal startup does not apply
-the entire consolidated file.
+development. Grants target the connected database and default privileges target
+the executing owner, so use the same owner for future migrations. Normal startup
+does not run the complete schema or the global grant section. The ACK initializer
+reads only the marked `measurement_ack_outbox` section.
+
+Verify policies after migration (the seven tables listed above must be present):
+
+```sql
+SELECT schemaname, tablename, policyname, roles, cmd
+FROM pg_policies
+WHERE schemaname = 'clinic'
+  AND policyname = 'cliniccare_runtime_backend_full_access'
+ORDER BY tablename;
+```
 
 ### Render Blueprint
 

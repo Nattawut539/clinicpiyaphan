@@ -44,17 +44,12 @@ psql -h 127.0.0.1 -p 5432 -U postgres -d cliniccare_demo -v ON_ERROR_STOP=1 -f d
 
 | ไฟล์ | การใช้งาน |
 |---|---|
-| `schema.sql` | สร้างโครงสร้างเริ่มต้นบนฐานข้อมูลว่าง |
-| `migrations.sql` | รวมการปรับปรุงโครงสร้างและสิทธิ์จาก migration เดิม รันหลัง schema และรันซ้ำได้ |
+| `schema.sql` | SQL ไฟล์เดียวสำหรับติดตั้งโครงสร้างล่าสุดบนฐานข้อมูลว่าง รวมตาราง ดัชนี ฟังก์ชัน และสิทธิ์ |
 | `DATABASE_DICTIONARY_TH.md` | คำอธิบายตารางและคอลัมน์ |
 
-รันไฟล์รวมด้วยบัญชีเจ้าของ schema (หรือเปิดไฟล์ทั้งหมดใน pgAdmin Query Tool แล้ว Execute):
+เปิด `schema.sql` ใน pgAdmin Query Tool แล้ว Execute ทั้งไฟล์แทนคำสั่ง psql ได้ โดยเลือกฐานข้อมูลว่างและใช้บัญชีเจ้าของ schema สำหรับ local ไม่ต้องสร้าง role `cliniccare_runtime`; ส่วน grants จะข้ามให้อัตโนมัติ สำหรับ production ให้สร้าง role นี้และตั้งรหัสผ่านแยกก่อนรัน ดู [Deployment](DEPLOYMENT.md)
 
-```powershell
-psql -h 127.0.0.1 -p 5432 -U postgres -d cliniccare_demo -v ON_ERROR_STOP=1 -f database/migrations.sql
-```
-
-สำหรับ local ไม่ต้องสร้าง role `cliniccare_runtime`; ส่วน grants จะข้ามให้อัตโนมัติ สำหรับ production ให้สร้าง role นี้และตั้งรหัสผ่านแยกก่อนรัน ดู [Deployment](DEPLOYMENT.md)
+ฐานข้อมูลที่มีอยู่แล้วให้ใช้ `npm --prefix backend run migrate` ด้วยบัญชีเจ้าของ schema ไม่รัน `schema.sql` ทั้งไฟล์ซ้ำ คำสั่งนี้ใช้ขั้นตอนอัปเดตแบบรันซ้ำได้และไม่ต้องมีไฟล์ SQL เพิ่มเติม
 
 ### 3. ตั้งค่า backend
 
@@ -90,13 +85,13 @@ node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
 
 `backend/.env.example` เป็นรายการตัวแปร deployment/integrations ไม่ใช่ค่าพร้อมรัน local ตัวอย่างนี้ปิด SMTP/OAuth/MQTT จึงไม่ทดสอบการยืนยันอีเมลหรืออุปกรณ์จริง
 
-รัน migrations หลัง schema:
+หลังตั้งค่า environment ให้รันคำสั่งตรวจปรับโครงสร้างของ backend (ใช้คำสั่งเดียวกันเมื่ออัปเดตฐานข้อมูลเดิม):
 
 ```powershell
 npm --prefix backend run migrate
 ```
 
-คำสั่งนี้ปรับ queue, account/consent, audit, profile images และ measurement ACK outbox ตามโค้ดปัจจุบัน ไม่ต้องรัน SQL migration เก่าทุกไฟล์ซ้ำสำหรับฐานข้อมูลใหม่
+คำสั่งนี้ปรับ queue, account/consent, audit, profile images, measurement ACK outbox, ฟังก์ชันและสิทธิ์ตามโค้ดปัจจุบัน โดยเก็บข้อมูลเดิมไว้ และไม่รันคำสั่งสร้างฐานข้อมูลทั้งไฟล์ซ้ำ
 
 ### 4. สร้างบัญชีทดสอบ
 

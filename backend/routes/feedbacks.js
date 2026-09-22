@@ -24,7 +24,7 @@ async function ensureFeedbackSchema() {
     !rows[0]?.has_unique_index
   ) {
     const error = new Error(
-      'Feedback schema is not ready; run database/migrations.sql as the database owner',
+      'Feedback schema is not ready; run npm run migrate as the database owner',
     );
     error.code = 'FEEDBACK_SCHEMA_NOT_READY';
     throw error;

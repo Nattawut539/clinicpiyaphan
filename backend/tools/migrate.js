@@ -14,6 +14,7 @@ const { ensureAuditSchema } = require("./audit");
 const pool = require("./db");
 const ensureProfileImageSchema = require("./ensureProfileImageSchema");
 const ensureMeasurementAckOutbox = require("./ensureMeasurementAckOutbox");
+const { readSchemaSection } = require("./schemaSections");
 
 async function migrate() {
   await ensureQueueSchema();
@@ -21,6 +22,19 @@ async function migrate() {
   await ensureAuditSchema();
   await ensureProfileImageSchema();
   await ensureMeasurementAckOutbox();
+  // Explicit owner-run migration only: never execute the full new-install schema.
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(readSchemaSection("runtime_functions"));
+    await client.query(readSchemaSection("runtime_grants"));
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
   console.log("Database migrations completed");
 }
 
