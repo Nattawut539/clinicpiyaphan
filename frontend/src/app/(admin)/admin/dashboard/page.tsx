@@ -458,11 +458,6 @@ function getErrorMessage(error: unknown, fallback: string) {
     return error instanceof Error ? error.message : fallback;
 }
 
-function formatMeasurement(value?: number | null, unit?: string) {
-    if (value === null || value === undefined) return 'ยังไม่มีข้อมูล';
-    return unit ? `${value} ${unit}` : String(value);
-}
-
 function hasSameQueueSnapshot(current: QueueTicket[], next: QueueTicket[]) {
     if (current.length !== next.length) return false;
     return current.every((queue, index) => JSON.stringify(queue) === JSON.stringify(next[index]));
@@ -2520,7 +2515,7 @@ export default function DashboardPage() {
 
                                     <div>
                                         <span>BMI — ดัชนีมวลกาย</span>
-                                        <strong>{formatMeasurement(latestMeasurement?.bmi)}</strong>
+                                        <strong aria-live="polite">{calcBmiText(vitalDraft.bw, vitalDraft.ht) || 'ยังไม่มีข้อมูล'}</strong>
                                     </div>
 
                                     <div>
