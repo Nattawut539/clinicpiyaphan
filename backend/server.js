@@ -76,6 +76,8 @@ app.use("/api", require("./routes/(userlogin)/google"));
 app.use("/api", require("./routes/(userlogin)/line"));
 app.use("/api/provinces", require("./routes/provinces"));
 
+app.use("/api/users", require("./routes/medicalConsent"));
+
 // === Core APIs ===
 app.use("/api", require("./routes/help"));
 app.use("/api", require("./routes/users"));

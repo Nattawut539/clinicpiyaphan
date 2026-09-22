@@ -30,6 +30,9 @@
 # misc
 .DS_Store
 .vscode/
+/.codesight/
+# Editable Word export stays local; submit the HTML source and reviewed PDF.
+/reports/Hardware_Team_Handoff_Report_TH.docx
 *.pem
 
 # debug

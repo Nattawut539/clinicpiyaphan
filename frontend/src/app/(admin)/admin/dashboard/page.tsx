@@ -106,6 +106,7 @@ type WalkinDraft = {
     blood_type: string;
     phone: string;
     emergency_phone: string;
+    congenital_disease: string;
     drug_allergy: string;
     food_allergy: string;
     weight: string;
@@ -155,6 +156,7 @@ function getEmptyWalkinDraft(): WalkinDraft {
         blood_type: '',
         phone: '',
         emergency_phone: '',
+        congenital_disease: '',
         drug_allergy: '',
         food_allergy: '',
         weight: '',
@@ -456,11 +458,6 @@ function getErrorMessage(error: unknown, fallback: string) {
     return error instanceof Error ? error.message : fallback;
 }
 
-function formatMeasurement(value?: number | null, unit?: string) {
-    if (value === null || value === undefined) return 'ยังไม่มีข้อมูล';
-    return unit ? `${value} ${unit}` : String(value);
-}
-
 function hasSameQueueSnapshot(current: QueueTicket[], next: QueueTicket[]) {
     if (current.length !== next.length) return false;
     return current.every((queue, index) => JSON.stringify(queue) === JSON.stringify(next[index]));
@@ -589,10 +586,12 @@ export default function DashboardPage() {
     const setWalkinValue = (key: keyof WalkinDraft, value: string) => {
         if (key === 'national_id' || key === 'first_name' || key === 'last_name') {
             setWalkinLookupStatus('idle');
+            lastWalkinLookupKey.current = '';
         }
 
         setWalkinDraft((current) => {
             const next = { ...current, [key]: value };
+            if (key === 'national_id' || key === 'first_name' || key === 'last_name') next.user_id = '';
             if (key === 'weight' || key === 'height') {
                 next.bmi = calcBmiText(next.weight, next.height);
             }
@@ -628,6 +627,7 @@ export default function DashboardPage() {
             last_name: stringifyMeasurement(data.last_name as string | number | null) || current.last_name,
             phone: stringifyMeasurement(data.phone as string | number | null),
             emergency_phone: stringifyMeasurement(data.emergency_phone as string | number | null),
+            congenital_disease: stringifyMeasurement(data.congenital_disease as string | number | null),
             birth_date: data.dob ? dayjs(String(data.dob)).format('YYYY-MM-DD') : '',
             age: data.dob ? calcAgeText(dayjs(String(data.dob)).format('YYYY-MM-DD')) : '',
             gender: stringifyMeasurement(data.gender as string | number | null),
@@ -670,6 +670,7 @@ export default function DashboardPage() {
             });
             const data = await res.json().catch(() => null);
 
+            if (lastWalkinLookupKey.current !== lookupKey) return;
             if (!res.ok || !data) {
                 setWalkinLookupStatus('not_found');
                 return;
@@ -682,7 +683,12 @@ export default function DashboardPage() {
         }
     };
 
+    const validReceiptQueue = /^B(?!000)\d{3}$/.test(walkinDraft.receipt_queue.trim());
     const saveWalkinQueue = async () => {
+        if (!validReceiptQueue) {
+            await Swal.fire({ icon: 'warning', title: 'กรุณากรอกหมายเลขคิว B จากใบคิวผู้ป่วย', text: 'ตรวจสอบให้ตรงกับใบคิวทุกครั้ง เช่น B001 ก่อนบันทึก' });
+            return;
+        }
         if (!walkinDraft.service_date || !walkinDraft.visit_time || !walkinDraft.first_name || !walkinDraft.last_name) {
             Swal.fire({
                 icon: 'warning',
@@ -716,7 +722,8 @@ export default function DashboardPage() {
                     service_date: walkinDraft.service_date,
                     visit_time: walkinDraft.visit_time,
                     avaliable_date: avaliableDate,
-                    receipt_queue: walkinDraft.receipt_queue || null,
+                    receipt_queue: walkinDraft.receipt_queue.trim(),
+                    user_id: walkinDraft.user_id ? Number(walkinDraft.user_id) : null,
                     service_type: 'Walk-in',
                     patient: {
                         first_name: walkinDraft.first_name,
@@ -727,6 +734,7 @@ export default function DashboardPage() {
                         blood_type: walkinDraft.blood_type,
                         phone: walkinDraft.phone,
                         emergency_phone: walkinDraft.emergency_phone,
+                        congenital_disease: walkinDraft.congenital_disease,
                         drug_allergy: walkinDraft.drug_allergy,
                         food_allergy: walkinDraft.food_allergy,
                     },
@@ -1939,13 +1947,12 @@ export default function DashboardPage() {
                                     </div>
                                 </label>
                                 <label>
-                                    <span>หมายเลขคิว Walk-in</span>
+                                    <span>หมายเลขคิว B จากใบคิวผู้ป่วย (จำเป็น)</span>
                                     <input
+                                        required
                                         value={walkinDraft.receipt_queue}
                                         onChange={(event) => {
-                                            const value = event.target.value.toUpperCase();
-                                            const digits = value.replace(/\D/g, '').slice(0, 3);
-                                            setWalkinValue('receipt_queue', value ? `B${digits}` : '');
+                                            setWalkinValue('receipt_queue', event.target.value.toUpperCase());
                                         }}
                                         placeholder="เช่น B001"
                                     />
@@ -2025,11 +2032,15 @@ export default function DashboardPage() {
                                     <span>แพ้อาหาร</span>
                                     <input value={walkinDraft.food_allergy} onChange={(event) => setWalkinValue('food_allergy', event.target.value)} placeholder="ไม่มี" />
                                 </label>
+                                <label>
+                                    <span>โรคประจำตัว</span>
+                                    <input value={walkinDraft.congenital_disease} onChange={(event) => setWalkinValue('congenital_disease', event.target.value)} placeholder="ไม่มี" />
+                                </label>
                             </div>
                             </section>
 
                             <section className={styles.walkinSection}>
-                            <div className={styles.walkinSectionTitle}>Vital signs และ CC</div>
+                            <div className={styles.walkinSectionTitle}>Vital signs (สัญญาณชีพ) และ CC (อาการสำคัญ)</div>
                             <div className={styles.walkinGrid}>
                                 <label>
                                     <span>น้ำหนัก</span>
@@ -2040,27 +2051,27 @@ export default function DashboardPage() {
                                     <input value={walkinDraft.height} onChange={(event) => setWalkinValue('height', event.target.value)} placeholder="ซม." />
                                 </label>
                                 <label>
-                                    <span>BMI</span>
+                                    <span>BMI — ดัชนีมวลกาย</span>
                                     <input value={walkinDraft.bmi} readOnly placeholder="คำนวณอัตโนมัติ" />
                                 </label>
                                 <label>
-                                    <span>TP</span>
+                                    <span>TP — อุณหภูมิร่างกาย (°C)</span>
                                     <input value={walkinDraft.temperature} onChange={(event) => setWalkinValue('temperature', event.target.value)} placeholder="36.8" />
                                 </label>
                                 <label>
-                                    <span>HR</span>
+                                    <span>HR — อัตราการเต้นหัวใจ (ครั้ง/นาที)</span>
                                     <input value={walkinDraft.heart_rate} onChange={(event) => setWalkinValue('heart_rate', event.target.value)} placeholder="80" />
                                 </label>
                                 <label>
-                                    <span>RR</span>
+                                    <span>RR — อัตราการหายใจ (ครั้ง/นาที)</span>
                                     <input value={walkinDraft.respiratory_rate} onChange={(event) => setWalkinValue('respiratory_rate', event.target.value)} placeholder="18" />
                                 </label>
                                 <label>
-                                    <span>BP</span>
+                                    <span>BP — ความดันโลหิต (มม.ปรอท)</span>
                                     <input value={walkinDraft.bp} onChange={(event) => setWalkinValue('bp', event.target.value)} placeholder="120/80" />
                                 </label>
                                 <label className={styles.walkinWideField}>
-                                    <span>CC</span>
+                                    <span>CC — อาการสำคัญที่มาพบแพทย์</span>
                                     <textarea value={walkinDraft.chief_complaint} onChange={(event) => setWalkinValue('chief_complaint', event.target.value)} placeholder="อาการสำคัญ" />
                                 </label>
                             </div>
@@ -2069,7 +2080,7 @@ export default function DashboardPage() {
 
                         <div className={styles.walkinFooter}>
                             <button type="button" className={styles.walkinGhostBtn} onClick={() => setWalkinOpen(false)}>ยกเลิก</button>
-                            <button type="button" className={styles.walkinSaveBtn} onClick={saveWalkinQueue} disabled={walkinSaving}>
+                            <button type="button" className={styles.walkinSaveBtn} onClick={saveWalkinQueue} disabled={walkinSaving || !validReceiptQueue}>
                                 {walkinSaving ? 'กำลังบันทึก...' : 'บันทึกคิว B'}
                             </button>
                         </div>
@@ -2479,7 +2490,7 @@ export default function DashboardPage() {
                                     </div>
 
                                     <div>
-                                        <span>BW น้ำหนัก</span>
+                                        <span>BW — น้ำหนัก (กก.)</span>
                                         <input
                                             className={styles.vitalInput}
                                             type="text"
@@ -2490,7 +2501,7 @@ export default function DashboardPage() {
                                     </div>
 
                                     <div>
-                                        <span>HT ส่วนสูง</span>
+                                        <span>HT — ส่วนสูง (ซม.)</span>
                                         <input
                                             className={styles.vitalInput}
                                             type="text"
@@ -2501,12 +2512,12 @@ export default function DashboardPage() {
                                     </div>
 
                                     <div>
-                                        <span>BMI</span>
-                                        <strong>{formatMeasurement(latestMeasurement?.bmi)}</strong>
+                                        <span>BMI — ดัชนีมวลกาย</span>
+                                        <strong aria-live="polite">{calcBmiText(vitalDraft.bw, vitalDraft.ht) || 'ยังไม่มีข้อมูล'}</strong>
                                     </div>
 
                                     <div>
-                                        <span>TP อุณหภูมิ</span>
+                                        <span>TP — อุณหภูมิร่างกาย (°C)</span>
                                         <input
                                             className={styles.vitalInput}
                                             type="text"
@@ -2517,7 +2528,7 @@ export default function DashboardPage() {
                                     </div>
 
                                     <div>
-                                        <span>HR ชีพจร</span>
+                                        <span>HR — อัตราการเต้นหัวใจ (ครั้ง/นาที)</span>
                                         <input
                                             className={styles.vitalInput}
                                             type="text"
@@ -2528,7 +2539,7 @@ export default function DashboardPage() {
                                     </div>
 
                                     <div>
-                                        <span>RR หายใจ</span>
+                                        <span>RR — อัตราการหายใจ (ครั้ง/นาที)</span>
                                         <input
                                             className={styles.vitalInput}
                                             type="text"
@@ -2539,7 +2550,7 @@ export default function DashboardPage() {
                                     </div>
 
                                     <div>
-                                        <span>BP ความดัน</span>
+                                        <span>BP — ความดันโลหิต (มม.ปรอท)</span>
                                         <input
                                             className={styles.vitalInput}
                                             type="text"

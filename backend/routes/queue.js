@@ -139,8 +139,8 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
   if (nationalId && !/^\d{13}$/.test(nationalId)) {
     return res.status(400).json({ message: "เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก" });
   }
-  if (requestedQueueNumber && !/^B\d{3}$/.test(requestedQueueNumber)) {
-    return res.status(400).json({ message: "หมายเลขคิว Walk-in ต้องเป็นรูปแบบ B001" });
+  if (!/^B(?!000)\d{3}$/.test(requestedQueueNumber)) {
+    return res.status(400).json({ message: "กรุณากรอกหมายเลขคิว B จากใบคิวผู้ป่วยทุกครั้ง เป็นรูปแบบ B001 ถึง B999" });
   }
 
   if (vitals?.bp && !bp) {
@@ -162,10 +162,8 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
       const arrivedAt = `${day} ${visitTimeText}:00+07`;
 
       const prefix = "B";
-      const n = requestedQueueNumber
-        ? Number.parseInt(requestedQueueNumber.slice(1), 10)
-        : await nextNo(client, day, avaliable_date, prefix);
-      const qnum = requestedQueueNumber || formatQ(prefix, n);
+      const n = Number.parseInt(requestedQueueNumber.slice(1), 10);
+      const qnum = requestedQueueNumber;
 
       const duplicateQueue = await client.query(
         `SELECT 1 FROM clinic.queue_tickets
@@ -181,18 +179,22 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
 
       let resolvedUserId = user_id;
 
-      if (!resolvedUserId && patient) {
-        const found = nationalId ? await client.query(
+      if (patient) {
+        const found = (resolvedUserId || nationalId) ? await client.query(
           `SELECT u.user_id
            FROM clinic.users u
            JOIN clinic.user_details d ON d.user_id = u.user_id
            WHERE u.role = 'user'
-             AND d.national_id = $1
+             AND (($2::integer IS NOT NULL AND u.user_id = $2)
+               OR ($2::integer IS NULL AND d.national_id = $1))
            ORDER BY u.user_id
            LIMIT 1`,
-          [nationalId],
+          [nationalId, resolvedUserId],
         ) : { rowCount: 0, rows: [] };
 
+        if (resolvedUserId && !found.rowCount) {
+          return res.status(404).json({ message: "ไม่พบผู้ป่วยที่เลือก กรุณาค้นหาผู้ป่วยใหม่" });
+        }
         if (found.rowCount) {
           resolvedUserId = found.rows[0].user_id;
           await client.query(
@@ -207,7 +209,8 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
                gender = COALESCE(NULLIF($8, ''), gender),
                blood_type = COALESCE(NULLIF($9, ''), blood_type),
                drug_allergy = COALESCE(NULLIF($10, ''), drug_allergy),
-               food_allergy = COALESCE(NULLIF($11, ''), food_allergy)
+               food_allergy = COALESCE(NULLIF($11, ''), food_allergy),
+               congenital_disease = COALESCE(NULLIF($12, ''), congenital_disease)
              WHERE user_id = $1`,
             [
               resolvedUserId,
@@ -221,6 +224,7 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
               cleanText(patient?.blood_type),
               cleanText(patient?.drug_allergy),
               cleanText(patient?.food_allergy),
+              cleanText(patient?.congenital_disease),
             ],
           );
         } else {
@@ -229,8 +233,8 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
           await client.query(
             `INSERT INTO clinic.user_details
                (user_id, national_id, first_name, last_name, phone, emergency_phone,
-                birth_date, gender, blood_type, drug_allergy, food_allergy)
-             VALUES ($1,$2,$3,$4,$5,$6,NULLIF($7, '')::date,$8,$9,$10,$11)`,
+                birth_date, gender, blood_type, drug_allergy, food_allergy, congenital_disease)
+             VALUES ($1,$2,$3,$4,$5,$6,NULLIF($7, '')::date,$8,$9,$10,$11,$12)`,
             [
               resolvedUserId,
               nationalId || null,
@@ -243,6 +247,7 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
               cleanText(patient?.blood_type) || null,
               cleanText(patient?.drug_allergy) || null,
               cleanText(patient?.food_allergy) || null,
+              cleanText(patient?.congenital_disease) || null,
             ],
           );
         }

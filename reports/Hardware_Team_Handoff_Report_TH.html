@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>รายงานส่งมอบสถานะระบบเครื่องชั่งและงานพิมพ์ให้ทีมฮาร์ดแวร์</title>
+  <style>
+    @page { size: A4; margin: 11mm 11mm 12mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #172033;
+      font-family: "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.2;
+    }
+    .page { page-break-after: always; position: relative; }
+    .page:last-child { page-break-after: auto; }
+    .cover {
+      border-top: 12px solid #087f6a;
+      padding: 9mm 7mm 0;
+    }
+    .eyebrow { color: #087f6a; font-size: 9pt; font-weight: 700; letter-spacing: 1.5px; }
+    h1 { margin: 7mm 0 3mm; color: #113a45; font-size: 25pt; line-height: 1.1; }
+    h2 { margin: 0 0 3mm; color: #113a45; font-size: 17pt; border-bottom: 2px solid #13a083; padding-bottom: 1.5mm; }
+    h3 { margin: 3.5mm 0 1.5mm; color: #087f6a; font-size: 13.5pt; }
+    h4 { margin: 2mm 0 1mm; color: #334155; font-size: 11pt; }
+    p { margin: 0 0 2mm; }
+    ul, ol { margin: 1.5mm 0 2.5mm 5mm; padding-left: 4mm; }
+    li { margin-bottom: 0.7mm; }
+    code {
+      font-family: Consolas, monospace;
+      font-size: 8pt;
+      color: #173e49;
+      overflow-wrap: anywhere;
+    }
+    .subtitle { color: #475569; font-size: 14.5pt; max-width: 165mm; }
+    .meta-table, .grid-table, .contract-table, .status-table, .check-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 2.5mm 0;
+    }
+    .meta-table td { padding: 1.7mm 2.5mm; border-bottom: 1px solid #dbe4e8; }
+    .meta-table td:first-child { width: 42mm; color: #64748b; font-weight: 700; }
+    .grid-table th, .grid-table td,
+    .contract-table th, .contract-table td,
+    .status-table th, .status-table td,
+    .check-table th, .check-table td {
+      border: 1px solid #cad7dc;
+      padding: 1.4mm 2mm;
+      vertical-align: top;
+    }
+    th { background: #e7f5f2; color: #114d50; font-weight: 700; text-align: left; }
+    tr { page-break-inside: avoid; }
+    .summary {
+      margin: 6mm 0 4mm;
+      border: 1px solid #b9dcd5;
+      border-left: 7px solid #0b9278;
+      border-radius: 7px;
+      padding: 4mm;
+      background: #f4fbf9;
+    }
+    .cards { width: 100%; border-collapse: separate; border-spacing: 3mm; margin: 2mm -3mm; }
+    .cards td {
+      width: 33.33%;
+      border: 1px solid #d8e2e7;
+      border-radius: 6px;
+      padding: 3.5mm;
+      background: #f8fafc;
+      vertical-align: top;
+    }
+    .cards strong { display: block; color: #087f6a; font-size: 14pt; margin-bottom: 1mm; }
+    .badge { display: inline-block; padding: 0.4mm 1.8mm; border-radius: 10px; font-size: 8.5pt; font-weight: 700; }
+    .pass { background: #dcfce7; color: #166534; }
+    .pending { background: #fef3c7; color: #92400e; }
+    .blocked { background: #ffe4e6; color: #be123c; }
+    .info { background: #dbeafe; color: #1e40af; }
+    .flow { width: 100%; border-collapse: separate; border-spacing: 1.5mm; margin: 2.5mm 0; }
+    .flow td {
+      border: 1px solid #b9d4d7;
+      border-radius: 6px;
+      padding: 2.5mm 2mm;
+      text-align: center;
+      vertical-align: middle;
+      background: #f7fbfc;
+      font-size: 9.5pt;
+    }
+    .flow .arrow { border: 0; background: transparent; color: #0b9278; font-size: 20pt; padding: 0; }
+    .note { margin: 2.5mm 0; border-left: 4px solid #3b82f6; background: #eff6ff; padding: 2.5mm; }
+    .warn { margin: 2.5mm 0; border-left: 4px solid #f59e0b; background: #fffbeb; padding: 2.5mm; }
+    .danger { margin: 2.5mm 0; border-left: 4px solid #ef4444; background: #fff1f2; padding: 2.5mm; }
+    .payload { margin: 1.5mm 0; border: 1px solid #cbd5e1; border-radius: 5px; background: #f8fafc; padding: 2mm; white-space: pre-wrap; font-family: Consolas, monospace; font-size: 7.5pt; line-height: 1.18; }
+    .small { color: #64748b; font-size: 8.5pt; }
+    .footer { margin-top: 3mm; border-top: 1px solid #dbe4e8; padding-top: 1.5mm; color: #64748b; font-size: 8pt; }
+    .footer span:last-child { float: right; }
+    .owner-software { color: #075985; }
+    .owner-hardware { color: #92400e; }
+    .tight td, .tight th { padding-top: 1.1mm; padding-bottom: 1.1mm; }
+    .sign { height: 20mm; vertical-align: bottom !important; }
+  </style>
+</head>
+<body>
+
+  <section class="page cover">
+    <div class="eyebrow">CLINICCARE · HARDWARE INTEGRATION HANDOFF</div>
+    <h1>รายงานสถานะระบบเครื่องชั่ง<br>OTP และงานพิมพ์</h1>
+    <p class="subtitle">เอกสารส่งมอบข้อมูลจากทีม Backend/Web ให้ทีม Hardware/Firmware สำหรับการเชื่อมต่อ ESP32, เครื่องชั่ง, เซนเซอร์วัดส่วนสูง และเครื่องพิมพ์</p>
+
+    <div class="summary">
+      <strong>สถานะรวม ณ วันที่ 16 กันยายน 2569</strong><br>
+      Core Software และ MQTT Contract พร้อมสำหรับ Integration Test แล้ว ส่วนการทดสอบเซนเซอร์ การ Calibration และการพิมพ์กับอุปกรณ์จริงยังต้องดำเนินการโดยทีมฮาร์ดแวร์ก่อน Production Acceptance
+    </div>
+
+    <table class="meta-table">
+      <tr><td>ระบบ</td><td>ClinicCare Hardware Scale Integration</td></tr>
+      <tr><td>อุปกรณ์อ้างอิง</td><td><code>SCALE-001</code></td></tr>
+      <tr><td>Contract version</td><td><code>schema_version 1.0</code></td></tr>
+      <tr><td>Source version</td><td><code>fc54836d</code> — super-admin hardware operations dashboard</td></tr>
+      <tr><td>Production branch</td><td><code>deployment/production-preparation</code></td></tr>
+      <tr><td>ผู้รับเอกสาร</td><td>ทีม Hardware / Firmware / Integration Test</td></tr>
+    </table>
+
+    <table class="cards">
+      <tr>
+        <td><strong>ผ่าน</strong>Backend reliability, MQTT bridge, database schema และ SQL smoke tests</td>
+        <td><strong>พร้อม</strong>OTP → Measurement → Print พร้อม ACK, retry และ idempotency</td>
+        <td><strong>รอทดสอบ</strong>Load Cell, VL53L1X, Keypad, LCD และ USB Printer จริง</td>
+      </tr>
+    </table>
+
+  </section>
+
+  <section class="page">
+    <h2>1. ขอบเขตและภาพรวมการทำงาน</h2>
+
+    <h3>1.1 เป้าหมาย</h3>
+    <p>ให้อุปกรณ์รับรองตัวตนผู้ป่วยคิวออนไลน์ด้วย OTP หรือสร้างคิว Walk-in จากผลวัด ส่งน้ำหนักและส่วนสูงให้ Backend บันทึก แล้วรับงานพิมพ์ที่มีค่า BMI ซึ่ง Backend เป็นผู้คำนวณ</p>
+
+    <h3>1.2 Flow A — คิวออนไลน์</h3>
+    <table class="flow">
+      <tr>
+        <td>ผู้ป่วยกรอก OTP<br><span class="small">6 หลัก</span></td><td class="arrow">→</td>
+        <td>ESP32<br><code>/otp-verify</code></td><td class="arrow">→</td>
+        <td>Backend ตรวจ OTP<br>ส่ง Session + คิว A</td>
+      </tr>
+      <tr>
+        <td>ชั่งน้ำหนัก<br>วัดส่วนสูง</td><td class="arrow">→</td>
+        <td>ESP32<br><code>/measurements</code></td><td class="arrow">→</td>
+        <td>Backend บันทึก<br>คำนวณ BMI</td>
+      </tr>
+      <tr>
+        <td>ESP32 รับ Print Job</td><td class="arrow">←</td>
+        <td>Backend<br><code>/print</code></td><td class="arrow">→</td>
+        <td>พิมพ์และตอบ<br><code>/print-ack</code></td>
+      </tr>
+    </table>
+
+    <h3>1.3 Flow B — Walk-in</h3>
+    <table class="flow">
+      <tr>
+        <td>เลือกโหมด Walk-in</td><td class="arrow">→</td>
+        <td>วัด Weight / Height</td><td class="arrow">→</td>
+        <td>ส่ง <code>mode: walk_in</code><br>ไม่ใช้ OTP</td>
+      </tr>
+      <tr>
+        <td>Backend สร้างคิว B</td><td class="arrow">→</td>
+        <td>ตอบ Measurement ACK</td><td class="arrow">→</td>
+        <td>ส่ง Print Job</td>
+      </tr>
+    </table>
+
+    <div class="note">
+      <strong>หลักการสำคัญ:</strong> Firmware ส่งเฉพาะน้ำหนักและส่วนสูง ห้ามคำนวณหรือส่ง BMI เป็นค่าหลัก Backend จะคำนวณ บันทึก และส่ง BMI กลับมากับ Print Job
+    </div>
+
+    <h3>1.4 ขอบเขตความรับผิดชอบ</h3>
+    <table class="grid-table tight">
+      <tr><th>เจ้าของงาน</th><th>รับผิดชอบ</th></tr>
+      <tr><td class="owner-software"><strong>Backend/Web</strong></td><td>ตรวจ OTP, ออก Session/คิว, validate payload, บันทึก Measurement, คำนวณ BMI, outbox/retry, Print Job, Audit/Timeline และหน้า Super Admin</td></tr>
+      <tr><td class="owner-hardware"><strong>Hardware/Firmware</strong></td><td>อ่านเซนเซอร์, UI บนอุปกรณ์, เวลา UTC, MQTT reconnect, เก็บ Pending, deduplicate Print Job, พิมพ์จริง และตอบ ACK</td></tr>
+      <tr><td><strong>Security/Ops</strong></td><td>Credential/ACL แยกต่ออุปกรณ์, TLS certificate, Client ID ไม่ซ้ำ, production monitoring และ incident response</td></tr>
+    </table>
+
+  </section>
+
+  <section class="page">
+    <h2>2. MQTT Contract ที่ต้องใช้ตรงกัน</h2>
+
+    <table class="contract-table tight">
+      <tr><th>ทิศทาง</th><th>Topic suffix</th><th>หน้าที่</th><th>QoS / Retain</th></tr>
+      <tr><td>ESP32 → Backend</td><td><code>/otp-verify</code></td><td>ตรวจ OTP และขอ Measurement Session</td><td>QoS 1 / false</td></tr>
+      <tr><td>Backend → ESP32</td><td><code>/otp-result</code></td><td>ตอบ Session, Queue A, expires_at หรือ error</td><td>QoS 1 / false</td></tr>
+      <tr><td>ESP32 → Backend</td><td><code>/measurements</code></td><td>ส่ง Weight / Height / measured_at</td><td>QoS 1 / false</td></tr>
+      <tr><td>Backend → ESP32</td><td><code>/measurement-ack</code></td><td>ยืนยัน accepted / duplicate / rejected</td><td>QoS 1 / false</td></tr>
+      <tr><td>Backend → ESP32</td><td><code>/print</code></td><td>ส่ง Queue, Weight, Height, BMI และ Print Job ID</td><td>QoS 1 / false</td></tr>
+      <tr><td>ESP32 → Backend</td><td><code>/print-ack</code></td><td>ตอบ printed หรือ failed + error_code</td><td>QoS 1 / false</td></tr>
+    </table>
+
+    <p><strong>Topic เต็ม:</strong> <code>clinic/v1/devices/{deviceId}/{action}</code></p>
+    <p><strong>Production transport:</strong> MQTT 3.1.1 หรือ MQTT 5 ผ่าน <code>mqtts://</code> port 8883, UTF-8 JSON, payload ไม่เกิน 16 KB</p>
+
+    <h3>2.1 Online OTP request</h3>
+    <div class="payload">{
+  "schema_version": "1.0",
+  "request_id": "REQ-A-000001",
+  "device_id": "SCALE-001",
+  "otp": "123456"
+}</div>
+
+    <h3>2.2 Measurement payload</h3>
+    <div class="payload">{
+  "schema_version": "1.0",
+  "message_id": "MSG-A-000001",
+  "device_id": "SCALE-001",
+  "mode": "online",
+  "measurement_session_id": "&lt;UUID จาก otp-result&gt;",
+  "measured_at": "2026-09-16T06:50:00.000Z",
+  "weight": 60.0,
+  "height": 170.0
+}</div>
+
+    <h3>2.3 Print acknowledgement</h3>
+    <div class="payload">{
+  "print_job_id": "PRINT-&lt;id จาก Backend&gt;",
+  "device_id": "SCALE-001",
+  "status": "printed"
+}</div>
+
+    <div class="warn"><strong>ห้าม:</strong> ใช้ Retain กับ Measurement, ใช้ <code>device_id</code> ไม่ตรงกับ Topic, เปลี่ยน payload แต่ใช้ <code>message_id</code> เดิม หรือพิมพ์ <code>print_job_id</code> เดิมซ้ำ</div>
+
+  </section>
+
+  <section class="page">
+    <h2>3. สถานะ Core Software และหลักฐาน</h2>
+
+    <table class="status-table tight">
+      <tr><th>รายการ</th><th>สถานะ</th><th>รายละเอียด</th></tr>
+      <tr><td>OTP validation</td><td><span class="badge pass">ผ่าน</span></td><td>แยก INVALID_OTP, OTP_NOT_FOUND, OTP_EXPIRED, OTP_USED และ OTP_NOT_ACTIVE_YET</td></tr>
+      <tr><td>Measurement validation</td><td><span class="badge pass">ผ่าน</span></td><td>Weight 1–300 kg, Height 30–250 cm, timestamp, mode, device/session และ retain</td></tr>
+      <tr><td>Idempotency</td><td><span class="badge pass">ผ่าน</span></td><td>ส่ง payload เดิมด้วย message_id เดิมได้ duplicate โดยไม่สร้างคิวหรือผลวัดซ้ำ; payload เปลี่ยนจะได้ MESSAGE_ID_CONFLICT</td></tr>
+      <tr><td>Backend BMI</td><td><span class="badge pass">ผ่าน</span></td><td>Backend คำนวณและบันทึก BMI จาก Weight/Height ใน transaction</td></tr>
+      <tr><td>Measurement ACK outbox</td><td><span class="badge pass">ผ่าน</span></td><td>ACK ที่ส่งไม่สำเร็จถูกเก็บและ replay หลัง reconnect</td></tr>
+      <tr><td>Print outbox/retry</td><td><span class="badge pass">ผ่าน</span></td><td>Backend สร้าง Print Job โดยไม่พึ่งหน้าเว็บ; retry สูงสุด 3 attempts ตามนโยบาย</td></tr>
+      <tr><td>Manual Reprint</td><td><span class="badge pass">ผ่าน</span></td><td>สร้าง print_job_id ใหม่ พร้อมบันทึก actor และ timeline</td></tr>
+      <tr><td>Web/Admin monitor</td><td><span class="badge pass">ผ่าน</span></td><td>OTP status, Device Online/Offline, Last seen, Print status/error, Timeline และ polling alert</td></tr>
+      <tr><td>Access control</td><td><span class="badge pass">ผ่าน</span></td><td>เมนู, Next middleware และ Backend API จำกัดเฉพาะ super_admin/superadmin; admin ปกติได้ 403</td></tr>
+      <tr><td>Render production verification</td><td><span class="badge pending">รอยืนยัน</span></td><td>Source ถูก push แล้ว ต้องยืนยัน Backend และ Frontend deploy เป็น Live ที่ commit fc54836d</td></tr>
+    </table>
+
+    <h3>3.1 ผล Automated Test ล่าสุด</h3>
+    <table class="grid-table tight">
+      <tr><th>ชุดทดสอบ</th><th>ผล</th></tr>
+      <tr><td>Hardware software reliability</td><td><span class="badge pass">14 / 14 ผ่าน</span></td></tr>
+      <tr><td>MQTT bridge</td><td><span class="badge pass">3 / 3 ผ่าน</span></td></tr>
+      <tr><td>Hardware schema</td><td><span class="badge pass">ผ่าน</span></td></tr>
+      <tr><td>Hardware SQL smoke test</td><td><span class="badge pass">ผ่าน</span></td></tr>
+      <tr><td>Super Admin API + database smoke test</td><td><span class="badge pass">ผ่าน</span></td></tr>
+      <tr><td>Frontend ESLint + production build</td><td><span class="badge pass">ผ่าน</span></td></tr>
+    </table>
+
+    <h3>3.2 หลักฐาน Integration รอบ Walk-in</h3>
+    <table class="grid-table tight">
+      <tr><td>message_id</td><td><code>MSG-B-TEST-20260916-009</code></td></tr>
+      <tr><td>ผลตอบรับ</td><td>accepted — measurement_id 73 — queue_number B013</td></tr>
+      <tr><td>ค่าที่ Backend บันทึก</td><td>Weight 60.00 kg, Height 170.00 cm, BMI 20.76</td></tr>
+      <tr><td>Print Job</td><td><code>PRINT-2715e850d0230edce4181381</code></td></tr>
+      <tr><td>Print ACK</td><td>printed — ฐานข้อมูลอัปเดต print_status เป็น printed</td></tr>
+    </table>
+
+  </section>
+
+  <section class="page">
+    <h2>4. ข้อกำหนดที่ทีม Firmware ต้องรองรับ</h2>
+
+    <table class="status-table">
+      <tr><th>ลำดับ</th><th>ข้อกำหนด</th><th>เกณฑ์ที่ถือว่าผ่าน</th></tr>
+      <tr><td>F-01</td><td>สร้าง request_id/message_id ใหม่และไม่ซ้ำ</td><td>Retry ใช้ ID เดิมเฉพาะ payload เดิม; งานใหม่ต้องใช้ ID ใหม่</td></tr>
+      <tr><td>F-02</td><td>ตรวจ Correlation ของ OTP</td><td>รับเฉพาะ otp-result ที่ request_id ตรงกับคำขอปัจจุบัน</td></tr>
+      <tr><td>F-03</td><td>ตรวจ Session และ expiry</td><td>ไม่เริ่ม/ไม่ส่ง Measurement เมื่อ Session หมดอายุ</td></tr>
+      <tr><td>F-04</td><td>เวลา UTC จาก NTP</td><td>ส่ง measured_at เป็น ISO-8601 UTC ลงท้าย Z และไม่อยู่ในอนาคตผิดปกติ</td></tr>
+      <tr><td>F-05</td><td>เก็บ Pending ก่อน Publish</td><td>ตัดไฟหรือหลุดเครือข่ายแล้วกลับมาส่ง payload/message_id เดิมได้</td></tr>
+      <tr><td>F-06</td><td>รอ Measurement ACK</td><td>accepted/duplicate จึงลบ Pending; rejected ต้องแสดง error และหยุด retry ตามประเภท</td></tr>
+      <tr><td>F-07</td><td>Reconnect และ resubscribe</td><td>กลับมา online และ subscribe ทุก topic ที่จำเป็นด้วย QoS 1 โดยอัตโนมัติ</td></tr>
+      <tr><td>F-08</td><td>ตรวจ Print Job schema</td><td>มี print_job_id, queue_number, weight, height, bmi, measured_at ครบ</td></tr>
+      <tr><td>F-09</td><td>Deduplicate การพิมพ์</td><td>จำ print_job_id ในหน่วยความจำถาวรและไม่พิมพ์ ID เดิมซ้ำแม้ MQTT ส่งซ้ำ</td></tr>
+      <tr><td>F-10</td><td>ตอบ Print ACK</td><td>printed เมื่อสำเร็จ; failed พร้อม error_code ที่สม่ำเสมอเมื่อไม่สำเร็จ</td></tr>
+      <tr><td>F-11</td><td>ห้ามคำนวณ BMI ใหม่</td><td>ใช้ค่า BMI จาก Print Job เป็นค่าที่พิมพ์และแสดง</td></tr>
+      <tr><td>F-12</td><td>รองรับ Payload จำกัด</td><td>UTF-8 JSON ไม่เกิน 16 KB และไม่ใช้ Retain</td></tr>
+    </table>
+
+    <h3>4.1 Error code ที่ต้องแสดงหรือบันทึก</h3>
+    <p><code>INVALID_OTP</code>, <code>OTP_NOT_FOUND</code>, <code>OTP_EXPIRED</code>, <code>OTP_USED</code>, <code>OTP_NOT_ACTIVE_YET</code>, <code>INVALID_SESSION</code>, <code>DEVICE_MISMATCH</code>, <code>WEIGHT_OUT_OF_RANGE</code>, <code>HEIGHT_OUT_OF_RANGE</code>, <code>RETAIN_NOT_ALLOWED</code>, <code>RATE_LIMITED</code>, <code>MESSAGE_ID_CONFLICT</code>, <code>INTERNAL_ERROR</code></p>
+
+    <h3>4.2 Print error code ขั้นต่ำ</h3>
+    <ul>
+      <li><code>PRINTER_NOT_CONNECTED</code> — ไม่มีหรือเชื่อมต่อเครื่องพิมพ์ไม่ได้ (Backend ไม่ retry)</li>
+      <li><code>PAPER_OUT</code> — กระดาษหมด (Backend อาจ retry ตาม backoff)</li>
+      <li><code>UNSUPPORTED_SCHEMA</code> — ไม่รองรับ schema (Backend ไม่ retry)</li>
+      <li><code>INVALID_PRINT_JOB</code> / <code>INVALID_PRINT_DATA</code> — ข้อมูลงานพิมพ์ไม่ถูกต้อง (Backend ไม่ retry)</li>
+    </ul>
+
+  </section>
+
+  <section class="page">
+    <h2>5. แผนทดสอบร่วมและเกณฑ์รับมอบ</h2>
+
+    <table class="check-table tight">
+      <tr><th>ID</th><th>กรณีทดสอบ</th><th>ผลที่คาดหวัง</th><th>สถานะ</th></tr>
+      <tr><td>IT-01</td><td>OTP ถูกต้องของวันนี้</td><td>accepted + Session + Queue A</td><td><span class="badge pending">รอเครื่องจริง</span></td></tr>
+      <tr><td>IT-02</td><td>OTP ผิด/หมดอายุ/ใช้แล้ว/อนาคต</td><td>rejected พร้อม error_code ถูกประเภท และไม่ส่ง Measurement</td><td><span class="badge pending">รอเครื่องจริง</span></td></tr>
+      <tr><td>IT-03</td><td>Online Measurement ปกติ</td><td>ACK accepted, Queue A ตรง, BMI จาก Backend</td><td><span class="badge pending">รอเครื่องจริง</span></td></tr>
+      <tr><td>IT-04</td><td>Walk-in Measurement</td><td>ACK accepted, สร้าง Queue B และ Print Job</td><td><span class="badge pass">ผ่าน MQTT จำลอง</span></td></tr>
+      <tr><td>IT-05</td><td>ส่ง payload เดิมซ้ำ</td><td>ACK duplicate, ไม่สร้าง Measurement/Queue ซ้ำ</td><td><span class="badge pass">ผ่าน Software</span></td></tr>
+      <tr><td>IT-06</td><td>เปลี่ยน payload แต่ใช้ message_id เดิม</td><td>rejected MESSAGE_ID_CONFLICT</td><td><span class="badge pass">ผ่าน Software</span></td></tr>
+      <tr><td>IT-07</td><td>ตัด Wi-Fi ก่อนรับ ACK</td><td>Pending อยู่ใน NVS และส่งซ้ำหลัง reconnect</td><td><span class="badge pending">รอเครื่องจริง</span></td></tr>
+      <tr><td>IT-08</td><td>ตัดไฟก่อนรับ ACK</td><td>เปิดใหม่แล้ว recover งานเดิมโดยไม่สร้างคิวซ้ำ</td><td><span class="badge pending">รอเครื่องจริง</span></td></tr>
+      <tr><td>IT-09</td><td>รับ Print Job เดิมหลายครั้ง</td><td>พิมพ์ครั้งเดียวและตอบ ACK อย่างปลอดภัย</td><td><span class="badge pending">รอเครื่องจริง</span></td></tr>
+      <tr><td>IT-10</td><td>เครื่องพิมพ์ไม่ต่อ/กระดาษหมด</td><td>failed พร้อม error_code ถูกต้อง; ไม่เกิด loop พิมพ์</td><td><span class="badge pending">รอเครื่องจริง</span></td></tr>
+      <tr><td>IT-11</td><td>Manual Reprint จาก Super Admin</td><td>ได้รับ print_job_id ใหม่และพิมพ์หนึ่งครั้ง</td><td><span class="badge pending">รอเครื่องจริง</span></td></tr>
+      <tr><td>IT-12</td><td>ทดสอบต่อเนื่อง 50 รอบ</td><td>ไม่มีคิว/measurement/print ซ้ำและไม่มี memory leak/reboot</td><td><span class="badge pending">รอ Endurance</span></td></tr>
+    </table>
+
+    <h3>5.1 หลักฐานที่ต้องส่งกลับ</h3>
+    <ul>
+      <li>Serial log ที่มี timestamp, topic, request_id/message_id/print_job_id และผลลัพธ์ โดยไม่เปิดเผย OTP/Password</li>
+      <li>ภาพหน้าจอ LCD และใบพิมพ์ที่เห็น Queue, Weight, Height, BMI ตรงกับ Backend</li>
+      <li>ผล Calibration พร้อมอุปกรณ์มาตรฐานและค่าความคลาดเคลื่อน</li>
+      <li>วิดีโอหรือ log ของกรณีตัด Wi-Fi/ตัดไฟ/reconnect และ duplicate handling</li>
+      <li>ตาราง Firmware version, board, build environment, RAM/Flash usage และ commit hash</li>
+    </ul>
+
+    <div class="danger"><strong>ห้ามทดสอบ destructive case กับข้อมูลผู้ป่วยจริง:</strong> ใช้นัดหมายและคิวทดสอบที่กำหนดร่วมกันเท่านั้น และลบข้อมูลทดสอบตามกระบวนการของทีม Software</div>
+
+  </section>
+
+  <section class="page">
+    <h2>6. งานคงเหลือก่อน Production Sign-off</h2>
+
+    <table class="status-table">
+      <tr><th>เจ้าของงาน</th><th>รายการ</th><th>สถานะปัจจุบัน</th><th>หลักฐานปิดงาน</th></tr>
+      <tr><td>Hardware</td><td>Calibration HX711 / Load Cell</td><td><span class="badge pending">ยังไม่ยืนยัน</span></td><td>ตารางค่ามาตรฐานหลายจุดและ tolerance ที่ยอมรับ</td></tr>
+      <tr><td>Hardware</td><td>ติดตั้งและกำหนด offset ของ VL53L1X</td><td><span class="badge pending">ยังไม่ยืนยัน</span></td><td>ผลเทียบส่วนสูงหลายระดับและตำแหน่งยืน</td></tr>
+      <tr><td>Hardware</td><td>ทดสอบ Keypad / LCD / USB Printer / กระดาษจริง</td><td><span class="badge pending">ยังไม่ยืนยัน</span></td><td>Checklist และภาพ/วิดีโอการทดสอบ</td></tr>
+      <tr><td>Firmware</td><td>NVS pending + reconnect + deduplication</td><td><span class="badge pending">ต้องทดสอบร่วม</span></td><td>ผ่าน IT-07, IT-08, IT-09</td></tr>
+      <tr><td>Firmware</td><td>รองรับ Error code และสถานะบนหน้าจอ</td><td><span class="badge pending">ต้องทดสอบร่วม</span></td><td>ผ่าน IT-02 และ IT-10</td></tr>
+      <tr><td>Security/Ops</td><td>MQTT ACL/Credential/Client ID แยกต่ออุปกรณ์</td><td><span class="badge pending">ก่อน Production</span></td><td>หลักฐาน ACL โดยไม่ใส่ secret ในรายงาน</td></tr>
+      <tr><td>Software/Ops</td><td>ยืนยัน Render Backend/Frontend Live</td><td><span class="badge pending">รอตรวจ</span></td><td>Deploy commit fc54836d และ /readyz = 200</td></tr>
+      <tr><td>ร่วมกัน</td><td>End-to-end และ Endurance test</td><td><span class="badge pending">รอเครื่องจริง</span></td><td>ผ่าน IT-01 ถึง IT-12 และมีผู้อนุมัติ</td></tr>
+    </table>
+
+    <h3>6.1 Production security checklist</h3>
+    <ul>
+      <li>ใช้ <code>mqtts://</code>, ตรวจ CA certificate และเปิด reject unauthorized</li>
+      <li>Username/Password และ Client ID ต้องไม่ฝังใน source repository หรือ log</li>
+      <li>Device publish ได้เฉพาะ <code>otp-verify</code>, <code>measurements</code>, <code>print-ack</code> ของตน</li>
+      <li>Device subscribe ได้เฉพาะ <code>otp-result</code>, <code>measurement-ack</code>, <code>print</code> ของตน</li>
+      <li>กำหนดวิธี revoke/rotate credential เมื่ออุปกรณ์สูญหายหรือถูกเปลี่ยน</li>
+    </ul>
+
+    <h3>6.2 สรุปการส่งมอบ</h3>
+    <div class="summary">
+      <strong>Software Ready for Hardware Integration</strong><br>
+      Backend, Database, MQTT reliability และ Web/Admin รองรับ flow ที่กำหนดแล้ว การประกาศ Production Ready ขั้นสุดท้ายจะทำได้เมื่อทีมฮาร์ดแวร์ส่งหลักฐาน Calibration, Physical Print, reconnect/power-loss, deduplication และ Endurance test ครบถ้วน
+    </div>
+
+    <table class="grid-table">
+      <tr><th>ผู้จัดทำ/ทีม Software</th><th>ผู้รับมอบ/ทีม Hardware</th><th>ผู้อนุมัติ Production</th></tr>
+      <tr><td class="sign">ลงชื่อ ____________________<br>วันที่ ____________________</td><td class="sign">ลงชื่อ ____________________<br>วันที่ ____________________</td><td class="sign">ลงชื่อ ____________________<br>วันที่ ____________________</td></tr>
+    </table>
+
+    <p class="small">เอกสารอ้างอิงทางเทคนิค: <code>MQTT_HARDWARE_CONTRACT_TH.md</code> ใน repository เดียวกัน ข้อมูลลับ เช่น OTP จริง, MQTT password และ database credential ไม่รวมอยู่ในรายงานนี้</p>
+
+  </section>
+
+</body>
+</html>

@@ -345,35 +345,24 @@ export default function PatientListPage() {
         }
     }
 
-    async function handleSmartSearch() {
-        try {
-            const raw = nationalId.trim();
-            if (!raw) throw new Error('empty');
+    const query = nationalId.trim().toLocaleLowerCase('th');
+    const queryDigits = query.replace(/[\s()-]/g, '');
+    const filteredPatients = allPatients.filter((patient) => {
+        if (!query) return true;
+        const code = String(patient.user_id).padStart(3, '0');
+        const name = `${patient.first_name || ''} ${patient.last_name || ''}`.toLocaleLowerCase('th');
+        const nameParts = query.split(/[\s-]+/).filter(Boolean);
+        return code === query || String(patient.user_id) === query || `p${code}` === query
+            || Boolean(queryDigits && patient.national_id?.includes(queryDigits))
+            || (nameParts.length > 0 && nameParts.every((part) => name.includes(part)))
+            || Boolean(queryDigits && patient.phone?.replace(/\D/g, '').includes(queryDigits));
+    });
 
-            if (/^\d{1,3}$/.test(raw)) {
-                const code = raw.padStart(3, '0');
-                const res = await fetch(`${API_BASE}/patients/code/${encodeURIComponent(code)}`, {
-                    headers: getAuthHeaders(),
-                    cache: 'no-store',
-                    credentials: 'include',
-                });
-
-                if (!res.ok) throw new Error('notfound');
-                const data = await res.json();
-                router.push(`/admin/information?user_id=${data.user_id}`);
-                return;
-            }
-
-            const res = await fetch(`${API_BASE}/patients/national/${encodeURIComponent(raw)}`, {
-                headers: getAuthHeaders(),
-                cache: 'no-store',
-                credentials: 'include',
-            });
-
-            if (!res.ok) throw new Error('notfound');
-            const data = await res.json();
-            router.push(`/admin/information?user_id=${data.user_id}`);
-        } catch {
+    function handleSmartSearch() {
+        if (!query) return;
+        if (filteredPatients.length === 1) {
+            router.push(`/admin/information?user_id=${filteredPatients[0].user_id}`);
+        } else if (!filteredPatients.length) {
             setShowPopup(true);
             setTimeout(() => setShowPopup(false), 2000);
         }
@@ -452,7 +441,7 @@ export default function PatientListPage() {
                                     รายการผู้ป่วยทั้งหมด
                                 </h2>
                                 <p className={styles.patientPanelCount}>
-                                    {allPatients.length} รายการ
+                                    {filteredPatients.length} จาก {allPatients.length} รายการ
                                 </p>
                             </div>
 
@@ -467,7 +456,7 @@ export default function PatientListPage() {
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') handleSmartSearch();
                                     }}
-                                    placeholder="ค้นหา รหัสผู้ป่วย, เลขบัตร, ชื่อ..."
+                                    placeholder="ค้นหา รหัสผู้ป่วย, เลขบัตร, ชื่อ-นามสกุล, เบอร์โทร"
                                 />
 
                                 <button
@@ -495,14 +484,14 @@ export default function PatientListPage() {
                                 </thead>
 
                                 <tbody>
-                                    {allPatients.length === 0 ? (
+                                    {filteredPatients.length === 0 ? (
                                         <tr>
                                             <td colSpan={7} className={styles.emptyBox}>
-                                                ไม่มีข้อมูลผู้ป่วย
+                                                ไม่พบข้อมูลผู้ป่วย
                                             </td>
                                         </tr>
                                     ) : (
-                                        allPatients.map((p) => (
+                                        filteredPatients.map((p) => (
                                             <tr key={p.user_id}>
                                                 <td>
                                                     <span className={styles.patientCodeBadge}>

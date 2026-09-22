@@ -37,6 +37,8 @@ async function preflight() {
     throw new Error("The runtime database role must not bypass row-level security");
   }
 
+  await pool.query("SELECT medical_consent_at, medical_consent_version FROM clinic.users LIMIT 0");
+
   const requiredTables = [
     "users",
     "user_details",
