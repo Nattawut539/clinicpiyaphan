@@ -21,8 +21,8 @@
 ### 1. ดาวน์โหลดและติดตั้ง
 
 ```powershell
-git clone --branch main https://github.com/Nattawut539/project2.git
-cd project2
+git clone --branch main https://github.com/Nattawut539/clinicpiyaphan.git
+cd clinicpiyaphan
 npm ci --prefix backend
 npm ci --prefix frontend
 ```
