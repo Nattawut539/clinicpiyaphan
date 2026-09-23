@@ -79,6 +79,7 @@ app.use("/api/provinces", require("./routes/provinces"));
 app.use("/api/users", require("./routes/medicalConsent"));
 
 // === Core APIs ===
+app.use("/api/chat", require("./routes/chat"));
 app.use("/api", require("./routes/help"));
 app.use("/api", require("./routes/users"));
 app.use("/api", require("./routes/profileImages"));
@@ -141,6 +142,7 @@ async function startServer() {
       await ensureAuditSchema();
       await ensureProfileImageSchema();
       await ensureMeasurementAckOutbox();
+      await require('./tools/ensureChatSchema')();
     }
     const runtimeRole = await pool.query(
       `SELECT current_user,

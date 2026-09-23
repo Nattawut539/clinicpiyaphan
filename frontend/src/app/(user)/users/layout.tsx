@@ -1,6 +1,7 @@
 "use client";
 
 import UserFooter from "@/components/user-shell/UserFooter";
+import ClinicChat from "@/components/chat/ClinicChat";
 import UserHeader from "@/components/user-shell/UserHeader";
 import UserSidebar from "@/components/user-shell/UserSidebar";
 import styles from "@/components/user-shell/UserShell.module.css";
@@ -37,6 +38,7 @@ export default function UserLayout({
         {children}
       </main>
       <UserFooter />
+      <ClinicChat />
     </div>
   );
 }

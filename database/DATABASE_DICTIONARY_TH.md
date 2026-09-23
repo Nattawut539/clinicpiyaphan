@@ -3,6 +3,18 @@
 ฐานข้อมูลใช้ PostgreSQL ชื่อแนะนำ `projectfinal` และใช้ schema หลักชื่อ `clinic`
 ไฟล์ติดตั้ง: `database/schema.sql`
 
+## แชทผู้ใช้–ทีมคลินิก
+
+| ตาราง | คอลัมน์สำคัญ | ความหมาย |
+|---|---|---|
+| `chat_conversations` | `patient_user_id` PK/FK → users, `created_at`, `updated_at` | ผู้ใช้หนึ่งคนมีบทสนทนาร่วมกับทีมคลินิกหนึ่งรายการ |
+| `chat_messages` | `message_id` PK, `patient_user_id` FK, `sender_user_id` FK | ลำดับข้อความ บทสนทนา และบัญชีผู้ส่ง |
+| `chat_messages` | `sender_first_name`, `sender_last_name`, `sender_role` | ชื่อ–นามสกุลและสิทธิ์ของผู้ส่ง ณ เวลาส่ง |
+| `chat_messages` | `client_id` uuid, `body` text, `created_at` | รหัสป้องกันการส่งซ้ำ เนื้อหา 1–4,000 ตัวอักษร และวันเวลา |
+| `chat_reads` | `patient_user_id` + `reader_user_id` PK, `last_message_id` | ข้อความล่าสุดที่แต่ละบัญชีอ่านถึง ไม่ลดค่าเมื่ออ่านประวัติเก่า |
+
+`UNIQUE(sender_user_id, client_id)` ป้องกันข้อความซ้ำจากการลองส่งใหม่ มีดัชนี `(patient_user_id, message_id DESC)` สำหรับโหลดประวัติ ทุกตารางเปิด RLS และ policy `chat_participants` จำกัดผู้ใช้ตาม `app.user_id` และเจ้าหน้าที่เฉพาะ admin/doctor/superadmin ชื่อผู้ส่งมาจากฐานข้อมูล ไม่รับจาก browser
+
 ## สัญลักษณ์
 
 - **PK** = Primary Key (คีย์หลัก)

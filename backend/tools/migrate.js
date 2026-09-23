@@ -22,6 +22,7 @@ async function migrate() {
   await ensureAuditSchema();
   await ensureProfileImageSchema();
   await ensureMeasurementAckOutbox();
+  await require('./ensureChatSchema')();
   // Explicit owner-run migration only: never execute the full new-install schema.
   const client = await pool.connect();
   try {

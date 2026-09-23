@@ -656,6 +656,60 @@ VALUES ('morning', 7), ('morning', 8), ('morning', 9), ('morning', 10),
        ('afternoon', 19), ('afternoon', 20)
 ON CONFLICT DO NOTHING;
 
+-- BEGIN SECTION: chat
+CREATE TABLE IF NOT EXISTS clinic.chat_conversations (
+  patient_user_id integer PRIMARY KEY REFERENCES clinic.users(user_id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS clinic.chat_messages (
+  message_id serial PRIMARY KEY,
+  patient_user_id integer NOT NULL REFERENCES clinic.chat_conversations(patient_user_id) ON DELETE CASCADE,
+  sender_user_id integer NOT NULL REFERENCES clinic.users(user_id),
+  sender_first_name text NOT NULL DEFAULT '',
+  sender_last_name text NOT NULL DEFAULT '',
+  sender_role text NOT NULL CHECK (sender_role IN ('user','users','admin','doctor','super_admin','superadmin')),
+  client_id uuid NOT NULL,
+  body text NOT NULL CHECK (char_length(btrim(body)) BETWEEN 1 AND 4000),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (sender_user_id, client_id)
+);
+CREATE INDEX IF NOT EXISTS chat_messages_thread_idx ON clinic.chat_messages(patient_user_id, message_id DESC);
+CREATE TABLE IF NOT EXISTS clinic.chat_reads (
+  patient_user_id integer NOT NULL REFERENCES clinic.chat_conversations(patient_user_id) ON DELETE CASCADE,
+  reader_user_id integer NOT NULL REFERENCES clinic.users(user_id) ON DELETE CASCADE,
+  last_message_id integer NOT NULL DEFAULT 0,
+  PRIMARY KEY (patient_user_id, reader_user_id)
+);
+DO $chat$
+DECLARE chat_table text;
+BEGIN
+  FOREACH chat_table IN ARRAY ARRAY['chat_conversations','chat_messages','chat_reads'] LOOP
+    EXECUTE format('ALTER TABLE clinic.%I ENABLE ROW LEVEL SECURITY', chat_table);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='clinic' AND tablename=chat_table AND policyname='chat_participants') THEN
+      EXECUTE format($policy$
+        CREATE POLICY chat_participants ON clinic.%I AS RESTRICTIVE FOR ALL TO PUBLIC
+        USING (current_setting('app.role', true) IN ('admin','doctor','super_admin','superadmin')
+          OR (current_setting('app.role', true) IN ('user','users')
+            AND patient_user_id = NULLIF(current_setting('app.user_id', true), '')::integer))
+        WITH CHECK (current_setting('app.role', true) IN ('admin','doctor','super_admin','superadmin')
+          OR (current_setting('app.role', true) IN ('user','users')
+            AND patient_user_id = NULLIF(current_setting('app.user_id', true), '')::integer))
+      $policy$, chat_table);
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='cliniccare_runtime') THEN
+      EXECUTE format('GRANT SELECT, INSERT, UPDATE ON clinic.%I TO cliniccare_runtime', chat_table);
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='clinic' AND tablename=chat_table AND policyname='cliniccare_runtime_backend_full_access') THEN
+        EXECUTE format('CREATE POLICY cliniccare_runtime_backend_full_access ON clinic.%I FOR ALL TO cliniccare_runtime USING (true) WITH CHECK (true)', chat_table);
+      END IF;
+    END IF;
+  END LOOP;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='cliniccare_runtime') THEN
+    GRANT USAGE, SELECT ON SEQUENCE clinic.chat_messages_message_id_seq TO cliniccare_runtime;
+  END IF;
+END $chat$;
+-- END SECTION: chat
+
 -- BEGIN SECTION: runtime_functions
 CREATE OR REPLACE FUNCTION clinic.seed_slots(start_date date, end_date date)
 RETURNS void AS $$

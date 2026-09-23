@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Cookies from '@/lib/cookies';
+import ClinicChat from '@/components/chat/ClinicChat';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -21,5 +22,5 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     };
   }, []);
 
-  return <>{children}</>;
+  return <>{children}<ClinicChat staff /></>;
 }

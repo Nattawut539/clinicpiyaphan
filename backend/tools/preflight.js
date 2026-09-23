@@ -40,6 +40,9 @@ async function preflight() {
   await pool.query("SELECT medical_consent_at, medical_consent_version FROM clinic.users LIMIT 0");
 
   const requiredTables = [
+    "chat_conversations",
+    "chat_messages",
+    "chat_reads",
     "users",
     "user_details",
     "appointments",

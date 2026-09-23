@@ -3,7 +3,7 @@ const path = require('path');
 
 // Only explicitly marked, repeatable sections may run on an existing database.
 function readSchemaSection(name) {
-  if (!['measurement_ack_outbox', 'runtime_functions', 'runtime_grants'].includes(name)) {
+  if (!['measurement_ack_outbox', 'runtime_functions', 'runtime_grants', 'chat'].includes(name)) {
     throw new Error(`Unsupported schema section: ${name}`);
   }
   const sql = fs.readFileSync(path.resolve(__dirname, '../../database/schema.sql'), 'utf8');

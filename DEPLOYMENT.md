@@ -28,6 +28,37 @@ private URL for reaching the backend. Build the frontend again whenever
 
 ## Backend
 
+<a id="chat-upgrade"></a>
+### Chat upgrade
+
+Before deploying this chat release, create its tables using the schema owner.
+The repeatable `chat` section in `database/schema.sql` creates only
+`chat_conversations`, `chat_messages`, `chat_reads`, indexes, grants and RLS.
+Do not rerun the full new-install schema on an existing database.
+
+- Existing installation: run `npm run migrate` from `backend` with
+  `MIGRATION_DATABASE_URL` set to the schema owner's connection; or execute only
+  the text between `-- BEGIN SECTION: chat` and `-- END SECTION: chat` inside a
+  transaction in the database SQL editor.
+- Deploy backend after migration, wait for `/readyz`, then deploy frontend
+  from the same commit. The storage and existing database checks remain enabled.
+- No WebSocket service or new production dependency is needed; chat uses the
+  authenticated API and short polling. The configured runtime role
+  `cliniccare_runtime` receives grants; custom runtime roles require equivalent
+  grants and a permissive role policy while retaining `chat_participants`.
+- Verify using two separate browser sessions: patient sends, staff sees their
+  full name and replies, patient receives it. Test unread badges while hidden,
+  minimize/expand, navigation with a draft, retry after a network failure and
+  history loading. Assistant and other patients must not access that thread.
+- Rollback: redeploy the previous application version; keep chat tables and
+  messages. No existing table data is rewritten by the chat section.
+
+Automated integration test (isolated local PostgreSQL only): create a disposable
+database named `clinic_chat_test`, set `CHAT_TEST_DATABASE_URL` to its owner URL,
+then run `node --test tests/chat-integration.test.js` from `backend`. The test
+recreates **only that database's clinic schema**, uses synthetic accounts, and
+tests the real API with the runtime DB role. Without that variable it skips.
+
 - Root directory: `backend`
 - Install command: `npm install`
 - Migration/release command: `npm run migrate`
