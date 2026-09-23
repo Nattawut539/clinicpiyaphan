@@ -29,35 +29,42 @@ private URL for reaching the backend. Build the frontend again whenever
 ## Backend
 
 <a id="chat-upgrade"></a>
-### Chat upgrade
+### การอัปเกรดระบบแชท
 
-Before deploying this chat release, create its tables using the schema owner.
-The repeatable `chat` section in `database/schema.sql` creates only
-`chat_conversations`, `chat_messages`, `chat_reads`, indexes, grants and RLS.
-Do not rerun the full new-install schema on an existing database.
+ก่อน Deploy รุ่นที่มีระบบแชท ต้องสร้างตารางด้วยบัญชีเจ้าของ schema ก่อน ส่วน
+`chat` ใน `database/schema.sql` สามารถรันซ้ำได้ และสร้างเฉพาะตาราง
+`chat_conversations`, `chat_messages`, `chat_reads` รวมถึงดัชนี สิทธิ์ และ RLS
+ของระบบแชทเท่านั้น ห้ามรันไฟล์ติดตั้ง `schema.sql` ทั้งไฟล์ซ้ำกับฐานข้อมูลเดิม
 
-- Existing installation: run `npm run migrate` from `backend` with
-  `MIGRATION_DATABASE_URL` set to the schema owner's connection; or execute only
-  the text between `-- BEGIN SECTION: chat` and `-- END SECTION: chat` inside a
-  transaction in the database SQL editor.
-- Deploy backend after migration, wait for `/readyz`, then deploy frontend
-  from the same commit. The storage and existing database checks remain enabled.
-- No WebSocket service or new production dependency is needed; chat uses the
-  authenticated API and short polling. The configured runtime role
-  `cliniccare_runtime` receives grants; custom runtime roles require equivalent
-  grants and a permissive role policy while retaining `chat_participants`.
-- Verify using two separate browser sessions: patient sends, staff sees their
-  full name and replies, patient receives it. Test unread badges while hidden,
-  minimize/expand, navigation with a draft, retry after a network failure and
-  history loading. Assistant and other patients must not access that thread.
-- Rollback: redeploy the previous application version; keep chat tables and
-  messages. No existing table data is rewritten by the chat section.
+- ฐานข้อมูลที่ติดตั้งระบบไว้แล้ว: เข้าโฟลเดอร์ `backend` แล้วรัน
+  `npm run migrate` โดยกำหนด `MIGRATION_DATABASE_URL` ให้เป็น connection ของ
+  บัญชีเจ้าของ schema หรือเปิด SQL Editor แล้วรันเฉพาะข้อความระหว่าง
+  `-- BEGIN SECTION: chat` กับ `-- END SECTION: chat` ภายใน transaction
+- คำสั่ง migration จะทำงานกับฐานข้อมูลที่ระบุใน environment ของ terminal นั้น
+  หากรันโดยเชื่อมต่อ localhost จะอัปเกรดเฉพาะฐานข้อมูล localhost ไม่ได้อัปเกรด
+  ฐานข้อมูล production บน Render หรือผู้ให้บริการฐานข้อมูลโดยอัตโนมัติ
+- หลัง migration ของฐานข้อมูล production สำเร็จ ให้ Deploy backend ก่อน รอให้
+  `/readyz` ตอบสำเร็จ แล้วจึง Deploy frontend จาก commit เดียวกัน การตรวจ
+  storage และฐานข้อมูลเดิมยังคงทำงานตามปกติ
+- ระบบแชทไม่ต้องใช้ WebSocket หรือ dependency production เพิ่ม โดยใช้ API ที่
+  ตรวจสอบตัวตนและดึงข้อความเป็นช่วงสั้น ๆ บัญชี runtime
+  `cliniccare_runtime` จะได้รับสิทธิ์จาก migration หากใช้ชื่อ role อื่น ต้องให้
+  สิทธิ์เทียบเท่าและสร้าง policy สำหรับ role นั้น โดยยังคง policy
+  `chat_participants` ไว้
+- ตรวจหลัง Deploy ด้วย browser สอง session: ให้ผู้ป่วยส่งข้อความ ตรวจว่าเจ้าหน้าที่
+  เห็นชื่อ–นามสกุลและตอบกลับได้ แล้วตรวจว่าผู้ป่วยได้รับคำตอบ ทดสอบจำนวนข้อความ
+  ยังไม่อ่านขณะซ่อนแชท การย่อ–ขยาย การเปลี่ยนหน้าขณะมีข้อความร่าง การลองส่งใหม่
+  หลังเครือข่ายขัดข้อง และการโหลดประวัติ Assistant และผู้ป่วยคนอื่นต้องเปิด
+  บทสนทนานั้นไม่ได้
+- หากต้องย้อนกลับ ให้ Deploy แอปเวอร์ชันก่อนหน้า โดยเก็บตารางและข้อความแชทไว้ได้
+  ส่วน migration ของแชทไม่เขียนทับข้อมูลในตารางเดิม
 
-Automated integration test (isolated local PostgreSQL only): create a disposable
-database named `clinic_chat_test`, set `CHAT_TEST_DATABASE_URL` to its owner URL,
-then run `node --test tests/chat-integration.test.js` from `backend`. The test
-recreates **only that database's clinic schema**, uses synthetic accounts, and
-tests the real API with the runtime DB role. Without that variable it skips.
+การทดสอบ integration อัตโนมัติใช้ได้กับ PostgreSQL ทดสอบในเครื่องเท่านั้น:
+สร้างฐานข้อมูลชั่วคราวชื่อ `clinic_chat_test` ตั้ง `CHAT_TEST_DATABASE_URL` เป็น
+URL ของบัญชีเจ้าของฐานข้อมูลนั้น แล้วรัน
+`node --test tests/chat-integration.test.js` จากโฟลเดอร์ `backend` การทดสอบจะ
+สร้าง schema `clinic` ใหม่เฉพาะในฐานข้อมูลดังกล่าว ใช้บัญชีจำลอง และเรียก API จริง
+ด้วย runtime role หากไม่ตั้งตัวแปรนี้ ระบบจะข้ามการทดสอบดังกล่าว
 
 - Root directory: `backend`
 - Install command: `npm install`
