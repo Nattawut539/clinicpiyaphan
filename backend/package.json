@@ -14,6 +14,7 @@
     "check:integrations:strict": "node tools/checkIntegrations.js --require-all",
     "check:integrations:live": "node tools/checkIntegrations.js --require-all --verify-smtp --verify-storage --verify-mqtt",
     "test:audit": "node tests/advisor-audit.js",
+    "test:appointment-reminders": "node --test tests/appointment-reminders.test.js",
     "test:requirements-schema": "node tests/requirements-schema.js",
     "test:requirements-api": "node tests/requirements-api-smoke.js",
     "test:requirements-workflow": "node tests/requirements-workflow.js",

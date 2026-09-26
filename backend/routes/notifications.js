@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../tools/db");
 const { authRequired } = require("../tools/_utils");
 const { escapeHtml, sendClinicMail } = require("../tools/mailer");
+const { sendAppointmentReminders } = require('../services/appointmentReminderService');
 
 function thaiDate(value) {
   if (!value) return "-";
@@ -221,6 +222,7 @@ async function sendDueEmails(userId) {
      WHERE n.user_id = $1
        AND n.email_required = true
        AND n.email_sent_at IS NULL
+       AND n.event_key NOT LIKE 'appointment_reminder:%'
        AND COALESCE(u.email, d.email) IS NOT NULL
      ORDER BY n.created_at ASC
      LIMIT 10`,
@@ -387,15 +389,23 @@ async function syncAllUsersNotifications() {
 }
 
 let notificationJobStarted = false;
+let notificationJobRunning = false;
 
 function startNotificationJob() {
   if (notificationJobStarted) return;
   notificationJobStarted = true;
 
-  const run = () => {
-    syncAllUsersNotifications().catch((error) => {
+  const run = async () => {
+    if (notificationJobRunning) return;
+    notificationJobRunning = true;
+    try {
+      if (process.env.DISABLE_EMAIL !== 'true') {
+        await sendAppointmentReminders({ pool, sendMail: sendClinicMail });
+      }
+      await syncAllUsersNotifications();
+    } catch (error) {
       console.error("notification job failed:", error.message);
-    });
+    } finally { notificationJobRunning = false; }
   };
 
   setTimeout(run, 10000);
