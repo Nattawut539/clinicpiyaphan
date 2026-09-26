@@ -10,11 +10,11 @@ test('chat API with real PostgreSQL, roles, history and retry handling', { skip:
   await owner.query('DROP SCHEMA IF EXISTS clinic CASCADE; CREATE SCHEMA clinic');
   await owner.query(`DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='cliniccare_runtime') THEN CREATE ROLE cliniccare_runtime LOGIN; END IF; END $$;
     CREATE TABLE clinic.users(user_id integer PRIMARY KEY, role text, email text, account_status text DEFAULT 'active', session_version integer DEFAULT 1, profile_completed_at timestamptz DEFAULT now(), registration_source text DEFAULT 'local', medical_consent_at timestamptz DEFAULT now(), medical_consent_version text DEFAULT '2026-09-18');
-    CREATE TABLE clinic.user_details(detail_id serial PRIMARY KEY,user_id integer,first_name text,last_name text);
+    CREATE TABLE clinic.user_details(detail_id serial PRIMARY KEY,user_id integer,first_name text,last_name text,profile_image text);
     INSERT INTO clinic.users(user_id,role) VALUES (1,'user'),(2,'user'),(3,'admin'),(4,'doctor'),(5,'super_admin'),(6,'assistant'),(7,'user'),(8,'user');
     UPDATE clinic.users SET medical_consent_at=NULL WHERE user_id=7;
     UPDATE clinic.users SET session_version=2 WHERE user_id=8;
-    INSERT INTO clinic.user_details(user_id,first_name,last_name) VALUES (1,'สมชาย','ทดสอบ'),(2,'สมหญิง','ทดสอบ'),(3,'แอดมิน','ทดสอบ'),(4,'แพทย์','ทดสอบ');
+    INSERT INTO clinic.user_details(user_id,first_name,last_name,profile_image) VALUES (1,'สมชาย','ทดสอบ','/api/profile-images/1'),(2,'สมหญิง','ทดสอบ',NULL),(3,'แอดมิน','ทดสอบ',NULL),(4,'แพทย์','ทดสอบ',NULL);
     GRANT USAGE ON SCHEMA clinic TO cliniccare_runtime;
     GRANT SELECT ON clinic.users,clinic.user_details TO cliniccare_runtime;`);
   const { readSchemaSection } = require('../tools/schemaSections');
@@ -54,7 +54,7 @@ test('chat API with real PostgreSQL, roles, history and retry handling', { skip:
     assert.equal(first.data.sender_last_name,'ทดสอบ');
     assert.equal((await request(2,'/conversations')).data.conversations.length,0);
     const inbox = await request(3,'/conversations');
-    assert.equal(inbox.data.conversations[0].first_name,'สมชาย'); assert.equal(inbox.data.unread_total,1);
+    assert.equal(inbox.data.conversations[0].first_name,'สมชาย'); assert.equal(inbox.data.conversations[0].profile_image,'/api/profile-images/1'); assert.equal(inbox.data.unread_total,1);
     assert.equal((await request(3,'/conversations?search=สมชาย')).data.conversations.length,1);
     assert.equal((await request(3,'/conversations?search=%25')).data.conversations.length,0);
   });

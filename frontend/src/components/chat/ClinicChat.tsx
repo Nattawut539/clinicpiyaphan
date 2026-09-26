@@ -1,24 +1,41 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Maximize2, MessageCircle, Minimize2, Minus, Send, X } from 'lucide-react';
+import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowLeft, GripVertical, Maximize2, MessageCircle, Minimize2, Minus, Send, X } from 'lucide-react';
 import { API_BASE } from '@/lib/api';
 import Cookies from '@/lib/cookies';
+import { resolveBackendImage } from '@/lib/images';
 import styles from './ClinicChat.module.css';
 
-type Conversation = { patient_user_id: number; first_name: string; last_name: string; last_message: string; last_message_at: string; unread_count: number };
+type Conversation = { patient_user_id: number; first_name: string; last_name: string; profile_image?: string | null; last_message: string; last_message_at: string; unread_count: number };
 type Message = { message_id: number; sender_user_id: number; sender_first_name: string; sender_last_name: string; sender_role: string; body: string; created_at: string };
 type Draft = { text: string; clientId: string };
+type ChatPosition = { x: number; y: number };
+type DragState = ChatPosition & { pointerId: number };
 type Api = <T>(path: string, body?: unknown, signal?: AbortSignal) => Promise<T>;
 const staffRoles = new Set(['admin', 'doctor', 'super_admin', 'superadmin']);
 const fullName = (first: string, last: string) => [first, last].filter(Boolean).join(' ');
 const time = (value: string) => new Date(value).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const errorText = (error: unknown) => error instanceof Error ? error.message : 'เชื่อมต่อแชทไม่สำเร็จ';
 
+function PatientAvatar({ conversation }: { conversation: Conversation }) {
+    const image = resolveBackendImage(conversation.profile_image);
+    const [failedImage, setFailedImage] = useState<string | null>(null);
+    return <span className={styles.avatar} aria-hidden="true">
+        {image && failedImage !== image
+            ? <img src={image} alt="" loading="lazy" onError={() => setFailedImage(image)} />
+            : conversation.first_name?.charAt(0) || 'ผ'}
+    </span>;
+}
+
 export default function ClinicChat({ staff = false }: { staff?: boolean }) {
+    const widget = useRef<HTMLElement>(null);
+    const drag = useRef<DragState | null>(null);
     const [identity, setIdentity] = useState<number | null>(null);
     const [mode, setMode] = useState<'hidden' | 'minimized' | 'open'>('hidden');
     const [expanded, setExpanded] = useState(false);
+    const [position, setPosition] = useState<ChatPosition | null>(null);
+    const [dragging, setDragging] = useState(false);
     const [selected, setSelected] = useState<Conversation | null>(null);
     const [drafts, setDrafts] = useState<Record<number, Draft>>({});
     const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -51,6 +68,7 @@ export default function ClinicChat({ staff = false }: { staff?: boolean }) {
                 const saved = JSON.parse(sessionStorage.getItem(`clinic-chat:${session.user_id}`) || '{}');
                 if (['hidden', 'minimized', 'open'].includes(saved.mode)) setMode(saved.mode);
                 setExpanded(Boolean(saved.expanded));
+                if (Number.isFinite(saved.position?.x) && Number.isFinite(saved.position?.y)) setPosition(saved.position);
             } catch { /* Browser storage may be disabled. */ }
         }).catch(() => { /* The surrounding authenticated layout handles sign-in. */ });
         return () => controller.abort();
@@ -58,8 +76,55 @@ export default function ClinicChat({ staff = false }: { staff?: boolean }) {
 
     useEffect(() => {
         if (!identity) return;
-        try { sessionStorage.setItem(`clinic-chat:${identity}`, JSON.stringify({ mode, expanded })); } catch { /* Optional UI preference only. */ }
-    }, [identity, mode, expanded]);
+        try { sessionStorage.setItem(`clinic-chat:${identity}`, JSON.stringify({ mode, expanded, position })); } catch { /* Optional UI preference only. */ }
+    }, [identity, mode, expanded, position]);
+
+    const keepInsideViewport = useCallback(() => {
+        setPosition((current) => {
+            if (!current || !widget.current) return current;
+            const bounds = widget.current.getBoundingClientRect();
+            const x = Math.min(Math.max(8, current.x), Math.max(8, window.innerWidth - bounds.width - 8));
+            const y = Math.min(Math.max(8, current.y), Math.max(8, window.innerHeight - bounds.height - 8));
+            return x === current.x && y === current.y ? current : { x, y };
+        });
+    }, []);
+
+    useEffect(() => {
+        const frame = requestAnimationFrame(keepInsideViewport);
+        window.addEventListener('resize', keepInsideViewport);
+        return () => { cancelAnimationFrame(frame); window.removeEventListener('resize', keepInsideViewport); };
+    }, [mode, expanded, keepInsideViewport]);
+
+    const startDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+        if (event.button !== 0 || !widget.current) return;
+        const bounds = widget.current.getBoundingClientRect();
+        drag.current = { pointerId: event.pointerId, x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+        setPosition({ x: bounds.left, y: bounds.top });
+        setDragging(true);
+        event.currentTarget.setPointerCapture(event.pointerId);
+        event.preventDefault();
+    };
+    const moveDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+        if (!drag.current || drag.current.pointerId !== event.pointerId || !widget.current) return;
+        const bounds = widget.current.getBoundingClientRect();
+        setPosition({
+            x: Math.min(Math.max(8, event.clientX - drag.current.x), Math.max(8, window.innerWidth - bounds.width - 8)),
+            y: Math.min(Math.max(8, event.clientY - drag.current.y), Math.max(8, window.innerHeight - bounds.height - 8)),
+        });
+    };
+    const endDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+        if (!drag.current || drag.current.pointerId !== event.pointerId) return;
+        drag.current = null;
+        setDragging(false);
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    };
+    const dragHandleProps = {
+        onPointerDown: startDrag,
+        onPointerMove: moveDrag,
+        onPointerUp: endDrag,
+        onPointerCancel: endDrag,
+        onLostPointerCapture: endDrag,
+    };
 
     useEffect(() => {
         if (!identity) return;
@@ -86,10 +151,14 @@ export default function ClinicChat({ staff = false }: { staff?: boolean }) {
     if (!identity) return null;
     const threadId = staff ? selected?.patient_user_id : identity;
     const title = staff ? selected ? fullName(selected.first_name, selected.last_name) || `ผู้ใช้ #${threadId}` : 'ข้อความจากผู้ใช้' : 'แชทกับคลินิก';
-    return <aside className={styles.widget} aria-label="แชทคลินิก">
-        {mode === 'hidden' && <button className={styles.launcher} onClick={() => setMode('open')} aria-label={`เปิดแชท${unread ? ` มี ${unread} ข้อความยังไม่อ่าน` : ''}`}><MessageCircle size={23} /><span>แชท</span>{unread > 0 && <b className={styles.badge}>{unread > 99 ? '99+' : unread}</b>}</button>}
+    return <aside ref={widget} className={`${styles.widget} ${dragging ? styles.dragging : ''}`} style={position ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto' } : undefined} aria-label="แชทคลินิก">
+        {mode === 'hidden' && <div className={styles.launcherGroup}>
+            <button className={styles.launcher} onClick={() => setMode('open')} aria-label={`เปิดแชท${unread ? ` มี ${unread} ข้อความยังไม่อ่าน` : ''}`}><MessageCircle size={23} /><span>แชท</span>{unread > 0 && <b className={styles.badge}>{unread > 99 ? '99+' : unread}</b>}</button>
+            <button className={styles.launcherMove} aria-label="ลากเพื่อย้ายตำแหน่งแชท" title="ลากเพื่อย้ายตำแหน่งแชท" {...dragHandleProps}><GripVertical size={18} /></button>
+        </div>}
         <section className={`${styles.panel} ${expanded ? styles.expanded : ''}`} style={{ display: mode === 'hidden' ? 'none' : undefined }} aria-label={title}>
             <header className={styles.header}>
+                <button className={styles.dragHandle} aria-label="ลากเพื่อย้ายตำแหน่งแชท" title="ลากเพื่อย้ายตำแหน่งแชท" {...dragHandleProps}><GripVertical size={18} /></button>
                 {staff && selected && <button aria-label="กลับไปรายชื่อ" onClick={() => setSelected(null)}><ArrowLeft size={18} /></button>}
                 <button className={styles.title} onClick={() => setMode(mode === 'minimized' ? 'open' : 'minimized')}>{title}{unread > 0 && <b className={styles.badge}>{unread}</b>}</button>
                 <button aria-label={expanded ? 'ลดขนาดแชท' : 'ขยายแชท'} onClick={() => { setExpanded(!expanded); setMode('open'); }}>{expanded ? <Minimize2 size={17} /> : <Maximize2 size={17} />}</button>
@@ -102,7 +171,7 @@ export default function ClinicChat({ staff = false }: { staff?: boolean }) {
                     {error && <p role="status" className={styles.error}>{error} <button onClick={() => setRefresh((n) => n + 1)}>ลองใหม่</button></p>}
                     {loading ? <p className={styles.empty}>กำลังโหลดข้อความ...</p> : !conversations.length && !error ? <p className={styles.empty}>ยังไม่มีบทสนทนาในรายการนี้</p> : null}
                     <div className={styles.conversations}>{conversations.map((conversation) => <button key={conversation.patient_user_id} className={styles.conversation} onClick={() => setSelected(conversation)}>
-                        <span className={styles.avatar}>{conversation.first_name?.charAt(0) || 'ผ'}</span><span className={styles.preview}><strong>{fullName(conversation.first_name, conversation.last_name) || `ผู้ใช้ #${conversation.patient_user_id}`}</strong><span>{conversation.last_message}</span><time>{time(conversation.last_message_at)}</time></span>{conversation.unread_count > 0 && <b className={styles.badge}>{conversation.unread_count}</b>}
+                        <PatientAvatar conversation={conversation} /><span className={styles.preview}><strong>{fullName(conversation.first_name, conversation.last_name) || `ผู้ใช้ #${conversation.patient_user_id}`}</strong><span>{conversation.last_message}</span><time>{time(conversation.last_message_at)}</time></span>{conversation.unread_count > 0 && <b className={styles.badge}>{conversation.unread_count}</b>}
                     </button>)}</div>
                     <div className={styles.pages}><button disabled={page === 0} onClick={() => setPage(page - 1)}>ก่อนหน้า</button><span>หน้า {page + 1}</span><button disabled={!more} onClick={() => setPage(page + 1)}>ถัดไป</button></div>
                 </div> : threadId && <ChatThread key={threadId} id={threadId} viewer={identity} staff={staff} api={api} active={mode === 'open'} draft={drafts[threadId] || { text: '', clientId: '' }} updateDraft={updateDraft} onRead={() => setRefresh((n) => n + 1)} />}
@@ -200,9 +269,12 @@ function ChatThread({ id, viewer, staff, api, active, draft, updateDraft, onRead
         <div ref={scroll} className={styles.messages} role="log" aria-label="ข้อความสนทนา" aria-live="polite" onScroll={() => { const el = scroll.current; if (el) { nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 45; setAtBottom(nearBottom.current); } }}>
             {older && <button className={styles.older} onClick={loadOlder} disabled={loadingOlder}>{loadingOlder ? 'กำลังโหลด...' : 'โหลดข้อความก่อนหน้า'}</button>}
             {loading ? <p className={styles.empty}>กำลังโหลดบทสนทนา...</p> : !messages.length && <p className={styles.empty}>เริ่มสนทนาโดยพิมพ์ข้อความด้านล่าง</p>}
-            {messages.map((message) => { const mine = message.sender_user_id === viewer; const team = staffRoles.has(message.sender_role); return <div key={message.message_id} className={`${styles.message} ${mine ? styles.mine : ''}`}>
-                <small>{fullName(message.sender_first_name, message.sender_last_name) || (team ? 'ทีมคลินิก' : 'ผู้ใช้')}{team ? ' · เจ้าหน้าที่' : ''}</small>
-                <p>{message.body}</p><time>{time(message.created_at)}{mine ? message.message_id <= readThrough ? ' · อ่านแล้ว' : ' · ส่งแล้ว' : ''}</time>
+            {messages.map((message) => { const mine = message.sender_user_id === viewer; const team = staffRoles.has(message.sender_role); return <div key={message.message_id} className={`${styles.messageRow} ${mine ? styles.mine : ''}`}>
+                {!staff && team && <img className={styles.clinicAvatar} src="/img/profileclinic.png" alt="รูปคลินิก" />}
+                <div className={styles.message}>
+                    <small>{fullName(message.sender_first_name, message.sender_last_name) || (team ? 'ทีมคลินิก' : 'ผู้ใช้')}{team ? ' · เจ้าหน้าที่' : ''}</small>
+                    <p>{message.body}</p><time>{time(message.created_at)}{mine ? message.message_id <= readThrough ? ' · อ่านแล้ว' : ' · ส่งแล้ว' : ''}</time>
+                </div>
             </div>; })}
         </div>
         {!atBottom && <button className={styles.older} onClick={() => { if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight; nearBottom.current = true; setAtBottom(true); }}>ไปข้อความล่าสุด ↓</button>}

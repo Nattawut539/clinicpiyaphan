@@ -28,13 +28,13 @@ router.get('/conversations', route(async (req, res) => {
   const search = String(req.query.search || '').trim().slice(0, 100);
   await withContext(req, async (db) => {
     const params = [req.user.user_id, staff, `%${search.replace(/[\\%_]/g, '\\$&')}%`, page * 30];
-    const { rows } = await db.query(`SELECT c.patient_user_id, d.first_name, d.last_name,
+    const { rows } = await db.query(`SELECT c.patient_user_id, d.first_name, d.last_name, d.profile_image,
       m.body AS last_message, m.created_at AS last_message_at, m.message_id AS last_message_id,
       (SELECT count(*)::int FROM clinic.chat_messages n WHERE n.patient_user_id=c.patient_user_id
         AND n.message_id > COALESCE(r.last_message_id, 0) AND n.sender_user_id <> $1
         AND (NOT $2 OR n.sender_role IN ('user','users'))) AS unread_count
       FROM clinic.chat_conversations c
-      LEFT JOIN LATERAL (SELECT first_name,last_name FROM clinic.user_details WHERE user_id=c.patient_user_id ORDER BY detail_id DESC LIMIT 1) d ON true
+      LEFT JOIN LATERAL (SELECT first_name,last_name,profile_image FROM clinic.user_details WHERE user_id=c.patient_user_id ORDER BY detail_id DESC LIMIT 1) d ON true
       JOIN LATERAL (SELECT * FROM clinic.chat_messages WHERE patient_user_id=c.patient_user_id ORDER BY message_id DESC LIMIT 1) m ON true
       LEFT JOIN clinic.chat_reads r ON r.patient_user_id=c.patient_user_id AND r.reader_user_id=$1
       WHERE ($2 OR c.patient_user_id=$1) AND concat_ws(' ', d.first_name,d.last_name) ILIKE $3
