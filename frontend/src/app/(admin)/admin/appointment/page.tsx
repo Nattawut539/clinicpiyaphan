@@ -99,7 +99,7 @@ export default function AppointmentPage() {
     const buddhistYear = dayjs().year() + 543;
     const [confirmAction, setConfirmAction] = useState<{
         appointmentId: number;
-        action: 'approve' | 'reject';
+        action: 'approve' | 'reject' | 'cancelApproved';
     } | null>(null);
     const [rejectReason, setRejectReason] = useState('');
 
@@ -469,13 +469,30 @@ export default function AppointmentPage() {
                                                         ) : (
                                                             <td>
                                                                 {item.status === 'approved' ? (
-                                                                    <button
-                                                                        type="button"
-                                                                        className={styles.approveBtn}
-                                                                        onClick={() => handleResendCode(item.appointment_id)}
-                                                                    >
-                                                                        ส่งรหัสอีกครั้ง
-                                                                    </button>
+                                                                    <div className={styles.actionButtons}>
+                                                                        <button
+                                                                            type="button"
+                                                                            className={styles.approveBtn}
+                                                                            onClick={() => handleResendCode(item.appointment_id)}
+                                                                        >
+                                                                            ส่งรหัสอีกครั้ง
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className={styles.rejectBtn}
+                                                                            aria-label="ยกเลิกนัดหมายที่อนุมัติแล้ว"
+                                                                            onClick={() => {
+                                                                                setRejectReason('ผู้ใช้แจ้งขอยกเลิกนัดหมาย');
+                                                                                setConfirmAction({
+                                                                                    appointmentId: item.appointment_id,
+                                                                                    action: 'cancelApproved',
+                                                                                });
+                                                                            }}
+                                                                        >
+                                                                            <XCircle size={16} strokeWidth={2.2} />
+                                                                            ยกเลิกนัด
+                                                                        </button>
+                                                                    </div>
                                                                 ) : item.status === 'cancelled' || item.status === 'rejected' ? (
                                                                     <button
                                                                         type="button"
@@ -585,23 +602,27 @@ export default function AppointmentPage() {
                                 <h3>
                                     {confirmAction.action === 'approve'
                                         ? 'ยืนยันการอนุมัติ'
-                                        : 'ยืนยันการยกเลิก'}
+                                        : confirmAction.action === 'cancelApproved'
+                                            ? 'ยืนยันยกเลิกนัดที่อนุมัติแล้ว'
+                                            : 'ยืนยันการยกเลิก'}
                                 </h3>
 
                                 <p>
                                     {confirmAction.action === 'approve'
                                         ? 'คุณต้องการอนุมัติการจองคิวนี้ใช่หรือไม่?'
-                                        : 'คุณต้องการยกเลิกการจองคิวนี้ใช่หรือไม่?'}
+                                        : confirmAction.action === 'cancelApproved'
+                                            ? 'ระบบจะยกเลิกนัด ปิดรหัสเครื่องชั่ง และแจ้งผู้ใช้'
+                                            : 'คุณต้องการยกเลิกการจองคิวนี้ใช่หรือไม่?'}
                                 </p>
 
-                                {confirmAction.action === 'reject' && (
+                                {confirmAction.action !== 'approve' && (
                                     <div className={styles.rejectReasonField}>
                                         <label htmlFor="reject-reason">เหตุผลที่ยกเลิก</label>
                                         <textarea
                                             id="reject-reason"
                                             value={rejectReason}
                                             onChange={(event) => setRejectReason(event.target.value)}
-                                            placeholder="ระบุเหตุผลเพื่อส่งให้ผู้ใช้ทางอีเมล"
+                                            placeholder="ระบุเหตุผลเพื่อแจ้งให้ผู้ใช้ทราบ"
                                             autoFocus
                                         />
                                     </div>
@@ -632,7 +653,7 @@ export default function AppointmentPage() {
 
                                             setConfirmAction(null);
                                         }}
-                                        disabled={confirmAction.action === 'reject' && !rejectReason.trim()}
+                                        disabled={confirmAction.action !== 'approve' && !rejectReason.trim()}
                                     >
                                         {confirmAction.action === 'approve'
                                             ? 'ยืนยันอนุมัติ'

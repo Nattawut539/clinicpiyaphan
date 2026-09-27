@@ -99,6 +99,7 @@ test("OTP errors distinguish used, future and expired codes", async () => {
   await expectOtpError({ ...base, not_active_yet: true }, "OTP_NOT_ACTIVE_YET");
   await expectOtpError({ ...base, is_expired: true }, "OTP_EXPIRED");
   await expectOtpError({ ...base, service_date_passed: true }, "OTP_EXPIRED");
+  await expectOtpError({ ...base, appointment_status: "cancelled" }, "INVALID_OTP");
   await expectOtpError(null, "OTP_NOT_FOUND");
 });
 

@@ -563,7 +563,8 @@ router.get("/user/:userId", authRequired, async (req, res) => {
       FROM clinic.appointments a
       JOIN clinic.appointment_slots s ON a.slot_id = s.slot_id
       LEFT JOIN clinic.queue_tickets q ON q.appointment_id = a.appointment_id AND q.status <> 'cancelled'
-      LEFT JOIN clinic.appointment_access_codes ac ON ac.appointment_id = a.appointment_id
+      LEFT JOIN clinic.appointment_access_codes ac
+        ON ac.appointment_id = a.appointment_id AND a.status = 'approved'
       WHERE a.user_id = $1
       ORDER BY s.service_date ASC`,
       [userId],

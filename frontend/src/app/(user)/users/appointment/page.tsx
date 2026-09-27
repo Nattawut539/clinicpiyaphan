@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './appointment.module.css';
 import CustomCalendar from '@/components/calendar/CustomCalendar';
-import { CalendarCheck, CalendarDays, Clock, Eye, EyeOff, KeyRound, List, Plus, Sun, Sunset } from 'lucide-react';
+import { CalendarCheck, CalendarDays, Clock, Eye, EyeOff, KeyRound, List, Plus, Sun, Sunset, XCircle } from 'lucide-react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/th';
 import { useRouter } from 'next/navigation';
@@ -102,6 +102,7 @@ export default function AppointmentPage() {
   const [error, setError] = useState('');
   const [accessCodes, setAccessCodes] = useState<Record<number, VisibleAccessCode>>({});
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const appointmentsRequestRef = useRef(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -118,11 +119,13 @@ export default function AppointmentPage() {
       return;
     }
 
-    const loadAppointments = async () => {
-      try {
-        setLoading(true);
-        setError('');
+    let isMounted = true;
+    const loadAppointments = async (showLoading = false) => {
+      if (appointmentsRequestRef.current) return;
+      appointmentsRequestRef.current = true;
+      if (showLoading && isMounted) setLoading(true);
 
+      try {
         const res = await fetch(`${API_BASE}/appointments/user/${userId}`, {
           headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
@@ -134,25 +137,47 @@ export default function AppointmentPage() {
         }
 
         const loadedAppointments: Appointment[] = Array.isArray(data) ? data : [];
+        if (!isMounted) return;
         setAppointments(loadedAppointments);
-        setAccessCodes(Object.fromEntries(
-          loadedAppointments
-            .filter((item) => item.access_code && item.access_code_expires_at)
-            .map((item) => [item.appointment_id, {
-              code: item.access_code as string,
-              expiresAt: item.access_code_expires_at as string,
-              visible: false,
-            }]),
-        ));
+        setAccessCodes((current) => {
+          const next: Record<number, VisibleAccessCode> = {};
+          loadedAppointments.forEach((item) => {
+            if (item.status !== 'approved' || !item.access_code || !item.access_code_expires_at) return;
+            const previous = current[item.appointment_id];
+            next[item.appointment_id] = {
+              code: item.access_code,
+              expiresAt: item.access_code_expires_at,
+              visible: previous?.code === item.access_code && previous.visible,
+            };
+          });
+          return next;
+        });
+        setError('');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'โหลดรายการนัดหมายไม่สำเร็จ');
+        if (isMounted) setError(err instanceof Error ? err.message : 'โหลดรายการนัดหมายไม่สำเร็จ');
       } finally {
-        setLoading(false);
-        setCheckingAuth(false);
+        appointmentsRequestRef.current = false;
+        if (isMounted) {
+          setLoading(false);
+          setCheckingAuth(false);
+        }
       }
     };
 
-    loadAppointments();
+    const refreshAppointments = () => {
+      if (document.visibilityState === 'visible') void loadAppointments();
+    };
+    void loadAppointments(true);
+    const intervalId = window.setInterval(refreshAppointments, 5_000);
+    window.addEventListener('focus', refreshAppointments);
+    document.addEventListener('visibilitychange', refreshAppointments);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshAppointments);
+      document.removeEventListener('visibilitychange', refreshAppointments);
+    };
   }, [router]);
 
   useEffect(() => {
@@ -392,7 +417,12 @@ export default function AppointmentPage() {
                           </span>
                         </div>
 
-                        {item.status === 'approved' && (
+                        {item.status === 'cancelled' ? (
+                          <div className={`${styles.metaRow} ${styles.accessCodeRow} ${styles.accessCodeExpired}`}>
+                            <XCircle size={16} />
+                            <strong className={styles.accessCodeNotice}>นัดหมายนี้ถูกยกเลิก</strong>
+                          </div>
+                        ) : item.status === 'approved' && (
                           <div className={`${styles.metaRow} ${styles.accessCodeRow} ${codeExpired ? styles.accessCodeExpired : ''}`}>
                             <KeyRound size={16} />
                             {codeInfo ? (
