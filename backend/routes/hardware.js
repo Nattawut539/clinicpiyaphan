@@ -48,7 +48,9 @@ router.get("/hardware/admin-dashboard", requireHardwareAdmin, async (_req, res, 
       hardwareMetrics.operationalSnapshot(mqttStatus()),
       pool.query(
         `SELECT a.appointment_id, q.queue_id, q.queue_number,
-                s.service_date::text, s.hour_of_day,
+                COALESCE(q.service_date, s.service_date)::text AS service_date, s.hour_of_day,
+                (q.service_date = (now() AT TIME ZONE 'Asia/Bangkok')::date) AS is_service_date_today,
+                (q.queue_id IS NOT NULL AND q.service_date <> s.service_date) AS queue_date_mismatch,
                 NULLIF(BTRIM(CONCAT_WS(' ', d.first_name, d.last_name)), '') AS patient_name,
                 ac.access_code_id, ac.created_at AS issued_at,
                 ac.expires_at, ac.used_at,
@@ -56,11 +58,12 @@ router.get("/hardware/admin-dashboard", requireHardwareAdmin, async (_req, res, 
                   SELECT 1 FROM clinic.measurements m WHERE m.queue_id = q.queue_id
                 ) AS has_measurement,
                 CASE
+                  WHEN q.queue_id IS NOT NULL AND q.service_date <> s.service_date THEN 'date_mismatch'
                   WHEN ac.access_code_id IS NULL THEN 'not_issued'
                   WHEN ac.used_at IS NOT NULL THEN 'used'
-                  WHEN s.service_date > (now() AT TIME ZONE 'Asia/Bangkok')::date THEN 'not_active_yet'
+                  WHEN COALESCE(q.service_date, s.service_date) > (now() AT TIME ZONE 'Asia/Bangkok')::date THEN 'not_active_yet'
                   WHEN ac.expires_at <= now()
-                    OR s.service_date < (now() AT TIME ZONE 'Asia/Bangkok')::date THEN 'expired'
+                    OR COALESCE(q.service_date, s.service_date) < (now() AT TIME ZONE 'Asia/Bangkok')::date THEN 'expired'
                   ELSE 'available'
                 END AS status
          FROM clinic.appointments a

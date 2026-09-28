@@ -20,7 +20,7 @@ import Cookies from '@/lib/cookies';
 import { API_BASE } from '@/lib/api';
 import styles from './Hardware.module.css';
 
-type OtpStatus = 'available' | 'not_active_yet' | 'expired' | 'used' | 'not_issued';
+type OtpStatus = 'available' | 'not_active_yet' | 'date_mismatch' | 'expired' | 'used' | 'not_issued';
 type PrintStatus = 'pending' | 'printed' | 'failed';
 
 type HardwareOtp = {
@@ -28,6 +28,8 @@ type HardwareOtp = {
   queue_id: number | null;
   queue_number: string | null;
   service_date: string;
+  is_service_date_today: boolean;
+  queue_date_mismatch: boolean;
   hour_of_day: number;
   patient_name: string | null;
   issued_at: string | null;
@@ -108,7 +110,8 @@ type HardwareDashboard = {
 
 const OTP_LABEL: Record<OtpStatus, string> = {
   available: 'พร้อมใช้',
-  not_active_yet: 'ยังไม่ถึงเวลา',
+  not_active_yet: 'ยังไม่ถึงวันนัด',
+  date_mismatch: 'วันคิวไม่ตรงกับวันนัด',
   expired: 'หมดอายุ',
   used: 'ใช้แล้ว',
   not_issued: 'ยังไม่ออกรหัส',
@@ -360,7 +363,7 @@ export default function HardwareOperationsPage() {
                             <td>{otp.service_date} · {String(otp.hour_of_day).padStart(2, '0')}:00 น.</td>
                             <td><span className={`${styles.badge} ${styles[`otp_${otp.status}`]}`}>{OTP_LABEL[otp.status]}</span></td>
                             <td>{formatDateTime(otp.expires_at)}</td>
-                            <td><button className={styles.actionButton} type="button" disabled={!otp.queue_id || otp.has_measurement || actionKey === `otp-${otp.appointment_id}`} onClick={() => void reissueOtp(otp)}><KeyRound size={15} />{actionKey === `otp-${otp.appointment_id}` ? 'กำลังออก...' : 'ออกรหัสใหม่'}</button></td>
+                            <td><button className={styles.actionButton} type="button" title={otp.queue_date_mismatch ? 'วันที่นัดหมายและวันที่คิวไม่ตรงกัน กรุณาตรวจสอบข้อมูล' : !otp.is_service_date_today ? 'ออกรหัสได้เฉพาะวันนัดหมาย' : undefined} disabled={!otp.queue_id || otp.has_measurement || otp.queue_date_mismatch || !otp.is_service_date_today || actionKey === `otp-${otp.appointment_id}`} onClick={() => void reissueOtp(otp)}><KeyRound size={15} />{actionKey === `otp-${otp.appointment_id}` ? 'กำลังออก...' : 'ออกรหัสใหม่'}</button></td>
                           </tr>
                         ))}
                         {!dashboard.otps.length && <tr><td colSpan={5} className={styles.empty}>ไม่มี OTP ในช่วงเวลานี้</td></tr>}

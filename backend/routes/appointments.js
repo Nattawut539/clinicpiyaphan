@@ -1066,7 +1066,13 @@ router.post("/:id/resend-code", verifyAdmin, async (req, res, next) => {
 
     //ดึงข้อมูลนัดหมาย ผู้ใช้ วันเวลา และหมายเลขคิว
     const result = await client.query(
-      `SELECT a.*, COALESCE(u.email,d.email) AS email,d.first_name,s.service_date,s.hour_of_day,q.queue_id,q.queue_number
+      `SELECT a.*, COALESCE(u.email,d.email) AS email,d.first_name,
+              s.service_date::text AS service_date,s.hour_of_day,
+              q.service_date::text AS queue_service_date,
+              (q.service_date = s.service_date) AS queue_date_matches_appointment,
+              (q.service_date = (now() AT TIME ZONE 'Asia/Bangkok')::date) AS is_service_date_today,
+              (q.service_date > (now() AT TIME ZONE 'Asia/Bangkok')::date) AS service_date_is_future,
+              q.queue_id,q.queue_number
       FROM clinic.appointments a
       JOIN clinic.users u ON u.user_id = a.user_id
       LEFT JOIN clinic.user_details d ON d.user_id = a.user_id
@@ -1085,6 +1091,23 @@ router.post("/:id/resend-code", verifyAdmin, async (req, res, next) => {
     }
 
     const appointment = result.rows[0]; //ดึงข้อมูลแถวแรกของนัดหมายที่อนุมัติเก็บไว้
+
+    if (!appointment.queue_date_matches_appointment) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: `วันนัด (${appointment.service_date}) ไม่ตรงกับวันที่คิว A (${appointment.queue_service_date}) กรุณาแก้ไขข้อมูลคิวก่อนออกรหัสใหม่`,
+      });
+    }
+
+    // OTP สำหรับคิว A ใช้ได้เฉพาะวันคิว ป้องกันการส่งรหัสที่เครื่องชั่งจะปฏิเสธ
+    if (!appointment.is_service_date_today) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: appointment.service_date_is_future
+          ? `ยังไม่ถึงวันนัด (${appointment.service_date}) ออกรหัสคิว A ได้เฉพาะวันนัดหมาย`
+          : `เลยวันนัด (${appointment.service_date}) แล้ว กรุณาดำเนินการเป็น Walk-in`,
+      });
+    }
 
     const accessCode = generateAccessCode(); //สร้างรหัสยืนยันใหม้ 6 หลัก
     const savedCode = await client.query(

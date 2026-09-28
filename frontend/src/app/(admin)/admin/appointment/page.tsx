@@ -45,6 +45,17 @@ function formatFullThaiDate(date: string) {
     return `${value.format('D MMMM')} ${value.year() + 543}`;
 }
 
+function formatThaiDateTime(value?: string | null) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return new Intl.DateTimeFormat('th-TH', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Asia/Bangkok',
+    }).format(date);
+}
+
 export default function AppointmentPage() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [error, setError] = useState('');
@@ -204,10 +215,10 @@ export default function AppointmentPage() {
         }
     };
 
-    const handleResendCode = async (appointmentId: number) => {
+    const handleResendCode = async (appointment: Appointment) => {
         try {
             const token = Cookies.get('adminToken');
-            const res = await fetch(`${API}/appointments/${appointmentId}/resend-code`, {
+            const res = await fetch(`${API}/appointments/${appointment.appointment_id}/resend-code`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -220,7 +231,8 @@ export default function AppointmentPage() {
                 title: 'ออกรหัสใหม่แล้ว',
                 html: `<p>${data?.email_sent ? 'ส่งรหัสใหม่ให้ผู้ใช้ทางอีเมลแล้ว' : data?.email_available === false ? 'ผู้ป่วยไม่มีอีเมล กรุณาแจ้งรหัสให้ผู้ป่วยโดยตรง' : 'ส่งอีเมลไม่สำเร็จ กรุณาแจ้งรหัสให้ผู้ป่วยโดยตรง'}</p>
                     <p style="font-size:28px;font-weight:800;letter-spacing:5px;margin:12px 0">${data?.access_code || '-'}</p>
-                    <p>ใช้ได้ถึง ${data?.expires_at ? new Date(data.expires_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '-'}</p>`,
+                    <p>ใช้ได้เฉพาะวันนัด: ${formatFullThaiDate(appointment.service_date)} เวลา ${String(appointment.hour_of_day).padStart(2, '0')}:00 น.</p>
+                    <p>หมดอายุ ${formatThaiDateTime(data?.expires_at)}</p>`,
             });
             await fetchAppointments();
         } catch (err) {
@@ -473,7 +485,7 @@ export default function AppointmentPage() {
                                                                         <button
                                                                             type="button"
                                                                             className={styles.approveBtn}
-                                                                            onClick={() => handleResendCode(item.appointment_id)}
+                                                                            onClick={() => handleResendCode(item)}
                                                                         >
                                                                             ส่งรหัสอีกครั้ง
                                                                         </button>
