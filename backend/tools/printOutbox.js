@@ -41,7 +41,8 @@ async function claim(messageId, { bmi = null, allowPending = false } = {}) {
        FROM clinic.hardware_measurement_events source
        WHERE source.message_id = $1
          AND m.measurement_id = source.measurement_id
-       RETURNING m.measurement_id, m.weight, m.height, m.bmi, m.measured_at
+       RETURNING m.measurement_id, m.weight, m.height, m.bmi, m.measured_at,
+                 m.queue_number
      )
      UPDATE clinic.hardware_measurement_events e
      SET print_job_id = COALESCE(e.print_job_id, $2),
@@ -59,9 +60,8 @@ async function claim(messageId, { bmi = null, allowPending = false } = {}) {
            ELSE NULL
          END,
          updated_at = now()
-     FROM measurement_data m, clinic.queue_tickets q
+     FROM measurement_data m
      WHERE e.message_id = $1
-       AND q.queue_id = e.queue_id
        AND e.print_attempts < $3
        AND (
          ($7::boolean AND e.print_status = 'pending')
@@ -74,7 +74,9 @@ async function claim(messageId, { bmi = null, allowPending = false } = {}) {
        )
      RETURNING e.device_id, e.print_job_id, e.message_id,
                e.print_attempts, e.print_next_attempt_at,
-               m.weight, m.height, m.bmi, m.measured_at, q.queue_number`,
+               m.weight, m.height, m.bmi, m.measured_at,
+               COALESCE((SELECT q.queue_number FROM clinic.queue_tickets q
+                         WHERE q.queue_id = e.queue_id), m.queue_number, 'Walk-in') AS queue_number`,
     [
       messageId,
       printJobId,

@@ -155,9 +155,10 @@ async function findDuplicate(client, messageId) {
   const result = await client.query(
     `SELECT e.message_id, e.device_id, e.mode, e.measurement_id,
             e.measurement_session_id, e.payload_hash, e.print_status,
-            q.queue_number, m.weight, m.height, m.measured_at
+            COALESCE(q.queue_number, m.queue_number) AS queue_number,
+            m.weight, m.height, m.measured_at
      FROM clinic.hardware_measurement_events e
-     JOIN clinic.queue_tickets q ON q.queue_id = e.queue_id
+     LEFT JOIN clinic.queue_tickets q ON q.queue_id = e.queue_id
      JOIN clinic.measurements m ON m.measurement_id = e.measurement_id
      WHERE e.message_id = $1`,
     [messageId],
@@ -193,7 +194,7 @@ async function insertMeasurement(client, {
         hardware_message_id, measured_at)
      VALUES ($1,$2,$3,$4,$5,'mqtt',$6,$7,$8)
      RETURNING measurement_id`,
-    [queue.queue_id, queue.queue_number, weight, height, bmi, deviceId, messageId, measuredAt],
+    [queue?.queue_id ?? null, queue?.queue_number ?? null, weight, height, bmi, deviceId, messageId, measuredAt],
   );
 
   await client.query(
@@ -203,7 +204,7 @@ async function insertMeasurement(client, {
         print_retryable, print_next_attempt_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7::uuid,$8,'pending',true,now())`,
     [
-      messageId, deviceId, mode, queue.queue_id, measurement.rows[0].measurement_id,
+      messageId, deviceId, mode, queue?.queue_id ?? null, measurement.rows[0].measurement_id,
       payloadHash, measurementSessionId || null, printJobId,
     ],
   );
@@ -220,7 +221,7 @@ async function insertMeasurement(client, {
       printJobId,
       JSON.stringify({
         measurement_id: measurement.rows[0].measurement_id,
-        queue_number: queue.queue_number,
+        queue_number: queue?.queue_number ?? null,
         bmi,
       }),
     ],
@@ -230,7 +231,7 @@ async function insertMeasurement(client, {
     message_id: messageId,
     status: "accepted",
     measurement_id: measurement.rows[0].measurement_id,
-    queue_number: queue.queue_number,
+    queue_number: queue?.queue_number ?? null,
     print_pending: true,
   };
   await client.query(
@@ -284,35 +285,45 @@ async function processOnlineMeasurement(client, values) {
 }
 
 async function processWalkinMeasurement(client, values) {
-  // Serialise B-number allocation so two scales cannot issue the same queue.
-  await client.query("LOCK TABLE clinic.queue_tickets IN SHARE ROW EXCLUSIVE MODE");
   const clock = await client.query(
-    `SELECT (now() AT TIME ZONE 'Asia/Bangkok')::date::text AS service_date,
-            CASE WHEN (now() AT TIME ZONE 'Asia/Bangkok')::time < time '12:00'
-                 THEN 'morning' ELSE 'afternoon' END AS avaliable_date`,
+    `SELECT (now() AT TIME ZONE 'Asia/Bangkok')::date::text AS service_date`,
   );
-  const { service_date: serviceDate, avaliable_date: availableDate } = clock.rows[0];
+  const serviceDate = clock.rows[0].service_date;
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtext($1))",
+    [`walkin-queue:${serviceDate}`],
+  );
   const number = await client.query(
-    `SELECT COALESCE(MAX(numeric_no), 0) + 1 AS value
-     FROM clinic.queue_tickets
-     WHERE prefix = 'B' AND service_date = $1::date`,
+    `SELECT GREATEST(
+       COALESCE((
+         SELECT MAX(numeric_no)
+         FROM clinic.queue_tickets
+         WHERE prefix = 'B' AND service_date = $1::date
+       ), 0),
+       COALESCE((
+         SELECT MAX(SUBSTRING(m.queue_number FROM 2)::integer)
+         FROM clinic.hardware_measurement_events e
+         JOIN clinic.measurements m ON m.measurement_id = e.measurement_id
+         WHERE e.mode = 'walk_in'
+           AND e.queue_id IS NULL
+           AND m.queue_number ~ '^B[0-9]{3}$'
+           AND (e.created_at AT TIME ZONE 'Asia/Bangkok')::date = $1::date
+       ), 0)
+     ) + 1 AS value`,
     [serviceDate],
   );
   const numericNo = Number(number.rows[0].value);
+  if (numericNo > 999) {
+    throw new HardwareMessageError("WALKIN_QUEUE_FULL", "No walk-in queue numbers are available today");
+  }
   const queueNumber = `B${String(numericNo).padStart(3, "0")}`;
-  const queue = await client.query(
-    `INSERT INTO clinic.queue_tickets
-       (queue_number, prefix, numeric_no, service_date, avaliable_date,
-        source, service_type)
-     VALUES ($1,'B',$2,$3::date,$4,'kiosk','Walk-in')
-     RETURNING queue_id, queue_number`,
-    [queueNumber, numericNo, serviceDate, availableDate],
-  );
 
   return insertMeasurement(client, {
     ...values,
     mode: "walk_in",
-    queue: queue.rows[0],
+    // Reserve and print the B number without creating a queue ticket. The
+    // Admin's later save creates that ticket and attaches this measurement.
+    queue: { queue_id: null, queue_number: queueNumber },
   });
 }
 
@@ -354,7 +365,7 @@ async function processHardwareMeasurement(payload, topicDeviceId) {
         message_id: messageId,
         status: "duplicate",
         measurement_id: duplicate.measurement_id,
-        queue_number: duplicate.queue_number,
+        queue_number: duplicate.queue_number ?? null,
         print_pending: duplicate.print_status !== "printed",
       };
     }

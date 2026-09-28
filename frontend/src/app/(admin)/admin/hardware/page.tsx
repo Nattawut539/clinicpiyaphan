@@ -60,7 +60,7 @@ type HardwareMeasurement = {
   print_manual_reprint_count: number;
   printed_at: string | null;
   created_at: string;
-  queue_number: string;
+  queue_number: string | null;
   patient_name: string | null;
   measurement_id: number;
   weight: number | null;
@@ -388,7 +388,7 @@ export default function HardwareOperationsPage() {
                       <tbody>
                         {dashboard.measurements.map((item) => (
                           <tr key={item.message_id}>
-                            <td><strong>{item.queue_number}</strong><small>{item.patient_name || item.mode}</small></td>
+                            <td><strong>{item.queue_number || (item.mode === 'walk_in' ? 'รอลงทะเบียน' : '-')}</strong><small>{item.patient_name || item.mode}</small></td>
                             <td><div className={styles.vitals}><span><b>{formatNumber(item.weight)}</b> kg</span><span><b>{formatNumber(item.height)}</b> cm</span><span><b>{formatNumber(item.bmi)}</b> BMI</span></div></td>
                             <td><code>{item.device_id}</code><small title={item.message_id}>{item.message_id}</small></td>
                             <td><span className={`${styles.badge} ${styles[`print_${item.print_status}`]}`}>{PRINT_LABEL[item.print_status]}</span><small>{item.print_error_code ? `Error: ${item.print_error_code}` : item.print_job_id || 'ยังไม่มี Print Job'}</small></td>

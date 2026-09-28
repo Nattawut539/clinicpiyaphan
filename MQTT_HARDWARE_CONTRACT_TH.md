@@ -104,7 +104,7 @@ clinic/v1/devices/{deviceId}/measurements
 }
 ```
 
-เว็บจะเป็นผู้ออกเลข B ที่ไม่ซ้ำและบันทึกผลวัด
+เว็บจะจองเลข B สำหรับใบเสร็จ บันทึกผลวัด และคำนวณ BMI แต่ยังไม่สร้างรายการคิวหรือเพิ่มผู้ป่วยลงคิววันนี้ จากนั้นพิมพ์เลข B พร้อมใบสรุป เมื่อ Admin กรอกเลขเดียวกันในฟอร์ม “เพิ่มผู้ป่วย Walk-in” ระบบจะแสดงค่าวัดอัตโนมัติ และเมื่อกดบันทึกจึงสร้างคิว B พร้อมผูกผลวัดกับคิวนั้น
 
 ## Measurement ACK
 
@@ -119,7 +119,7 @@ clinic/v1/devices/{deviceId}/measurement-ack
   "message_id": "MSG-B-000001",
   "status": "accepted",
   "measurement_id": 1025,
-  "queue_number": "B009",
+  "queue_number": "B015",
   "print_pending": true
 }
 ```
@@ -142,6 +142,7 @@ Error code ที่ firmware ต้องรองรับ:
 - `RETAIN_NOT_ALLOWED`
 - `RATE_LIMITED`
 - `MESSAGE_ID_CONFLICT`
+- `WALKIN_QUEUE_FULL`
 - `INTERNAL_ERROR`
 
 ## Print Job
@@ -158,7 +159,7 @@ clinic/v1/devices/{deviceId}/print
   "schema_version": "1.0",
   "print_job_id": "PRINT-c2e863bf5d4b4ed1db1c990f",
   "message_id": "MSG-B-000001",
-  "queue_number": "B009",
+  "queue_number": "B015",
   "weight": 60.0,
   "height": 170.0,
   "bmi": 20.76,

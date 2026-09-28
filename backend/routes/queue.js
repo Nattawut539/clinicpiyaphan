@@ -52,6 +52,14 @@ function formatQ(prefix, n) {
   return `${prefix}${String(n).padStart(3, "0")}`;
 }
 
+function normalizeWalkinQueueNumber(value) {
+  const match = cleanText(value).toUpperCase().match(/^B(\d{1,3})$/);
+  if (!match) return "";
+  const number = Number(match[1]);
+  if (number < 1 || number > 999) return "";
+  return `B${String(number).padStart(3, "0")}`;
+}
+
 async function createWalkinPatientUser(client) {
   const random = crypto.randomBytes(5).toString("hex");
   const username = `walkin_${Date.now()}_${random}`;
@@ -119,6 +127,7 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
     service_type = null,
     source = "staff",
     receipt_queue = null,
+    hardware_message_id = null,
     patient = null,
     vitals = null,
   } = req.body || {};
@@ -130,7 +139,8 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
   const firstName = cleanText(patient?.first_name);
   const lastName = cleanText(patient?.last_name);
   const nationalId = cleanText(patient?.national_id);
-  const requestedQueueNumber = cleanText(receipt_queue).toUpperCase();
+  const requestedQueueNumber = normalizeWalkinQueueNumber(receipt_queue);
+  const hardwareMessageId = cleanText(hardware_message_id);
   const bp = splitBp(vitals?.bp);
 
   if ((patient || vitals) && (!firstName || !lastName)) {
@@ -139,7 +149,10 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
   if (nationalId && !/^\d{13}$/.test(nationalId)) {
     return res.status(400).json({ message: "เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก" });
   }
-  if (!/^B(?!000)\d{3}$/.test(requestedQueueNumber)) {
+  if (hardwareMessageId.length > 100) {
+    return res.status(400).json({ message: "hardware_message_id ไม่ถูกต้อง" });
+  }
+  if (!requestedQueueNumber) {
     return res.status(400).json({ message: "กรุณากรอกหมายเลขคิว B จากใบคิวผู้ป่วยทุกครั้ง เป็นรูปแบบ B001 ถึง B999" });
   }
 
@@ -165,6 +178,11 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
       const n = Number.parseInt(requestedQueueNumber.slice(1), 10);
       const qnum = requestedQueueNumber;
 
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext($1))",
+        [`walkin-queue:${day}`],
+      );
+
       const duplicateQueue = await client.query(
         `SELECT 1 FROM clinic.queue_tickets
          WHERE service_date = $1::date
@@ -176,6 +194,24 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
       if (duplicateQueue.rowCount) {
         return res.status(409).json({ message: `หมายเลขคิว ${qnum} ถูกใช้แล้วในวันนี้` });
       }
+
+      const stagedResult = await client.query(
+        `SELECT e.message_id, m.measurement_id, m.weight, m.height, m.bmi
+         FROM clinic.hardware_measurement_events e
+         JOIN clinic.measurements m ON m.measurement_id = e.measurement_id
+         WHERE ($1::varchar IS NULL OR e.message_id = $1)
+           AND e.mode = 'walk_in'
+           AND e.queue_id IS NULL
+           AND m.queue_id IS NULL
+           AND m.queue_number = $2
+           AND (e.created_at AT TIME ZONE 'Asia/Bangkok')::date = $3::date
+         FOR UPDATE OF e, m`,
+        [hardwareMessageId || null, qnum, day],
+      );
+      if (hardwareMessageId && !stagedResult.rowCount) {
+        return res.status(409).json({ message: "ไม่พบผลวัด Walk-in ที่ยังไม่ได้บันทึก หรือผลวัดนี้ไม่ตรงกับหมายเลขคิว" });
+      }
+      const stagedMeasurement = stagedResult.rows[0] || null;
 
       let resolvedUserId = user_id;
 
@@ -272,37 +308,85 @@ router.post("/issue-walkin", requireStaff, async (req, res, next) => {
       );
 
       let measurement = null;
-      if (vitals) {
-        const weight = parseOptionalNumber(vitals.weight);
-        const height = parseOptionalNumber(vitals.height);
-        const temperature = parseOptionalNumber(vitals.temperature);
-        const heartRate = parseOptionalInteger(vitals.heart_rate);
-        const respiratoryRate = parseOptionalInteger(vitals.respiratory_rate);
-        const bmi = weight > 0 && height > 0
+      if (vitals || stagedMeasurement) {
+        const weight = stagedMeasurement
+          ? parseOptionalNumber(stagedMeasurement.weight)
+          : parseOptionalNumber(vitals?.weight);
+        const height = stagedMeasurement
+          ? parseOptionalNumber(stagedMeasurement.height)
+          : parseOptionalNumber(vitals?.height);
+        const temperature = parseOptionalNumber(vitals?.temperature);
+        const heartRate = parseOptionalInteger(vitals?.heart_rate);
+        const respiratoryRate = parseOptionalInteger(vitals?.respiratory_rate);
+        const bmi = stagedMeasurement?.bmi ?? (weight > 0 && height > 0
           ? +(weight / ((height / 100) * (height / 100))).toFixed(2)
-          : null;
+          : null);
 
-        const measurementResult = await client.query(
-          `INSERT INTO clinic.measurements
-             (queue_id, queue_number, weight, height, bmi, chief_complaint,
-              temperature, heart_rate, respiratory_rate, systolic_bp, diastolic_bp)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-           RETURNING *`,
-          [
-            ins.rows[0].queue_id,
-            ins.rows[0].queue_number,
-            weight,
-            height,
-            bmi,
-            cleanText(vitals.chief_complaint) || null,
-            temperature,
-            heartRate,
-            respiratoryRate,
-            bp?.systolic_bp ?? null,
-            bp?.diastolic_bp ?? null,
-          ],
-        );
+        const measurementResult = stagedMeasurement
+          ? await client.query(
+            `UPDATE clinic.measurements
+             SET queue_id = $1, queue_number = $2,
+                 chief_complaint = COALESCE($3, chief_complaint),
+                 temperature = COALESCE($4, temperature),
+                 heart_rate = COALESCE($5, heart_rate),
+                 respiratory_rate = COALESCE($6, respiratory_rate),
+                 systolic_bp = COALESCE($7, systolic_bp),
+                 diastolic_bp = COALESCE($8, diastolic_bp)
+             WHERE measurement_id = $9 AND queue_id IS NULL
+             RETURNING *`,
+            [
+              ins.rows[0].queue_id,
+              ins.rows[0].queue_number,
+              cleanText(vitals?.chief_complaint) || null,
+              temperature,
+              heartRate,
+              respiratoryRate,
+              bp?.systolic_bp ?? null,
+              bp?.diastolic_bp ?? null,
+              stagedMeasurement.measurement_id,
+            ],
+          )
+          : await client.query(
+            `INSERT INTO clinic.measurements
+               (queue_id, queue_number, weight, height, bmi, chief_complaint,
+                temperature, heart_rate, respiratory_rate, systolic_bp, diastolic_bp)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+             RETURNING *`,
+            [
+              ins.rows[0].queue_id,
+              ins.rows[0].queue_number,
+              weight,
+              height,
+              bmi,
+              cleanText(vitals?.chief_complaint) || null,
+              temperature,
+              heartRate,
+              respiratoryRate,
+              bp?.systolic_bp ?? null,
+              bp?.diastolic_bp ?? null,
+            ],
+          );
+        if (stagedMeasurement && !measurementResult.rowCount) {
+          const error = new Error("ผลวัด Walk-in นี้ถูกบันทึกไปแล้ว");
+          error.status = 409;
+          throw error;
+        }
         measurement = measurementResult.rows[0];
+
+        if (stagedMeasurement) {
+          const attachedEvent = await client.query(
+            `UPDATE clinic.hardware_measurement_events
+             SET queue_id = $2, updated_at = now()
+             WHERE message_id = $1 AND queue_id IS NULL
+             RETURNING message_id`,
+            [stagedMeasurement.message_id, ins.rows[0].queue_id],
+          );
+          if (!attachedEvent.rowCount) {
+            const error = new Error("ผลวัด Walk-in นี้ถูกบันทึกไปแล้ว");
+            error.status = 409;
+            throw error;
+          }
+        }
       }
 
       res.json({ message: "issued", ticket: ins.rows[0], user_id: resolvedUserId, measurement });

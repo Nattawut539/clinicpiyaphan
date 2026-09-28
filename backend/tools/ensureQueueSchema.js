@@ -11,6 +11,13 @@ async function ensureQueueSchema() {
       ADD COLUMN IF NOT EXISTS queue_id integer
     `);
 
+    // Walk-in scale readings are staged before an Admin creates the patient's
+    // queue ticket, so they have no queue number until the walk-in form is saved.
+    await client.query(`
+      ALTER TABLE clinic.measurements
+      ALTER COLUMN queue_number DROP NOT NULL
+    `);
+
     await client.query(`
       ALTER TABLE clinic.measurements
       ADD COLUMN IF NOT EXISTS chief_complaint text,
@@ -228,6 +235,11 @@ async function ensureQueueSchema() {
 
     await client.query(`
       ALTER TABLE clinic.hardware_measurement_events
+      ALTER COLUMN queue_id DROP NOT NULL
+    `);
+
+    await client.query(`
+      ALTER TABLE clinic.hardware_measurement_events
       ADD COLUMN IF NOT EXISTS print_attempts integer NOT NULL DEFAULT 0
     `);
 
@@ -293,6 +305,12 @@ async function ensureQueueSchema() {
       CREATE INDEX IF NOT EXISTS hardware_measurement_events_pending_print_idx
       ON clinic.hardware_measurement_events (created_at)
       WHERE print_status IN ('pending', 'failed')
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS hardware_walkin_measurements_unassigned_idx
+      ON clinic.hardware_measurement_events (created_at DESC)
+      WHERE mode = 'walk_in' AND queue_id IS NULL
     `);
 
     await client.query(`

@@ -96,6 +96,7 @@ type WalkinDraft = {
     service_date: string;
     visit_time: string;
     receipt_queue: string;
+    hardware_message_id: string;
     user_id: string;
     first_name: string;
     last_name: string;
@@ -117,6 +118,16 @@ type WalkinDraft = {
     respiratory_rate: string;
     bp: string;
     chief_complaint: string;
+};
+
+type PendingWalkinMeasurement = {
+    hardware_message_id: string;
+    measurement_id: number;
+    queue_number: string;
+    weight: number | null;
+    height: number | null;
+    bmi: number | null;
+    measured_at: string | null;
 };
 
 const emptyVitalDraft: VitalDraft = {
@@ -146,6 +157,7 @@ function getEmptyWalkinDraft(): WalkinDraft {
         service_date: dayjs().format('YYYY-MM-DD'),
         visit_time: dayjs().format('HH:mm'),
         receipt_queue: '',
+        hardware_message_id: '',
         user_id: '',
         first_name: '',
         last_name: '',
@@ -197,6 +209,14 @@ function calcBmiText(weight: string, height: string) {
     const h = Number.parseFloat(height);
     if (!(w > 0) || !(h > 0)) return '';
     return (w / ((h / 100) * (h / 100))).toFixed(2);
+}
+
+function normalizeWalkinQueueNumber(value: string) {
+    const match = value.trim().toUpperCase().match(/^B(\d{1,3})$/);
+    if (!match) return '';
+    const number = Number(match[1]);
+    if (number < 1 || number > 999) return '';
+    return `B${String(number).padStart(3, '0')}`;
 }
 
 function calcAgeText(birthDate: string) {
@@ -488,6 +508,7 @@ export default function DashboardPage() {
     const [walkinSaving, setWalkinSaving] = useState(false);
     const [walkinLookupStatus, setWalkinLookupStatus] = useState<'idle' | 'searching' | 'found' | 'not_found'>('idle');
     const [walkinDraft, setWalkinDraft] = useState<WalkinDraft>(() => getEmptyWalkinDraft());
+    const [pendingWalkinMeasurements, setPendingWalkinMeasurements] = useState<PendingWalkinMeasurement[]>([]);
     const [checkinOpen, setCheckinOpen] = useState(false);
     const [checkinSearching, setCheckinSearching] = useState(false);
     const [checkinSavingId, setCheckinSavingId] = useState<number | null>(null);
@@ -605,8 +626,31 @@ export default function DashboardPage() {
     const openWalkinForm = () => {
         setWalkinDraft(getEmptyWalkinDraft());
         setWalkinLookupStatus('idle');
+        setPendingWalkinMeasurements([]);
         lastWalkinLookupKey.current = '';
         setWalkinOpen(true);
+        void fetch(`${API}/hardware/walkin-pending`, {
+            headers: authHeaders(),
+            cache: 'no-store',
+        }).then(async (response) => {
+            if (!response.ok) return;
+            const data = await response.json().catch(() => []);
+            setPendingWalkinMeasurements(Array.isArray(data) ? data : []);
+        }).catch(() => {});
+    };
+
+    const selectPendingWalkinMeasurement = (messageId: string) => {
+        const selected = pendingWalkinMeasurements.find((item) => item.hardware_message_id === messageId);
+        setWalkinDraft((current) => selected
+            ? {
+                ...current,
+                hardware_message_id: selected.hardware_message_id,
+                receipt_queue: selected.queue_number,
+                weight: stringifyMeasurement(selected.weight),
+                height: stringifyMeasurement(selected.height),
+                bmi: stringifyMeasurement(selected.bmi),
+            }
+            : { ...current, hardware_message_id: '' });
     };
 
     const useCurrentWalkinDateTime = () => {
@@ -634,9 +678,9 @@ export default function DashboardPage() {
             blood_type: stringifyMeasurement(data.blood_type as string | number | null),
             drug_allergy: stringifyMeasurement(data.drug_allergy as string | number | null),
             food_allergy: stringifyMeasurement(data.food_allergy as string | number | null),
-            weight: stringifyMeasurement(data.weight as string | number | null),
-            height: stringifyMeasurement(data.height as string | number | null),
-            bmi: stringifyMeasurement(data.bmi as string | number | null),
+            weight: current.hardware_message_id ? current.weight : stringifyMeasurement(data.weight as string | number | null),
+            height: current.hardware_message_id ? current.height : stringifyMeasurement(data.height as string | number | null),
+            bmi: current.hardware_message_id ? current.bmi : stringifyMeasurement(data.bmi as string | number | null),
         }));
     };
 
@@ -683,7 +727,8 @@ export default function DashboardPage() {
         }
     };
 
-    const validReceiptQueue = /^B(?!000)\d{3}$/.test(walkinDraft.receipt_queue.trim());
+    const normalizedReceiptQueue = normalizeWalkinQueueNumber(walkinDraft.receipt_queue);
+    const validReceiptQueue = Boolean(normalizedReceiptQueue);
     const saveWalkinQueue = async () => {
         if (!validReceiptQueue) {
             await Swal.fire({ icon: 'warning', title: 'กรุณากรอกหมายเลขคิว B จากใบคิวผู้ป่วย', text: 'ตรวจสอบให้ตรงกับใบคิวทุกครั้ง เช่น B001 ก่อนบันทึก' });
@@ -722,7 +767,8 @@ export default function DashboardPage() {
                     service_date: walkinDraft.service_date,
                     visit_time: walkinDraft.visit_time,
                     avaliable_date: avaliableDate,
-                    receipt_queue: walkinDraft.receipt_queue.trim(),
+                    receipt_queue: normalizedReceiptQueue,
+                    hardware_message_id: walkinDraft.hardware_message_id || null,
                     user_id: walkinDraft.user_id ? Number(walkinDraft.user_id) : null,
                     service_type: 'Walk-in',
                     patient: {
@@ -1591,6 +1637,57 @@ export default function DashboardPage() {
     }, [walkinOpen, walkinDraft.national_id, walkinDraft.first_name, walkinDraft.last_name]);
 
     useEffect(() => {
+        const queueNumber = normalizeWalkinQueueNumber(walkinDraft.receipt_queue);
+        const serviceDate = walkinDraft.service_date;
+        if (!walkinOpen || !queueNumber || !serviceDate) return;
+
+        let active = true;
+        const timer = window.setTimeout(async () => {
+            try {
+                const params = new URLSearchParams({ queue_number: queueNumber, service_date: serviceDate });
+                const response = await fetch(`${API}/hardware/walkin-pending?${params}`, {
+                    headers: authHeaders(),
+                    cache: 'no-store',
+                });
+                if (!response.ok || !active) return;
+                const matches: PendingWalkinMeasurement[] = await response.json();
+                if (!active) return;
+                const selected = matches[0];
+                if (!selected) {
+                    setWalkinDraft((current) => current.receipt_queue.trim().toUpperCase() === walkinDraft.receipt_queue.trim().toUpperCase()
+                        ? { ...current, hardware_message_id: '' }
+                        : current);
+                    return;
+                }
+
+                setPendingWalkinMeasurements((current) => [
+                    selected,
+                    ...current.filter((item) => item.hardware_message_id !== selected.hardware_message_id),
+                ]);
+                setWalkinDraft((current) => {
+                    if (current.receipt_queue.trim().toUpperCase() !== walkinDraft.receipt_queue.trim().toUpperCase()
+                        || current.service_date !== serviceDate) return current;
+                    return {
+                        ...current,
+                        hardware_message_id: selected.hardware_message_id,
+                        receipt_queue: selected.queue_number,
+                        weight: stringifyMeasurement(selected.weight),
+                        height: stringifyMeasurement(selected.height),
+                        bmi: stringifyMeasurement(selected.bmi),
+                    };
+                });
+            } catch {
+                // Manual walk-in entry remains available if the lookup is offline.
+            }
+        }, 250);
+
+        return () => {
+            active = false;
+            window.clearTimeout(timer);
+        };
+    }, [walkinOpen, walkinDraft.receipt_queue, walkinDraft.service_date]);
+
+    useEffect(() => {
         fetchApprovedAppointments();
         fetchCalendarMonth();
     // Calendar month is the only intended refresh trigger.
@@ -2042,13 +2139,31 @@ export default function DashboardPage() {
                             <section className={styles.walkinSection}>
                             <div className={styles.walkinSectionTitle}>Vital signs (สัญญาณชีพ) และ CC (อาการสำคัญ)</div>
                             <div className={styles.walkinGrid}>
+                                {pendingWalkinMeasurements.length > 0 && (
+                                    <label className={styles.walkinWideField}>
+                                        <span>ผลชั่งน้ำหนักและส่วนสูงที่รอลงทะเบียน</span>
+                                        <select
+                                            value={walkinDraft.hardware_message_id}
+                                            onChange={(event) => selectPendingWalkinMeasurement(event.target.value)}
+                                        >
+                                            <option value="">เลือกผลวัดจากเครื่อง</option>
+                                            {pendingWalkinMeasurements.map((item) => (
+                                                <option key={item.hardware_message_id} value={item.hardware_message_id}>
+                                                    {item.queue_number} · {item.measured_at ? dayjs(item.measured_at).format('HH:mm น.') : 'ไม่ทราบเวลา'}
+                                                    {' · '}{item.weight ?? '-'} กก. / {item.height ?? '-'} ซม.
+                                                    {' · BMI '}{item.bmi ?? '-'}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                )}
                                 <label>
                                     <span>น้ำหนัก</span>
-                                    <input value={walkinDraft.weight} onChange={(event) => setWalkinValue('weight', event.target.value)} placeholder="กก." />
+                                    <input value={walkinDraft.weight} onChange={(event) => setWalkinValue('weight', event.target.value)} placeholder="กก." readOnly={Boolean(walkinDraft.hardware_message_id)} />
                                 </label>
                                 <label>
                                     <span>ส่วนสูง</span>
-                                    <input value={walkinDraft.height} onChange={(event) => setWalkinValue('height', event.target.value)} placeholder="ซม." />
+                                    <input value={walkinDraft.height} onChange={(event) => setWalkinValue('height', event.target.value)} placeholder="ซม." readOnly={Boolean(walkinDraft.hardware_message_id)} />
                                 </label>
                                 <label>
                                     <span>BMI — ดัชนีมวลกาย</span>

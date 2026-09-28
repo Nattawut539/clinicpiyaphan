@@ -9,6 +9,39 @@ const { MAX_PRINT_ATTEMPTS } = require("../services/printRetryPolicy");
 
 const requireHardwareAdmin = requireRole("super_admin", "superadmin");
 
+router.get("/hardware/walkin-pending", requireStaff, async (req, res, next) => {
+  try {
+    const rawQueueNumber = String(req.query?.queue_number || "").trim().toUpperCase();
+    const queueMatch = rawQueueNumber.match(/^B(\d{1,3})$/);
+    if (rawQueueNumber && (!queueMatch || Number(queueMatch[1]) < 1 || Number(queueMatch[1]) > 999)) {
+      return res.status(400).json({ message: "queue_number is invalid" });
+    }
+    const queueNumber = queueMatch
+      ? `B${String(Number(queueMatch[1])).padStart(3, "0")}`
+      : null;
+    const serviceDate = String(req.query?.service_date || "").trim();
+    if (serviceDate && !/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) {
+      return res.status(400).json({ message: "service_date is invalid" });
+    }
+    const result = await pool.query(
+      `SELECT e.message_id AS hardware_message_id,
+              m.measurement_id, m.queue_number, m.weight, m.height, m.bmi, m.measured_at,
+              e.created_at
+       FROM clinic.hardware_measurement_events e
+       JOIN clinic.measurements m ON m.measurement_id = e.measurement_id
+       WHERE e.mode = 'walk_in' AND e.queue_id IS NULL
+         AND ($1::varchar IS NULL OR m.queue_number = $1)
+         AND ($2::date IS NULL OR (e.created_at AT TIME ZONE 'Asia/Bangkok')::date = $2::date)
+       ORDER BY e.created_at DESC
+       LIMIT 50`,
+      [queueNumber, serviceDate || null],
+    );
+    return res.json(result.rows);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get("/hardware/admin-dashboard", requireHardwareAdmin, async (_req, res, next) => {
   try {
     const [health, otpResult, deviceResult, measurementResult, timelineResult] = await Promise.all([
@@ -72,13 +105,13 @@ router.get("/hardware/admin-dashboard", requireHardwareAdmin, async (_req, res, 
                 e.print_next_attempt_at, e.print_requested_at,
                 e.print_last_manual_reprint_at, e.print_manual_reprint_count,
                 e.printed_at, e.created_at, e.updated_at,
-                q.queue_number,
+                COALESCE(q.queue_number, m.queue_number) AS queue_number,
                 NULLIF(BTRIM(CONCAT_WS(' ', d.first_name, d.last_name)), '') AS patient_name,
                 m.measurement_id, m.weight, m.height, m.bmi,
                 m.measured_at, m.source
          FROM clinic.hardware_measurement_events e
          JOIN clinic.measurements m ON m.measurement_id = e.measurement_id
-         JOIN clinic.queue_tickets q ON q.queue_id = e.queue_id
+         LEFT JOIN clinic.queue_tickets q ON q.queue_id = e.queue_id
          LEFT JOIN clinic.user_details d ON d.user_id = q.user_id
          ORDER BY e.created_at DESC
          LIMIT 100`,
@@ -178,10 +211,10 @@ router.get("/hardware/pending-print", requireStaff, async (_req, res, next) => {
     const result = await pool.query(
       `SELECT e.message_id, e.device_id, e.mode, e.print_status,
               m.measurement_id, m.weight, m.height, m.measured_at,
-              q.queue_number
+              COALESCE(q.queue_number, m.queue_number) AS queue_number
        FROM clinic.hardware_measurement_events e
        JOIN clinic.measurements m ON m.measurement_id = e.measurement_id
-       JOIN clinic.queue_tickets q ON q.queue_id = e.queue_id
+       LEFT JOIN clinic.queue_tickets q ON q.queue_id = e.queue_id
        WHERE e.print_attempts < $1
          AND (
            e.print_status = 'pending'

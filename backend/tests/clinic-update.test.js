@@ -9,6 +9,7 @@ let accepted = false;
 let sessionVersion = 1;
 let existingPatient = false;
 let duplicateQueue = false;
+let pendingHardwareMeasurement = null;
 const client = {
   release() {},
   async query(sql, values) {
@@ -20,6 +21,13 @@ const client = {
     if (sql.includes('SET medical_consent_at = CASE')) accepted = true;
     if (sql.includes('session_version = session_version + 1')) { accepted = false; sessionVersion++; }
     if (sql.includes('SELECT 1 FROM clinic.queue_tickets')) return { rowCount: duplicateQueue ? 1 : 0, rows: [] };
+    if (sql.includes('FROM clinic.hardware_measurement_events e') && sql.includes('m.queue_number = $2')) {
+      return pendingHardwareMeasurement
+        ? { rowCount: 1, rows: [pendingHardwareMeasurement] }
+        : { rowCount: 0, rows: [] };
+    }
+    if (sql.includes('UPDATE clinic.measurements')) return { rowCount: 1, rows: [{ measurement_id: 69, weight: 60, height: 170, bmi: 20.76 }] };
+    if (sql.includes('UPDATE clinic.hardware_measurement_events')) return { rowCount: 1, rows: [{ message_id: values[0] }] };
     if (sql.includes('SELECT u.user_id')) return { rowCount: existingPatient ? 1 : 0, rows: existingPatient ? [{ user_id: 7 }] : [] };
     if (sql.includes('INSERT INTO clinic.users')) return { rows: [{ user_id: 7 }] };
     if (sql.includes('INSERT INTO clinic.queue_tickets')) return { rows: [{ queue_id: 9, queue_number: values[0] }] };
@@ -78,7 +86,7 @@ test('accept persists consent, decline revokes existing tokens, stale versions a
 
 test('walk-in rejects missing/invalid receipt numbers before writing and rejects duplicates', async () => {
   const post = handler(queueRouter, '/issue-walkin', 'post');
-  for (const receipt_queue of [undefined, '', 'B', 'B000', 'A001', 'B01', 'B1000']) {
+  for (const receipt_queue of [undefined, '', 'B', 'B0', 'B000', 'A001', 'B1000']) {
     calls.length = 0;
     const res = response();
     await post({ body: { receipt_queue } }, res, assert.fail);
@@ -109,4 +117,29 @@ test('walk-in stores underlying disease for new and existing patients with exact
     assert.equal(res.body.ticket.queue_number, 'B042');
     assert.equal(calls.some(({ sql }) => sql.includes('MAX(numeric_no)')), false);
   }
+});
+
+test('walk-in receipt number loads and attaches the staged scale measurement on save', async () => {
+  const post = handler(queueRouter, '/issue-walkin', 'post');
+  pendingHardwareMeasurement = {
+    message_id: 'MSG-B-STAGED-001', measurement_id: 69,
+    weight: '60.00', height: '170.00', bmi: '20.76',
+  };
+  calls.length = 0;
+  const res = response();
+  await post({ body: {
+    receipt_queue: 'B15', service_date: '2026-09-18',
+    patient: { first_name: 'Test', last_name: 'Patient' },
+    vitals: { weight: null, height: null },
+  } }, res, assert.fail);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ticket.queue_number, 'B015');
+  const attachMeasurement = calls.find(({ sql }) => sql.includes('UPDATE clinic.measurements'));
+  assert.ok(attachMeasurement, 'save must attach the existing staged measurement');
+  assert.equal(attachMeasurement.values[0], 9);
+  assert.equal(attachMeasurement.values[8], 69);
+  const attachEvent = calls.find(({ sql }) => sql.includes('UPDATE clinic.hardware_measurement_events'));
+  assert.equal(attachEvent.values[0], 'MSG-B-STAGED-001');
+  pendingHardwareMeasurement = null;
 });

@@ -31,6 +31,12 @@ const client = {
         }],
       };
     }
+    if (String(sql).includes("SELECT (now() AT TIME ZONE 'Asia/Bangkok')::date::text AS service_date")) {
+      return { rowCount: 1, rows: [{ service_date: "2026-09-28" }] };
+    }
+    if (String(sql).includes("SELECT GREATEST(")) {
+      return { rowCount: 1, rows: [{ value: 15 }] };
+    }
     if (String(sql).includes("INSERT INTO clinic.measurements")) {
       return { rowCount: 1, rows: [{ measurement_id: 69 }] };
     }
@@ -239,6 +245,30 @@ test("accepted measurement persists backend BMI and creates a due print job atom
   const auditInsert = queries.find((entry) => entry.sql.includes("INSERT INTO clinic.hardware_event_audit"));
   assert.equal(auditInsert.params[2], "MSG-A-NEW-001");
   assert.equal(auditInsert.params[3], eventInsert.params[7]);
+});
+
+test("walk-in measurement reserves a printed B number without creating a queue ticket", async () => {
+  duplicateRow = null;
+  queries.length = 0;
+  const measuredAt = new Date().toISOString();
+  const result = await service.processHardwareMeasurement({
+    message_id: "MSG-B-STAGED-001",
+    device_id: "SCALE-001",
+    mode: "walk_in",
+    measured_at: measuredAt,
+    weight: 60,
+    height: 170,
+  }, "SCALE-001");
+
+  assert.equal(result.status, "accepted");
+  assert.equal(result.queue_number, "B015");
+  assert.equal(result.print_pending, true);
+  const measurementInsert = queries.find((entry) => entry.sql.includes("INSERT INTO clinic.measurements"));
+  assert.equal(measurementInsert.params[0], null);
+  assert.equal(measurementInsert.params[1], "B015");
+  const eventInsert = queries.find((entry) => entry.sql.includes("INSERT INTO clinic.hardware_measurement_events"));
+  assert.equal(eventInsert.params[3], null);
+  assert.equal(queries.some((entry) => entry.sql.includes("INSERT INTO clinic.queue_tickets")), false);
 });
 
 test("print ACK stops terminal failure and schedules transient failure", async () => {
