@@ -130,6 +130,25 @@ function enforceOtpRateLimit(deviceId) {
   otpAttempts.set(deviceId, recent);
 }
 
+function publicHardwareErrorCode(error) {
+  const code = String(error?.code || "");
+  // PostgreSQL SQLSTATE values are internal diagnostics, not device-facing
+  // error codes. Keep application errors such as INVALID_SESSION intact.
+  return /^\d{5}$/.test(code) ? "INTERNAL_ERROR" : code || "INTERNAL_ERROR";
+}
+
+function hardwareErrorLogDetails(error) {
+  return {
+    code: error?.code || "INTERNAL_ERROR",
+    message: error?.message,
+    schema: error?.schema,
+    table: error?.table,
+    column: error?.column,
+    constraint: error?.constraint,
+    where: error?.where,
+  };
+}
+
 async function handleMessage(receivedTopic, buffer, packet) {
   const route = parseTopic(receivedTopic);
   if (!route) return;
@@ -223,14 +242,14 @@ async function handleMessage(receivedTopic, buffer, packet) {
       });
     }
   } catch (error) {
-    const code = error?.code || "INTERNAL_ERROR";
+    const code = publicHardwareErrorCode(error);
     console.error("MQTT hardware message rejected", {
       at: new Date().toISOString(),
       topic: receivedTopic,
       device_id: route.deviceId,
       message_id: payload?.message_id || null,
-      code,
-      message: error?.message,
+      ...hardwareErrorLogDetails(error),
+      public_error_code: code,
     });
     hardwareMetrics.increment("mqtt_messages_rejected_total");
     await safeRecordHardwareAudit(`${route.action}_rejected`, {
