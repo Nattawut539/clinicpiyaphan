@@ -120,6 +120,25 @@ type WalkinDraft = {
     chief_complaint: string;
 };
 
+type WalkinValidationField =
+    | 'service_date'
+    | 'visit_time'
+    | 'receipt_queue'
+    | 'first_name'
+    | 'last_name'
+    | 'national_id'
+    | 'phone'
+    | 'emergency_phone'
+    | 'weight'
+    | 'height'
+    | 'temperature'
+    | 'heart_rate'
+    | 'respiratory_rate'
+    | 'bp'
+    | 'chief_complaint';
+
+type WalkinFieldErrors = Partial<Record<WalkinValidationField, string>>;
+
 type PendingWalkinMeasurement = {
     hardware_message_id: string;
     measurement_id: number;
@@ -128,6 +147,13 @@ type PendingWalkinMeasurement = {
     height: number | null;
     bmi: number | null;
     measured_at: string | null;
+    created_at?: string | null;
+};
+
+type WalkinMeasurementNotice = {
+    queueNumber: string;
+    weight: number | null;
+    height: number | null;
 };
 
 const emptyVitalDraft: VitalDraft = {
@@ -217,6 +243,92 @@ function normalizeWalkinQueueNumber(value: string) {
     const number = Number(match[1]);
     if (number < 1 || number > 999) return '';
     return `B${String(number).padStart(3, '0')}`;
+}
+
+function isPositiveNumeric(value: string, maxValue: number) {
+    if (!/^\d+(?:\.\d+)?$/.test(value)) return false;
+    const number = Number(value);
+    return Number.isFinite(number) && number > 0 && number <= maxValue;
+}
+
+function getWalkinFieldError(field: WalkinValidationField, value: string) {
+    const text = value.trim();
+
+    switch (field) {
+        case 'service_date':
+            return text ? undefined : 'กรุณาเลือกวันที่';
+        case 'visit_time':
+            return /^([01]\d|2[0-3]):[0-5]\d$/.test(text) ? undefined : 'กรุณาเลือกเวลาที่ถูกต้อง';
+        case 'receipt_queue':
+            if (!text) return 'กรุณากรอกหมายเลขคิว B';
+            return normalizeWalkinQueueNumber(text) ? undefined : 'กรอกหมายเลขคิวรูปแบบ B001 ถึง B999';
+        case 'first_name':
+            return text ? undefined : 'กรุณากรอกชื่อ';
+        case 'last_name':
+            return text ? undefined : 'กรุณากรอกนามสกุล';
+        case 'national_id':
+            return !text || /^\d{13}$/.test(text) ? undefined : 'เลขบัตรประชาชนต้องมี 13 หลัก หรือเว้นว่างได้';
+        case 'phone':
+        case 'emergency_phone':
+            return !text || text.length <= 10 ? undefined : 'กรอกหมายเลขโทรศัพท์ไม่เกิน 10 ตัวอักษร';
+        case 'weight':
+            if (!text) return 'กรุณากรอกน้ำหนัก';
+            return isPositiveNumeric(text, 999.99)
+                ? undefined
+                : 'กรอกน้ำหนักเป็นตัวเลขมากกว่า 0 และไม่เกิน 999.99 กก.';
+        case 'height':
+            if (!text) return 'กรุณากรอกส่วนสูง';
+            return isPositiveNumeric(text, 999.99)
+                ? undefined
+                : 'กรอกส่วนสูงเป็นตัวเลขมากกว่า 0 และไม่เกิน 999.99 ซม.';
+        case 'temperature':
+            if (!text) return 'กรุณากรอกอุณหภูมิ';
+            return isPositiveNumeric(text, 999.9)
+                ? undefined
+                : 'กรอกอุณหภูมิเป็นตัวเลขมากกว่า 0 และไม่เกิน 999.9 °C';
+        case 'heart_rate':
+            if (!text) return 'กรุณากรอกอัตราการเต้นหัวใจ';
+            return /^\d+$/.test(text) && Number(text) > 0
+                ? undefined
+                : 'กรอกอัตราการเต้นหัวใจเป็นจำนวนเต็มมากกว่า 0';
+        case 'respiratory_rate':
+            if (!text) return 'กรุณากรอกอัตราการหายใจ';
+            return /^\d+$/.test(text) && Number(text) > 0
+                ? undefined
+                : 'กรอกอัตราการหายใจเป็นจำนวนเต็มมากกว่า 0';
+        case 'bp':
+            if (!text) return 'กรุณากรอกความดันโลหิต';
+            return parseBpValue(text) ? undefined : 'กรอกความดันรูปแบบ เช่น 120/80';
+        case 'chief_complaint':
+            return text ? undefined : 'กรุณากรอกอาการสำคัญที่มาพบแพทย์';
+    }
+}
+
+const WALKIN_VALIDATION_FIELDS: WalkinValidationField[] = [
+    'service_date',
+    'visit_time',
+    'receipt_queue',
+    'first_name',
+    'last_name',
+    'national_id',
+    'phone',
+    'emergency_phone',
+    'weight',
+    'height',
+    'temperature',
+    'heart_rate',
+    'respiratory_rate',
+    'bp',
+    'chief_complaint',
+];
+
+function validateWalkinDraft(draft: WalkinDraft): WalkinFieldErrors {
+    const errors: WalkinFieldErrors = {};
+    for (const field of WALKIN_VALIDATION_FIELDS) {
+        const message = getWalkinFieldError(field, draft[field]);
+        if (message) errors[field] = message;
+    }
+    return errors;
 }
 
 function calcAgeText(birthDate: string) {
@@ -508,7 +620,9 @@ export default function DashboardPage() {
     const [walkinSaving, setWalkinSaving] = useState(false);
     const [walkinLookupStatus, setWalkinLookupStatus] = useState<'idle' | 'searching' | 'found' | 'not_found'>('idle');
     const [walkinDraft, setWalkinDraft] = useState<WalkinDraft>(() => getEmptyWalkinDraft());
+    const [walkinFieldErrors, setWalkinFieldErrors] = useState<WalkinFieldErrors>({});
     const [pendingWalkinMeasurements, setPendingWalkinMeasurements] = useState<PendingWalkinMeasurement[]>([]);
+    const [walkinMeasurementNotice, setWalkinMeasurementNotice] = useState<WalkinMeasurementNotice | null>(null);
     const [checkinOpen, setCheckinOpen] = useState(false);
     const [checkinSearching, setCheckinSearching] = useState(false);
     const [checkinSavingId, setCheckinSavingId] = useState<number | null>(null);
@@ -605,6 +719,18 @@ export default function DashboardPage() {
     };
 
     const setWalkinValue = (key: keyof WalkinDraft, value: string) => {
+        if (WALKIN_VALIDATION_FIELDS.includes(key as WalkinValidationField)) {
+            const field = key as WalkinValidationField;
+            setWalkinFieldErrors((current) => {
+                if (!current[field]) return current;
+                const next = { ...current };
+                const message = getWalkinFieldError(field, value);
+                if (message) next[field] = message;
+                else delete next[field];
+                return next;
+            });
+        }
+
         if (key === 'national_id' || key === 'first_name' || key === 'last_name') {
             setWalkinLookupStatus('idle');
             lastWalkinLookupKey.current = '';
@@ -625,6 +751,7 @@ export default function DashboardPage() {
 
     const openWalkinForm = () => {
         setWalkinDraft(getEmptyWalkinDraft());
+        setWalkinFieldErrors({});
         setWalkinLookupStatus('idle');
         setPendingWalkinMeasurements([]);
         lastWalkinLookupKey.current = '';
@@ -641,6 +768,14 @@ export default function DashboardPage() {
 
     const selectPendingWalkinMeasurement = (messageId: string) => {
         const selected = pendingWalkinMeasurements.find((item) => item.hardware_message_id === messageId);
+        if (selected) {
+            setWalkinFieldErrors((current) => {
+                if (!current.receipt_queue) return current;
+                const next = { ...current };
+                delete next.receipt_queue;
+                return next;
+            });
+        }
         setWalkinDraft((current) => selected
             ? {
                 ...current,
@@ -655,6 +790,12 @@ export default function DashboardPage() {
 
     const useCurrentWalkinDateTime = () => {
         const current = dayjs();
+        setWalkinFieldErrors((errors) => {
+            const next = { ...errors };
+            delete next.service_date;
+            delete next.visit_time;
+            return next;
+        });
         setWalkinDraft((draft) => ({
             ...draft,
             service_date: current.format('YYYY-MM-DD'),
@@ -728,29 +869,24 @@ export default function DashboardPage() {
     };
 
     const normalizedReceiptQueue = normalizeWalkinQueueNumber(walkinDraft.receipt_queue);
-    const validReceiptQueue = Boolean(normalizedReceiptQueue);
-    const saveWalkinQueue = async () => {
-        if (!validReceiptQueue) {
-            await Swal.fire({ icon: 'warning', title: 'กรุณากรอกหมายเลขคิว B จากใบคิวผู้ป่วย', text: 'ตรวจสอบให้ตรงกับใบคิวทุกครั้ง เช่น B001 ก่อนบันทึก' });
-            return;
-        }
-        if (!walkinDraft.service_date || !walkinDraft.visit_time || !walkinDraft.first_name || !walkinDraft.last_name) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'กรอกข้อมูลคิว B ไม่ครบ',
-                text: 'ต้องมีวันที่ เวลา ชื่อ และนามสกุล',
-                confirmButtonColor: '#0f766e',
-            });
-            return;
-        }
+    const walkinFieldProps = (field: WalkinValidationField) => ({
+        className: walkinFieldErrors[field] ? styles.walkinFieldInvalid : undefined,
+        'data-walkin-invalid': Boolean(walkinFieldErrors[field]),
+    });
+    const walkinFieldError = (field: WalkinValidationField) => walkinFieldErrors[field]
+        ? <small className={styles.walkinFieldError} role="alert">{walkinFieldErrors[field]}</small>
+        : null;
 
-        const parsedBp = parseBpValue(walkinDraft.bp);
-        if (walkinDraft.bp.trim() && !parsedBp) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'รูปแบบ BP ไม่ถูกต้อง',
-                text: 'กรุณากรอกความดันเป็นรูปแบบ เช่น 120/80',
-                confirmButtonColor: '#0f766e',
+    const saveWalkinQueue = async () => {
+        const validationErrors = validateWalkinDraft(walkinDraft);
+        setWalkinFieldErrors(validationErrors);
+        if (Object.keys(validationErrors).length > 0) {
+            window.requestAnimationFrame(() => {
+                const firstInvalidField = document.querySelector<HTMLElement>(
+                    '[data-walkin-invalid="true"] input, [data-walkin-invalid="true"] select, [data-walkin-invalid="true"] textarea',
+                );
+                firstInvalidField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstInvalidField?.focus();
             });
             return;
         }
@@ -1625,6 +1761,68 @@ export default function DashboardPage() {
     }, []);
 
     useEffect(() => {
+        let active = true;
+        let requestInFlight = false;
+        let hasInitialSnapshot = false;
+        let noticeTimer: number | undefined;
+        const mountedAt = Date.now();
+        const seenMessageIds = new Set<string>();
+
+        const refreshPendingWalkinMeasurements = async () => {
+            if (requestInFlight) return;
+            requestInFlight = true;
+
+            try {
+                const response = await fetch(`${API}/hardware/walkin-pending`, {
+                    headers: authHeaders(),
+                    cache: 'no-store',
+                });
+                if (!response.ok || !active) return;
+
+                const measurements: PendingWalkinMeasurement[] = await response.json();
+                if (!active) return;
+
+                const newMeasurements = measurements.filter((measurement) => {
+                    const messageId = String(measurement.hardware_message_id || '');
+                    if (!messageId || seenMessageIds.has(messageId)) return false;
+                    seenMessageIds.add(messageId);
+
+                    if (hasInitialSnapshot) return true;
+                    const createdAt = measurement.created_at ? Date.parse(measurement.created_at) : Number.NaN;
+                    return Number.isFinite(createdAt) && createdAt >= mountedAt - 1500;
+                });
+                hasInitialSnapshot = true;
+
+                if (newMeasurements.length > 0) {
+                    const newestMeasurement = newMeasurements[0];
+                    setWalkinMeasurementNotice({
+                        queueNumber: newestMeasurement.queue_number,
+                        weight: newestMeasurement.weight,
+                        height: newestMeasurement.height,
+                    });
+                    if (noticeTimer !== undefined) window.clearTimeout(noticeTimer);
+                    noticeTimer = window.setTimeout(() => {
+                        setWalkinMeasurementNotice(null);
+                    }, 3000);
+                }
+            } catch (error) {
+                console.error('refreshPendingWalkinMeasurements:', error);
+            } finally {
+                requestInFlight = false;
+            }
+        };
+
+        void refreshPendingWalkinMeasurements();
+        const timer = window.setInterval(refreshPendingWalkinMeasurements, 2000);
+
+        return () => {
+            active = false;
+            window.clearInterval(timer);
+            if (noticeTimer !== undefined) window.clearTimeout(noticeTimer);
+        };
+    }, []);
+
+    useEffect(() => {
         if (!walkinOpen) return;
 
         const timer = window.setTimeout(() => {
@@ -1956,6 +2154,16 @@ export default function DashboardPage() {
                 <AdminHeaderActions />
             </header>
 
+            {walkinMeasurementNotice && (
+                <div className={styles.walkinMeasurementNotice} role="status" aria-live="polite">
+                    <strong>มีผลชั่งคิว B เข้ามาใหม่</strong>
+                    <span>
+                        {walkinMeasurementNotice.queueNumber || 'คิว B'} · น้ำหนัก {walkinMeasurementNotice.weight ?? '-'} กก.
+                        {' '}· ส่วนสูง {walkinMeasurementNotice.height ?? '-'} ซม.
+                    </span>
+                </div>
+            )}
+
             {checkinOpen && (
                 <div className={styles.walkinOverlay} onMouseDown={() => setCheckinOpen(false)}>
                     <div className={styles.checkinModal} onMouseDown={(event) => event.stopPropagation()}>
@@ -2003,20 +2211,22 @@ export default function DashboardPage() {
                             <section className={styles.walkinSection}>
                             <div className={styles.walkinSectionTitle}>ข้อมูลคิว</div>
                             <div className={`${styles.walkinGrid} ${styles.walkinQueueGrid}`}>
-                                <label>
-                                    <span>วัน เดือน ปี</span>
+                                <label {...walkinFieldProps('service_date')}>
+                                    <span>วัน เดือน ปี (จำเป็น)</span>
                                     <ThaiDatePicker
                                         value={walkinDraft.service_date}
                                         onChange={(value) => setWalkinValue('service_date', value)}
                                         startYear={dayjs().year() - 1}
                                         endYear={dayjs().year() + 1}
                                     />
+                                    {walkinFieldError('service_date')}
                                 </label>
-                                <label>
-                                    <span>เวลาที่เข้ารับการรักษา</span>
+                                <label {...walkinFieldProps('visit_time')}>
+                                    <span>เวลาที่เข้ารับการรักษา (จำเป็น)</span>
                                     <div className={styles.walkinTimeSelects}>
                                         <select
                                             value={(walkinDraft.visit_time || '00:00').split(':')[0] || '00'}
+                                            aria-invalid={Boolean(walkinFieldErrors.visit_time)}
                                             onChange={(event) => {
                                                 const minute = (walkinDraft.visit_time || '00:00').split(':')[1] || '00';
                                                 setWalkinValue('visit_time', `${event.target.value}:${minute}`);
@@ -2030,6 +2240,7 @@ export default function DashboardPage() {
                                         <span className={styles.walkinTimeSeparator}>:</span>
                                         <select
                                             value={(walkinDraft.visit_time || '00:00').split(':')[1] || '00'}
+                                            aria-invalid={Boolean(walkinFieldErrors.visit_time)}
                                             onChange={(event) => {
                                                 const hour = (walkinDraft.visit_time || '00:00').split(':')[0] || '00';
                                                 setWalkinValue('visit_time', `${hour}:${event.target.value}`);
@@ -2042,17 +2253,19 @@ export default function DashboardPage() {
                                         </select>
                                         <small>น.</small>
                                     </div>
+                                    {walkinFieldError('visit_time')}
                                 </label>
-                                <label>
+                                <label {...walkinFieldProps('receipt_queue')}>
                                     <span>หมายเลขคิว B จากใบคิวผู้ป่วย (จำเป็น)</span>
                                     <input
-                                        required
                                         value={walkinDraft.receipt_queue}
+                                        aria-invalid={Boolean(walkinFieldErrors.receipt_queue)}
                                         onChange={(event) => {
                                             setWalkinValue('receipt_queue', event.target.value.toUpperCase());
                                         }}
                                         placeholder="เช่น B001"
                                     />
+                                    {walkinFieldError('receipt_queue')}
                                 </label>
                                 <button type="button" className={styles.walkinNowBtn} onClick={useCurrentWalkinDateTime}>
                                     ใช้วันเดือนปีและเวลาปัจจุบัน
@@ -2063,17 +2276,33 @@ export default function DashboardPage() {
                             <section className={styles.walkinSection}>
                             <div className={styles.walkinSectionTitle}>ข้อมูลผู้ป่วย</div>
                             <div className={styles.walkinGrid}>
-                                <label>
-                                    <span>เลขบัตรประชาชน</span>
-                                    <input value={walkinDraft.national_id} onChange={(event) => setWalkinValue('national_id', event.target.value)} placeholder="13 หลัก" />
+                                <label {...walkinFieldProps('national_id')}>
+                                    <span>เลขบัตรประชาชน (ถ้ามี)</span>
+                                    <input
+                                        value={walkinDraft.national_id}
+                                        aria-invalid={Boolean(walkinFieldErrors.national_id)}
+                                        onChange={(event) => setWalkinValue('national_id', event.target.value)}
+                                        placeholder="13 หลัก หรือเว้นว่างได้"
+                                    />
+                                    {walkinFieldError('national_id')}
                                 </label>
-                                <label>
-                                    <span>ชื่อ</span>
-                                    <input value={walkinDraft.first_name} onChange={(event) => setWalkinValue('first_name', event.target.value)} />
+                                <label {...walkinFieldProps('first_name')}>
+                                    <span>ชื่อ (จำเป็น)</span>
+                                    <input
+                                        value={walkinDraft.first_name}
+                                        aria-invalid={Boolean(walkinFieldErrors.first_name)}
+                                        onChange={(event) => setWalkinValue('first_name', event.target.value)}
+                                    />
+                                    {walkinFieldError('first_name')}
                                 </label>
-                                <label>
-                                    <span>นามสกุล</span>
-                                    <input value={walkinDraft.last_name} onChange={(event) => setWalkinValue('last_name', event.target.value)} />
+                                <label {...walkinFieldProps('last_name')}>
+                                    <span>นามสกุล (จำเป็น)</span>
+                                    <input
+                                        value={walkinDraft.last_name}
+                                        aria-invalid={Boolean(walkinFieldErrors.last_name)}
+                                        onChange={(event) => setWalkinValue('last_name', event.target.value)}
+                                    />
+                                    {walkinFieldError('last_name')}
                                 </label>
                                 <div className={`${styles.walkinLookupHint} ${walkinLookupStatus === 'found'
                                     ? styles.walkinLookupFound
@@ -2087,7 +2316,7 @@ export default function DashboardPage() {
                                             ? 'พบข้อมูลผู้ป่วยเดิมและเติมข้อมูลให้อัตโนมัติ'
                                             : walkinLookupStatus === 'not_found'
                                                 ? 'ยังไม่พบข้อมูลเดิม สามารถกรอกข้อมูลใหม่ต่อได้'
-                                                : 'กรอกเลขบัตรประชาชน 13 หลัก หรือชื่อและนามสกุล ระบบจะค้นหาให้อัตโนมัติ'}
+                                                : 'เลขบัตรประชาชนไม่บังคับ หากไม่มีให้กรอกชื่อและนามสกุล ข้อมูลอื่นกรอกเพิ่มได้ถ้ามี'}
                                 </div>
                                 <label>
                                     <span>วันเดือนปีเกิด</span>
@@ -2113,13 +2342,23 @@ export default function DashboardPage() {
                                         {['A', 'B', 'AB', 'O'].map((blood) => <option key={blood} value={blood}>{blood}</option>)}
                                     </select>
                                 </label>
-                                <label>
+                                <label {...walkinFieldProps('phone')}>
                                     <span>เบอร์โทร</span>
-                                    <input value={walkinDraft.phone} onChange={(event) => setWalkinValue('phone', event.target.value)} />
+                                    <input
+                                        value={walkinDraft.phone}
+                                        aria-invalid={Boolean(walkinFieldErrors.phone)}
+                                        onChange={(event) => setWalkinValue('phone', event.target.value)}
+                                    />
+                                    {walkinFieldError('phone')}
                                 </label>
-                                <label>
+                                <label {...walkinFieldProps('emergency_phone')}>
                                     <span>เบอร์โทรฉุกเฉิน</span>
-                                    <input value={walkinDraft.emergency_phone} onChange={(event) => setWalkinValue('emergency_phone', event.target.value)} />
+                                    <input
+                                        value={walkinDraft.emergency_phone}
+                                        aria-invalid={Boolean(walkinFieldErrors.emergency_phone)}
+                                        onChange={(event) => setWalkinValue('emergency_phone', event.target.value)}
+                                    />
+                                    {walkinFieldError('emergency_phone')}
                                 </label>
                                 <label>
                                     <span>แพ้ยา</span>
@@ -2137,7 +2376,7 @@ export default function DashboardPage() {
                             </section>
 
                             <section className={styles.walkinSection}>
-                            <div className={styles.walkinSectionTitle}>Vital signs (สัญญาณชีพ) และ CC (อาการสำคัญ)</div>
+                            <div className={styles.walkinSectionTitle}>Vital signs (สัญญาณชีพ) และ CC (อาการสำคัญ) — จำเป็นต้องกรอกทุกช่อง</div>
                             <div className={styles.walkinGrid}>
                                 {pendingWalkinMeasurements.length > 0 && (
                                     <label className={styles.walkinWideField}>
@@ -2157,37 +2396,81 @@ export default function DashboardPage() {
                                         </select>
                                     </label>
                                 )}
-                                <label>
-                                    <span>น้ำหนัก</span>
-                                    <input value={walkinDraft.weight} onChange={(event) => setWalkinValue('weight', event.target.value)} placeholder="กก." readOnly={Boolean(walkinDraft.hardware_message_id)} />
+                                <label {...walkinFieldProps('weight')}>
+                                    <span>น้ำหนัก (จำเป็น)</span>
+                                    <input
+                                        value={walkinDraft.weight}
+                                        aria-invalid={Boolean(walkinFieldErrors.weight)}
+                                        onChange={(event) => setWalkinValue('weight', event.target.value)}
+                                        placeholder="กก."
+                                        readOnly={Boolean(walkinDraft.hardware_message_id)}
+                                    />
+                                    {walkinFieldError('weight')}
                                 </label>
-                                <label>
-                                    <span>ส่วนสูง</span>
-                                    <input value={walkinDraft.height} onChange={(event) => setWalkinValue('height', event.target.value)} placeholder="ซม." readOnly={Boolean(walkinDraft.hardware_message_id)} />
+                                <label {...walkinFieldProps('height')}>
+                                    <span>ส่วนสูง (จำเป็น)</span>
+                                    <input
+                                        value={walkinDraft.height}
+                                        aria-invalid={Boolean(walkinFieldErrors.height)}
+                                        onChange={(event) => setWalkinValue('height', event.target.value)}
+                                        placeholder="ซม."
+                                        readOnly={Boolean(walkinDraft.hardware_message_id)}
+                                    />
+                                    {walkinFieldError('height')}
                                 </label>
                                 <label>
                                     <span>BMI — ดัชนีมวลกาย</span>
                                     <input value={walkinDraft.bmi} readOnly placeholder="คำนวณอัตโนมัติ" />
                                 </label>
-                                <label>
-                                    <span>TP — อุณหภูมิร่างกาย (°C)</span>
-                                    <input value={walkinDraft.temperature} onChange={(event) => setWalkinValue('temperature', event.target.value)} placeholder="36.8" />
+                                <label {...walkinFieldProps('temperature')}>
+                                    <span>TP — อุณหภูมิร่างกาย (°C) (จำเป็น)</span>
+                                    <input
+                                        value={walkinDraft.temperature}
+                                        aria-invalid={Boolean(walkinFieldErrors.temperature)}
+                                        onChange={(event) => setWalkinValue('temperature', event.target.value)}
+                                        placeholder="36.8"
+                                    />
+                                    {walkinFieldError('temperature')}
                                 </label>
-                                <label>
-                                    <span>HR — อัตราการเต้นหัวใจ (ครั้ง/นาที)</span>
-                                    <input value={walkinDraft.heart_rate} onChange={(event) => setWalkinValue('heart_rate', event.target.value)} placeholder="80" />
+                                <label {...walkinFieldProps('heart_rate')}>
+                                    <span>HR — อัตราการเต้นหัวใจ (ครั้ง/นาที) (จำเป็น)</span>
+                                    <input
+                                        value={walkinDraft.heart_rate}
+                                        aria-invalid={Boolean(walkinFieldErrors.heart_rate)}
+                                        onChange={(event) => setWalkinValue('heart_rate', event.target.value)}
+                                        placeholder="80"
+                                    />
+                                    {walkinFieldError('heart_rate')}
                                 </label>
-                                <label>
-                                    <span>RR — อัตราการหายใจ (ครั้ง/นาที)</span>
-                                    <input value={walkinDraft.respiratory_rate} onChange={(event) => setWalkinValue('respiratory_rate', event.target.value)} placeholder="18" />
+                                <label {...walkinFieldProps('respiratory_rate')}>
+                                    <span>RR — อัตราการหายใจ (ครั้ง/นาที) (จำเป็น)</span>
+                                    <input
+                                        value={walkinDraft.respiratory_rate}
+                                        aria-invalid={Boolean(walkinFieldErrors.respiratory_rate)}
+                                        onChange={(event) => setWalkinValue('respiratory_rate', event.target.value)}
+                                        placeholder="18"
+                                    />
+                                    {walkinFieldError('respiratory_rate')}
                                 </label>
-                                <label>
-                                    <span>BP — ความดันโลหิต (มม.ปรอท)</span>
-                                    <input value={walkinDraft.bp} onChange={(event) => setWalkinValue('bp', event.target.value)} placeholder="120/80" />
+                                <label {...walkinFieldProps('bp')}>
+                                    <span>BP — ความดันโลหิต (มม.ปรอท) (จำเป็น)</span>
+                                    <input
+                                        value={walkinDraft.bp}
+                                        aria-invalid={Boolean(walkinFieldErrors.bp)}
+                                        onChange={(event) => setWalkinValue('bp', event.target.value)}
+                                        placeholder="120/80"
+                                    />
+                                    {walkinFieldError('bp')}
                                 </label>
-                                <label className={styles.walkinWideField}>
-                                    <span>CC — อาการสำคัญที่มาพบแพทย์</span>
-                                    <textarea value={walkinDraft.chief_complaint} onChange={(event) => setWalkinValue('chief_complaint', event.target.value)} placeholder="อาการสำคัญ" />
+                                <label className={`${styles.walkinWideField} ${walkinFieldErrors.chief_complaint ? styles.walkinFieldInvalid : ''}`} data-walkin-invalid={Boolean(walkinFieldErrors.chief_complaint)}>
+                                    <span>CC — อาการสำคัญที่มาพบแพทย์ (จำเป็น)</span>
+                                    <textarea
+                                        value={walkinDraft.chief_complaint}
+                                        aria-invalid={Boolean(walkinFieldErrors.chief_complaint)}
+                                        onChange={(event) => setWalkinValue('chief_complaint', event.target.value)}
+                                        placeholder="อาการสำคัญ"
+                                    />
+                                    {walkinFieldError('chief_complaint')}
                                 </label>
                             </div>
                             </section>
@@ -2195,7 +2478,7 @@ export default function DashboardPage() {
 
                         <div className={styles.walkinFooter}>
                             <button type="button" className={styles.walkinGhostBtn} onClick={() => setWalkinOpen(false)}>ยกเลิก</button>
-                            <button type="button" className={styles.walkinSaveBtn} onClick={saveWalkinQueue} disabled={walkinSaving || !validReceiptQueue}>
+                            <button type="button" className={styles.walkinSaveBtn} onClick={saveWalkinQueue} disabled={walkinSaving}>
                                 {walkinSaving ? 'กำลังบันทึก...' : 'บันทึกคิว B'}
                             </button>
                         </div>

@@ -602,6 +602,53 @@
   padding: 24px;
 }
 
+.walkinMeasurementNotice {
+  position: fixed;
+  top: 94px;
+  right: 24px;
+  z-index: 1100;
+  display: grid;
+  gap: 4px;
+  width: min(380px, calc(100vw - 32px));
+  padding: 14px 18px;
+  border: 1px solid #99f6e4;
+  border-left: 5px solid #0f766e;
+  border-radius: 12px;
+  background: #f0fdfa;
+  color: #134e4a;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.2);
+  animation: walkinNoticeIn 180ms ease-out;
+}
+
+.walkinMeasurementNotice strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.walkinMeasurementNotice span {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@keyframes walkinNoticeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .walkinMeasurementNotice {
+    top: 80px;
+    right: 12px;
+  }
+}
+
 .walkinModal {
   width: min(1040px, 96vw);
   max-height: 90vh;
@@ -701,6 +748,21 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+}
+
+.walkinGrid .walkinFieldInvalid input,
+.walkinGrid .walkinFieldInvalid select,
+.walkinGrid .walkinFieldInvalid textarea {
+  border-color: #dc2626 !important;
+  background: #fff7f7 !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12) !important;
+}
+
+.walkinFieldError {
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
 }
 
 .walkinGrid span {
