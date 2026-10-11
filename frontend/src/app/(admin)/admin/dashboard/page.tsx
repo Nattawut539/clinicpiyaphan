@@ -1803,7 +1803,7 @@ export default function DashboardPage() {
                     if (noticeTimer !== undefined) window.clearTimeout(noticeTimer);
                     noticeTimer = window.setTimeout(() => {
                         setWalkinMeasurementNotice(null);
-                    }, 3000);
+                    }, 5000);
                 }
             } catch (error) {
                 console.error('refreshPendingWalkinMeasurements:', error);
